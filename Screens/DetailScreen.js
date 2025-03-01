@@ -5,25 +5,25 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const dataProfile = [
   {
-    avatar:require('../assets/avt.png'),
+    avatar:require('../Images/avt.png'),
     name :'John Nguyen'
   }
 ]
 const dataPic = [
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   }
 
 ]
@@ -52,7 +52,7 @@ const Detail = () => {
   return(
     <View style={styles.container}>
     <View style={styles.header}>
-      <TouchableOpacity style={{position:'absolute', left:10}}><Image source={require('../icons/back.png')} /></TouchableOpacity>
+      <TouchableOpacity style={{position:'absolute', left:10}}><Image source={require('../icons/back.png')}  style={{width:25,height:20}} /></TouchableOpacity>
       <Text style={{color:'#086DC0', fontWeight:'bold', fontSize:15}}>Details</Text>
       <View style={{flexDirection:'row', position:'absolute', right:10}}>
       <TouchableOpacity
@@ -90,7 +90,7 @@ const Detail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Notification.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Notification.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Mute messages</Text>
         </View>
         <TouchableOpacity 
@@ -115,7 +115,7 @@ const Detail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Star.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Star.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Mark as bestfriend</Text>
         </View>
         <TouchableOpacity 
@@ -140,12 +140,12 @@ const Detail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Photos.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Photos/Videos, Files, Links</Text>
         </View>
         <TouchableOpacity 
           style={{width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10, justifyContent:'center',alignItems:'center'}}>
-          <Image source={require('../assets/arrow.png')} />
+          <Image source={require('../icons/arrow.png')} />
         </TouchableOpacity>
         </View>
 
@@ -167,7 +167,7 @@ const Detail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Trash.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Trash.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Delete chat history</Text>
         </View>
       </TouchableOpacity>

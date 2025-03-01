@@ -43,7 +43,7 @@ const SignupScreen = () => {
 
         {/* Login Button */}
         <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-          <Image source={require('../assets/loginBtn.png')} style={styles.loginImage} />
+          <Image source={require('../icons/loginBtn.png')} style={styles.loginImage} />
         </TouchableOpacity>
         
         {/* Sign Up Section */}
@@ -56,7 +56,7 @@ const SignupScreen = () => {
 
         {/* Google Sign In Button */}
         <TouchableOpacity style={styles.googleSignInBtn}>
-          <Image source={require('../assets/google_icon.png')} style={styles.googleIcon} />
+          <Image source={require('../icons/google_icon.png')} style={styles.googleIcon} />
           <Text style={styles.googleSignInText}>Sign in with Google</Text>
         </TouchableOpacity>
       </ImageBackground>

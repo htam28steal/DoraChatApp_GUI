@@ -3,12 +3,12 @@ import {
   View, Text, Image, StyleSheet, TouchableOpacity, 
   TextInput, SafeAreaView, ImageBackground 
 } from 'react-native';
-import bg from '../assets/bg.png';
+import bg from '../Images/bground.png';
 
 const dataPerson = [
   {
     name: 'John Nguyen',
-    avt: require('../assets/avt.png'),
+    avt: require('../Images/avt.png'),
     phoneNum: '0923090945'
   }
 ];
@@ -77,7 +77,7 @@ const HomeScreen = () => {
           <Image source={require('../icons/searchicon.png')} style={styles.icon} />
           <Image source={require('../icons/Home.png')} style={styles.icon} />
           <Image source={require('../icons/friends.png')} style={styles.icon} />
-          <Image source={require('../assets/avt.png')} style={styles.icon} />
+          <Image source={require('../Images/avt.png')} style={styles.icon} />
         </View>
       </ImageBackground>
     </SafeAreaView>

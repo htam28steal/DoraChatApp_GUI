@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView, ImageBackground } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import bg from '../assets/bg.png';
+import bg from '../Images/bground.png';
 
 const WelcomeScreen = () => {
   const navigation = useNavigation();
@@ -21,7 +21,7 @@ const WelcomeScreen = () => {
 
         {/* Welcome Message */}
         <View style={styles.welcomeSection}>
-          <Image source={require('../assets/Cat.png')} style={styles.catImage} />
+          <Image source={require('../Images/Cat.png')} style={styles.catImage} />
           <View>
             <Text style={styles.welcomeTitle}>
               WELCOME TO <Text style={{color:'#086DC0'}}>D<Text style={{color:'#FFBD59'}}>O</Text>RA</Text>
@@ -35,7 +35,7 @@ const WelcomeScreen = () => {
           style={styles.getStartedBtn} 
           onPress={handleGetStarted}
         >
-          <Image source={require('../assets/rocket.png')} style={styles.rocketIcon} />
+          <Image source={require('../icons/rocket.png')} style={styles.rocketIcon} />
           <Text style={styles.getStartedText}>Get started</Text>
         </TouchableOpacity>
       </ImageBackground>

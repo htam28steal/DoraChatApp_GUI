@@ -7,7 +7,7 @@ import {
   Send,
   Bubble,
 } from 'react-native-gifted-chat';
-import bg from '../assets/bg.png';
+import bg from '../Images/bground.png';
 
 const ChatScreen = () => {
   const [messages, setMessages] = useState([]);
@@ -21,7 +21,7 @@ const ChatScreen = () => {
         user: {
           _id: 2,
           name: 'John Nguyen',
-          avatar: require('../assets/avt.png'),
+          avatar: require('../Images/avt.png'),
         },
       },
     ]);
@@ -32,7 +32,7 @@ const ChatScreen = () => {
   }, []);
 
   const dataProfile = {
-    avatar: require('../assets/avt.png'),
+    avatar: require('../Images/avt.png'),
     name: 'John Nguyen',
   };
 
@@ -64,17 +64,17 @@ const ChatScreen = () => {
   const renderComposer = (props) => (
     <View style={styles.inputContainer}>
       <TouchableOpacity style={styles.iconButton} onPress={() => console.log('Attachment pressed')}>
-        <Image source={require('../assets/attachment.png')} style={styles.icon} />
+        <Image source={require('../icons/attachment.png')} style={styles.icon} />
       </TouchableOpacity>
 
       <Composer {...props} textInputStyle={styles.input} placeholder="Message" />
 
       <TouchableOpacity style={styles.iconButton} onPress={() => console.log('Emoji pressed')}>
-        <Image source={require('../assets/emoji.png')} style={styles.icon} />
+        <Image source={require('../icons/emoji.png')} style={styles.icon} />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.iconButton} onPress={() => console.log('Gallery pressed')}>
-        <Image source={require('../assets/gallery.png')} style={styles.icon} />
+        <Image source={require('../icons/gallery.png')} style={styles.icon} />
       </TouchableOpacity>
     </View>
   );

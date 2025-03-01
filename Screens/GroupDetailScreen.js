@@ -5,25 +5,25 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const dataGroupProfile = [
   {
-    avatar:require('../assets/GroupAvt.png'),
+    avatar:require('../Images/GroupAvt.png'),
     name :'John Nguyen'
   }
 ]
 const dataPic = [
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   },
   {
-    url:require('../assets/pic1.png')
+    url:require('../Images/pic1.png')
   }
 
 ]
@@ -52,7 +52,7 @@ const GroupDetail = () => {
   return(
     <View style={styles.container}>
     <View style={styles.header}>
-      <TouchableOpacity style={{position:'absolute', left:10}}><Image source={require('../icons/back.png')} /></TouchableOpacity>
+      <TouchableOpacity style={{position:'absolute', left:10}}><Image source={require('../icons/back.png')} style={{width:25,height:20}} /></TouchableOpacity>
       <Text style={{color:'#086DC0', fontWeight:'bold', fontSize:15}}>Details</Text>
       <View style={{flexDirection:'row', position:'absolute', right:10}}>
       <TouchableOpacity
@@ -62,7 +62,7 @@ const GroupDetail = () => {
         justifyContent:'center',
         alignItems:'center',
         borderRadius:15,
-        marginRight:5}}><Image source={require('../assets/Add.png')} /></TouchableOpacity>
+        marginRight:5}}><Image source={require('../icons/addFriend.png')} style={{width:14,height:14}} /></TouchableOpacity>
       <TouchableOpacity 
       style={{backgroundColor:'#086DC0',
         width:30,
@@ -90,7 +90,7 @@ const GroupDetail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Notification.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Notification.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Mute messages</Text>
         </View>
         <TouchableOpacity 
@@ -115,7 +115,7 @@ const GroupDetail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Star.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Star.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Mark as bestfriend</Text>
         </View>
         <TouchableOpacity 
@@ -140,12 +140,12 @@ const GroupDetail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Photos.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Photos/Videos, Files, Links</Text>
         </View>
         <TouchableOpacity 
           style={{width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10, justifyContent:'center',alignItems:'center'}}>
-          <Image source={require('../assets/arrow.png')} />
+          <Image source={require('../icons/arrow.png')} />
         </TouchableOpacity>
         </View>
 
@@ -169,19 +169,19 @@ const GroupDetail = () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../assets/Photos.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Quyền quản trị</Text>
         </View>
         <TouchableOpacity 
           style={{width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10, justifyContent:'center',alignItems:'center'}}>
-          <Image source={require('../assets/arrow.png')} />
+          <Image source={require('../icons/arrow.png')} />
         </TouchableOpacity>
         </View>
         <View style={styles.authority}>
             <TouchableOpacity style={styles.authorityOptions}>
               <View style={styles.authorityIcon}>
                 <View style={styles.authorityBorderIcon}>
-                  <Image source={require('../assets/Verify.png')} />
+                  <Image source={require('../icons/Verify.png')} />
                 </View>
               </View>
               <Text style={styles.authorityText}>Phê duyệt thành viên </Text>
@@ -190,7 +190,7 @@ const GroupDetail = () => {
                 <View style={styles.authority}>
             <TouchableOpacity style={styles.authorityOptions}>
               <View style={styles.authorityIcon}>
-                  <Image source={require('../assets/Branches.png')} />
+                  <Image source={require('../icons/Branches.png')} />
               </View>
               <Text style={styles.authorityText}>Uỷ quyền </Text>
             </TouchableOpacity>
@@ -199,7 +199,7 @@ const GroupDetail = () => {
             <TouchableOpacity style={styles.authorityOptions}>
               <View style={styles.authorityIcon}>
                 <View style={styles.authorityBorderIcon}>
-                  <Image source={require('../assets/Disband.png')} />
+                  <Image source={require('../icons/Disband.png')} />
                 </View>
               </View>
               <Text style={styles.authorityText}>Giải tán nhóm </Text>
@@ -213,7 +213,7 @@ const GroupDetail = () => {
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
-            <Image source={require('../assets/Trash.png')} style={{alignSelf:'center'}} />
+            <Image source={require('../icons/Trash.png')} style={{alignSelf:'center'}} />
           </View>
           <Text style={{color:'#086DC0', fontSize:15}}>Delete chat history</Text>
         </View>

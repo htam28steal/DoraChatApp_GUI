@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, ImageBackground } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import bg from '../assets/bg.png';
+import bg from '../Images/bground.png';
 
 const LoginScreen = () => {
   const navigation = useNavigation();
