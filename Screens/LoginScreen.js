@@ -1,15 +1,55 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, ImageBackground } from 'react-native';
+import React, { useState } from 'react'; // Import useState
+import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, ImageBackground, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import bg from '../Images/bground.png';
+import api from '../api/apiConfig'; // If you plan to use it for API calls, make sure it's properly set up.
 
-const SignupScreen = () => {
+const LoginScreen = () => {
   const navigation = useNavigation();
+  const [username, setUsername] = useState(''); // State for username
+  const [password, setPassword] = useState(''); // State for password
+  const [loading, setLoading] = useState(false); // State for loading (if you want to show loading spinner later)
 
-  const handleLogin = () => {
-    navigation.navigate("WelcomeScreen"); // Navigate to WelcomeScreen
+  const handleLogin = async () => {
+    // Step 1: Check if username and password are entered
+    if (!username || !password) {
+      Alert.alert('Error', 'Please enter both username and password');
+      return; // Do not continue if validation fails
+    }
+  
+    try {
+      // Step 2: Set loading state to true
+      setLoading(true);
+  
+      // Step 3: Send the login request
+      const response = await api.post('/auth/login', {
+        username,
+        password
+      });
+  
+      // Step 4: If login is successful, store user data and token in AsyncStorage
+      if (response.data && response.data.token) {
+        await AsyncStorage.setItem('userToken', response.data.token);
+        await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+  
+        // Step 5: Navigate to the WelcomeScreen
+        navigation.navigate("WelcomeScreen");
+      } else {
+        // If no token is returned, something went wrong
+        Alert.alert('Error', 'Invalid username or password');
+      }
+    } catch (error) {
+      // Step 6: Handle any errors from the API request
+      Alert.alert(
+        'Login Failed',
+        error.response?.data?.message || 'An error occurred during login'
+      );
+    } finally {
+      // Step 7: Set loading state back to false after the request is done
+      setLoading(false);
+    }
   };
-
+  
   const handleSignup = () => {
     navigation.navigate("SignupScreen"); // Navigate to SignupScreen (update if needed)
   };
@@ -29,12 +69,16 @@ const SignupScreen = () => {
             style={styles.usernameInput} 
             placeholder="Username" 
             placeholderTextColor="#666"
+            value={username} // Bind username state to input field
+            onChangeText={setUsername} // Update state when input changes
           />
           <TextInput 
             style={styles.pwdInput} 
             placeholder="Password" 
             placeholderTextColor="#666"
             secureTextEntry={true}
+            value={password} // Bind password state to input field
+            onChangeText={setPassword} // Update state when input changes
           />
           <TouchableOpacity style={styles.forgotPasswordBtn}>
             <Text style={styles.forgotPasswordText}>Forgot password</Text>
@@ -185,4 +229,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SignupScreen;
+export default LoginScreen;

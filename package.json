@@ -12,6 +12,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
     "@expo/vector-icons": "^14.0.2",
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-masked-view/masked-view": "^0.3.2",
     "@react-navigation/elements": "^2.2.5",
     "@react-navigation/native": "^7.0.14",
@@ -19,7 +20,7 @@
     "@react-navigation/stack": "^7.1.1",
     "@reduxjs/toolkit": "*",
     "@types/react": "18.2.25",
-    "axios": "*",
+    "axios": "^1.8.3",
     "expo": "~52.0.37",
     "expo-linear-gradient": "~14.0.2",
     "expo-status-bar": "~2.0.1",

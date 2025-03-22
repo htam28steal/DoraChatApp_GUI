@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, SafeAreaVie
 import { useNavigation } from '@react-navigation/native';
 import bg from '../Images/bground.png';
 
-const LoginScreen = () => {
+const SignupScreen = () => {
   const navigation = useNavigation();
 
   const handleNext = () => {
@@ -20,7 +20,7 @@ const LoginScreen = () => {
         </View>
 
         {/* Input Fields */}
-        <View style={styles.loginSection}>
+        <View style={styles.signUpSection}>
           <TextInput 
             style={styles.usernameInput} 
             placeholder="Enter your mail or phone" 
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     height: 60,
     marginBottom: 15,
   },
-  loginSection: {
+  signUpSection: {
     width: '100%',
     alignItems: 'center',
     height: 80,
@@ -127,4 +127,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default SignupScreen;
