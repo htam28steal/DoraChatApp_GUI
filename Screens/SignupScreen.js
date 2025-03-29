@@ -1,14 +1,30 @@
-import React from 'react';
+
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, ImageBackground } from 'react-native';
+import { Dropdown } from 'react-native-element-dropdown';
 import { useNavigation } from '@react-navigation/native';
 import bg from '../Images/bground.png';
+import React, { useState } from 'react';
+import DatePicker from "react-datepicker";
+
+import "react-datepicker/dist/react-datepicker.css";
+
+const genderData = [
+  { label: 'Male', value: 'male' },
+  { label: 'Female', value: 'female' },
+];
+
+
 
 const SignupScreen = () => {
+  const [gender, setGender] = useState(null); 
   const navigation = useNavigation();
+
+  const [startDate, setStartDate] = useState(new Date());
 
   const handleNext = () => {
     navigation.navigate("OtpScreen"); // Navigate to OtpScreen
   };
+  
 
   return (
     <SafeAreaView style={styles.container}>
@@ -21,6 +37,39 @@ const SignupScreen = () => {
 
         {/* Input Fields */}
         <View style={styles.signUpSection}>
+            <TextInput 
+              style={styles.usernameInput} 
+              placeholder="First name" 
+              placeholderTextColor="#666"
+            />
+            <TextInput 
+            style={styles.usernameInput} 
+            placeholder="Last name" 
+            placeholderTextColor="#666"
+            />
+          <View style={styles.inputContainer}>
+          <Dropdown
+            style={styles.halfInput}
+            data={genderData}
+            labelField="label"
+            valueField="value"
+            placeholder="Gender"
+            value={gender}
+            onChange={item => {
+              setGender(item.value);
+            }}
+            selectedTextStyle={{ color: '#333', fontSize: 14 }}
+            placeholderStyle={{ color: '#666', fontSize: 14 }}
+          />
+  
+    <DatePicker
+      showIcon
+      selected={startDate}
+      onChange={(date) => setStartDate(date)}
+      icon="fa fa-calendar"
+    />
+          </View>
+
           <TextInput 
             style={styles.usernameInput} 
             placeholder="Enter your mail or phone" 
@@ -29,7 +78,7 @@ const SignupScreen = () => {
         </View>
 
         {/* Next Button */}
-        <TouchableOpacity style={styles.loginBtn} onPress={handleNext}>
+        <TouchableOpacity style={styles.signupBtn} onPress={handleNext}>
           <Image source={require('../icons/next.png')} style={styles.loginImage} />
           <Text style={styles.nextText}>Next</Text>
         </TouchableOpacity>
@@ -78,12 +127,13 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     height: 80,
+    marginBottom:100
   },
   usernameInput: {
     borderWidth: 1,
     borderColor: '#dcdcdc',
-    borderRadius: 30,
-    width: 320,
+    borderRadius: 10,
+    width: 340,
     height: 33,
     backgroundColor: '#fff',
     fontSize: 14,
@@ -91,14 +141,15 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     paddingTop: 5,
     paddingBottom: 5,
+    marginBottom:20
   },
-  loginBtn: {
+  signupBtn: {
     backgroundColor: '#086DC0',
     width: 100,
     height: 40,
     justifyContent: 'center',
     borderRadius: 20,
-    marginTop: 15,
+    marginTop: 30,
     marginBottom: 30,
     flexDirection: 'row',
     alignItems: 'center',
@@ -116,6 +167,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
+    width:360,
+    marginBottom:10
   },
   noAccountText: {
     fontSize: 12,
@@ -125,6 +178,28 @@ const styles = StyleSheet.create({
     color: '#086DC0',
     fontWeight: 'bold',
   },
+  inputContainer:{
+    flexDirection:'row',
+    justifyContent:'center',
+    width:320,
+
+    marginBottom:20
+
+  },
+  halfInput:{
+    borderWidth: 1,
+    borderColor: '#dcdcdc',
+    borderRadius: 10,
+    width: 160,
+    height: 33,
+    backgroundColor: '#fff',
+    fontSize: 14,
+    color: '#333',
+    paddingLeft: 10,
+    paddingTop: 5,
+    paddingBottom: 5,
+    marginRight:10
+  }
 });
 
 export default SignupScreen;
