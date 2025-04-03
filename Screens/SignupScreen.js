@@ -1,99 +1,175 @@
+  import {
+    View,
+    Text,
+    Image,
+    StyleSheet,
+    TouchableOpacity,
+    TextInput,
+    SafeAreaView,
+    ImageBackground,
+    Alert,
+    ActivityIndicator,
+    Platform,
+  } from 'react-native';
+  import { Dropdown } from 'react-native-element-dropdown';
+  import { useNavigation } from '@react-navigation/native';
+  import bg from '../Images/bground.png';
+  import React, { useState } from 'react';
+  import axios from '../api/apiConfig'
+  import DatePicker from 'react-native-date-picker'
 
-import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, SafeAreaView, ImageBackground } from 'react-native';
-import { Dropdown } from 'react-native-element-dropdown';
-import { useNavigation } from '@react-navigation/native';
-import bg from '../Images/bground.png';
-import React, { useState } from 'react';
-import DatePicker from "react-datepicker";
 
-import "react-datepicker/dist/react-datepicker.css";
+  const genderData = [
+    { label: 'Male', value: 'male' },
+    { label: 'Female', value: 'female' },
+  ];
 
-const genderData = [
-  { label: 'Male', value: 'male' },
-  { label: 'Female', value: 'female' },
-];
+  const birthday = [
+    { date: "22/12/2000"}
+  ]
 
+  const SignupScreen = () => {
+    const navigation = useNavigation();
+    const [date, setDate] = useState(new Date())
+    const [open, setOpen] = useState(false)
+    const [loading, setLoading] = useState(false);
 
+    const [formData, setFormData] = useState({
+      firstName: '',
+      lastName: '',
+      contact: '',
+      gender: null,
+      dateOfBirth: new Date(),
+      bio: '',
+    });
 
-const SignupScreen = () => {
-  const [gender, setGender] = useState(null); 
-  const navigation = useNavigation();
+    const handleInputChange = (field, value) => {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+      }));
+    };
 
-  const [startDate, setStartDate] = useState(new Date());
+    const validateForm = () => {
+      const { firstName, lastName, contact, gender, dateOfBirth } = formData;
+      if (!firstName || !lastName || !contact || !gender || !dateOfBirth) {
+        Alert.alert('Validation Error', 'Please fill in all required fields.');
+        return false;
+      }
+      return true;
+    };
 
-  const handleNext = () => {
-    navigation.navigate("OtpScreen"); // Navigate to OtpScreen
-  };
-  
+    const handleNext = async () => {
+      if (!validateForm()) return;
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
-        {/* Logo & Slogan */}
-        <View style={styles.banner}>
-          <Image source={require('../Images/logoDoRa.png')} style={styles.logo} />
-          <Text style={styles.statement}>Everywhere you want to be</Text>
-        </View>
+      try {
+        setLoading(true);
+          const registrationResponse = await axios.post('/api/auth/register', {
+            contact: formData.contact,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            password: 'Temporary@123', 
+            dateOfBirth: formData.dateOfBirth.toISOString().split('T')[0],
+            gender: formData.gender,
+            bio: formData.bio || '',
+          });
 
-        {/* Input Fields */}
-        <View style={styles.signUpSection}>
-            <TextInput 
-              style={styles.usernameInput} 
-              placeholder="First name" 
-              placeholderTextColor="#666"
-            />
-            <TextInput 
-            style={styles.usernameInput} 
-            placeholder="Last name" 
-            placeholderTextColor="#666"
-            />
-          <View style={styles.inputContainer}>
-          <Dropdown
-            style={styles.halfInput}
-            data={genderData}
-            labelField="label"
-            valueField="value"
-            placeholder="Gender"
-            value={gender}
-            onChange={item => {
-              setGender(item.value);
-            }}
-            selectedTextStyle={{ color: '#333', fontSize: 14 }}
-            placeholderStyle={{ color: '#666', fontSize: 14 }}
-          />
-  
-    <DatePicker
-      showIcon
-      selected={startDate}
-      onChange={(date) => setStartDate(date)}
-      icon="fa fa-calendar"
-    />
+              if (registrationResponse.data.message === 'Đã lưu thông tin người dùng') {
+                navigation.navigate('OtpScreen', {
+                  email: formData.contact
+                });
+              
+            } 
+      } catch (error) {
+        console.error('Registration error:', error.response?.data || error);
+        const errorMessage = error.response?.data?.error || 'Registration failed. Please try again.';
+        Alert.alert('Error', errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
+          <View style={styles.banner}>
+            <Image source={require('../Images/logoDoRa.png')} style={styles.logo} />
+            <Text style={styles.statement}>Everywhere you want to be</Text>
           </View>
 
-          <TextInput 
-            style={styles.usernameInput} 
-            placeholder="Enter your mail or phone" 
-            placeholderTextColor="#666"
-          />
-        </View>
+          <View style={styles.signUpSection}>
+            <TextInput
+              style={styles.usernameInput}
+              placeholder="First name"
+              placeholderTextColor="#666"
+              value={formData.firstName}
+              onChangeText={(text) => handleInputChange('firstName', text)}
+            />
+            <TextInput
+              style={styles.usernameInput}
+              placeholder="Last name"
+              placeholderTextColor="#666"
+              value={formData.lastName}
+              onChangeText={(text) => handleInputChange('lastName', text)}
+            />
+      
+            <View style={styles.inputContainer}>
+              <Dropdown
+                style={styles.halfInput}
+                data={genderData}
+                labelField="label"
+                valueField="value"
+                placeholder="Gender"
+                value={formData.gender}
+                onChange={(item) => handleInputChange('gender', item.value)}
+                selectedTextStyle={{ color: '#333', fontSize: 14 }}
+                placeholderStyle={{ color: '#666', fontSize: 14 }}
+              />
+            <DatePicker date={date} onDateChange={setDate} />
 
-        {/* Next Button */}
-        <TouchableOpacity style={styles.signupBtn} onPress={handleNext}>
-          <Image source={require('../icons/next.png')} style={styles.loginImage} />
-          <Text style={styles.nextText}>Next</Text>
-        </TouchableOpacity>
-        
-        {/* Sign In Section */}
-        <View style={styles.signInSection}>
-          <Text style={styles.noAccountText}>Already have an account? </Text>
-          <TouchableOpacity>
-            <Text style={styles.signInText}>Sign in</Text>
+
+            </View>
+
+            <TextInput
+              style={styles.usernameInput}
+              placeholder="Enter your mail or phone"
+              placeholderTextColor="#666"
+              value={formData.contact}
+              onChangeText={(text) => handleInputChange('contact', text)}
+            />
+
+
+
+            <TextInput
+              style={styles.usernameInput}
+              placeholder="Bio"
+              placeholderTextColor="#666"
+              value={formData.bio}
+              onChangeText={(text) => handleInputChange('bio', text)}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.signupBtn} onPress={handleNext} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Image source={require('../icons/next.png')} style={styles.loginImage} />
+                <Text style={styles.nextText}>Next</Text>
+              </>
+            )}
           </TouchableOpacity>
-        </View>
-      </ImageBackground>
-    </SafeAreaView>
-  );
-};
+
+          <View style={styles.signInSection}>
+            <Text style={styles.noAccountText}>Already have an account? </Text>
+            <TouchableOpacity>
+              <Text style={styles.signInText}>Sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </ImageBackground>
+      </SafeAreaView>
+    );
+  };
 
 const styles = StyleSheet.create({
   container: {
@@ -111,7 +187,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   statement: {
-    color: "#FFBD59",
+    color: '#FFBD59',
     fontSize: 12,
     alignSelf: 'center',
     position: 'absolute',
@@ -126,8 +202,7 @@ const styles = StyleSheet.create({
   signUpSection: {
     width: '100%',
     alignItems: 'center',
-    height: 80,
-    marginBottom:100
+    marginBottom: 100,
   },
   usernameInput: {
     borderWidth: 1,
@@ -141,7 +216,7 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     paddingTop: 5,
     paddingBottom: 5,
-    marginBottom:20
+    marginBottom: 20,
   },
   signupBtn: {
     backgroundColor: '#086DC0',
@@ -167,8 +242,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    width:360,
-    marginBottom:10
+    width: 360,
+    marginBottom: 10,
   },
   noAccountText: {
     fontSize: 12,
@@ -178,15 +253,13 @@ const styles = StyleSheet.create({
     color: '#086DC0',
     fontWeight: 'bold',
   },
-  inputContainer:{
-    flexDirection:'row',
-    justifyContent:'center',
-    width:320,
-
-    marginBottom:20
-
+  inputContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: 320,
+    marginBottom: 20,
   },
-  halfInput:{
+  halfInput: {
     borderWidth: 1,
     borderColor: '#dcdcdc',
     borderRadius: 10,
@@ -194,12 +267,10 @@ const styles = StyleSheet.create({
     height: 33,
     backgroundColor: '#fff',
     fontSize: 14,
-    color: '#333',
     paddingLeft: 10,
-    paddingTop: 5,
-    paddingBottom: 5,
-    marginRight:10
-  }
+    justifyContent: 'center',
+    marginRight: 10,
+  },
 });
 
 export default SignupScreen;
