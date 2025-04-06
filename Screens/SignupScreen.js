@@ -9,14 +9,14 @@
     ImageBackground,
     Alert,
     ActivityIndicator,
-    Platform,
+    Button
   } from 'react-native';
   import { Dropdown } from 'react-native-element-dropdown';
   import { useNavigation } from '@react-navigation/native';
   import bg from '../Images/bground.png';
   import React, { useState } from 'react';
   import axios from '../api/apiConfig'
-  import DatePicker from 'react-native-date-picker'
+  import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 
   const genderData = [
@@ -24,11 +24,34 @@
     { label: 'Female', value: 'female' },
   ];
 
-  const birthday = [
-    { date: "22/12/2000"}
-  ]
+
 
   const SignupScreen = () => {
+    const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+    const [dateOfBirth, setDateOfBirth] = useState(null);
+  
+    const showDatePicker = () => {
+      setDatePickerVisibility(true);
+    };
+  
+    const hideDatePicker = () => {
+      setDatePickerVisibility(false);
+    };
+  
+    const handleConfirm = (date) => {
+      setDateOfBirth(date);
+      hideDatePicker();
+    };
+  
+  const getFormattedDate = (date) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+
     const navigation = useNavigation();
     const [date, setDate] = useState(new Date())
     const [open, setOpen] = useState(false)
@@ -69,7 +92,7 @@
             firstName: formData.firstName,
             lastName: formData.lastName,
             password: 'Temporary@123', 
-            dateOfBirth: formData.dateOfBirth.toISOString().split('T')[0],
+            dateOfBirth: formData.dateOfBirth,
             gender: formData.gender,
             bio: formData.bio || '',
           });
@@ -82,6 +105,9 @@
             } 
       } catch (error) {
         console.error('Registration error:', error.response?.data || error);
+        if (error.response) {
+          console.error('Error response data:', error.response.data);
+        }
         const errorMessage = error.response?.data?.error || 'Registration failed. Please try again.';
         Alert.alert('Error', errorMessage);
       } finally {
@@ -125,8 +151,26 @@
                 selectedTextStyle={{ color: '#333', fontSize: 14 }}
                 placeholderStyle={{ color: '#666', fontSize: 14 }}
               />
-            <DatePicker date={date} onDateChange={setDate} />
+               <View style={styles.halfInput}>
+                <TouchableOpacity onPress={showDatePicker}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ngày sinh"
+                    value={getFormattedDate(dateOfBirth)}
+                    editable={false} // Không cho phép chỉnh sửa trực tiếp
+                    pointerEvents="none" // Để đảm bảo TouchableOpacity bắt được sự kiện chạm
+                    
+                  />
+                </TouchableOpacity>
 
+                <DateTimePickerModal
+                  isVisible={isDatePickerVisible}
+                  mode="date"
+                  onConfirm={handleConfirm}
+                  onCancel={hideDatePicker}
+                  value={formData.dateOfBirth}
+                />
+              </View>
 
             </View>
 
@@ -271,6 +315,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
+  input:{
+    paddingTop:5,
+    marginBottom:-5
+  }
 });
 
 export default SignupScreen;

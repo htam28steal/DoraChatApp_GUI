@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView, ImageBackground } from 'react-native';
-import {
-  GiftedChat,
-  InputToolbar,
-  Composer,
-  Send,
-  Bubble,
-} from 'react-native-gifted-chat';
+
 import bg from '../Images/bground.png';
 
 const ChatScreen = () => {
@@ -116,7 +110,7 @@ const ChatScreen = () => {
         </View>
 
         {/* GiftedChat */}
-        <GiftedChat
+        {/* <GiftedChat
           messages={messages}
           onSend={onSend}
           user={{ _id: 1 }}
@@ -125,7 +119,7 @@ const ChatScreen = () => {
           renderComposer={renderComposer}
           renderSend={renderSend}
           messagesContainerStyle={{ paddingTop: 60 }}
-        />
+        /> */}
       </ImageBackground>
     </SafeAreaView>
   );
