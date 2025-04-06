@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   FlatList,
@@ -11,8 +11,72 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-export default function Screen_04({ navigation }) {
+export default function Screen_04({ navigation, route }) {
   const [screen, setScreen] = useState('home');
+  const { userInfo } = route.params;
+
+
+
+  const ChangePasswordScreen = () => {
+    // State for input fields
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    // State for error messages
+    const [currentPasswordError, setCurrentPasswordError] = useState('*');
+    const [newPasswordError, setNewPasswordError] = useState('*');
+    const [confirmPasswordError, setConfirmPasswordError] = useState('*');
+
+    // State for success message
+    const [successMessage, setSuccessMessage] = useState('');
+
+    const clearInputs = () => {
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    };
+    const clearErrors = () => {
+      setCurrentPasswordError('');
+      setNewPasswordError('');
+      setConfirmPasswordError('');
+      setSuccessMessage('');
+    };
+
+    const handleUpdatePassword = async () => {
+      // Clear previous error messages
+      clearErrors();
+
+      // Client-side validation
+      let hasError = false;
+
+      if (!currentPassword) {
+        setCurrentPasswordError('Vui lòng nhập mật khẩu hiện tại');
+        hasError = true;
+      }
+
+      if (!newPassword) {
+        setNewPasswordError('Vui lòng nhập mật khẩu mới');
+        hasError = true;
+      } else if (newPassword.length < 8) {
+        setNewPasswordError('Mật khẩu mới phải có ít nhất 8 ký tự');
+        hasError = true;
+      }
+
+      if (!confirmPassword) {
+        setConfirmPasswordError('Vui lòng xác nhận mật khẩu mới');
+        hasError = true;
+      } else if (confirmPassword !== newPassword) {
+        setConfirmPasswordError('Mật khẩu xác nhận không khớp');
+        hasError = true;
+      }
+
+      if (currentPassword != curPW) {
+        setCurrentPasswordError('Mật khẩu cũ không đúng');
+      }
+
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -42,12 +106,12 @@ export default function Screen_04({ navigation }) {
         <View style={styles.detailProfile}>
           <View style={styles.favatar}>
             <Image
-              source={require('../Images/nike.png')}
+              source={{ uri: userInfo?.avatar }}
               style={styles.imgAvatar}></Image>
           </View>
 
           <View style={styles.fName}>
-            <Text style={styles.txtName}>User Admin</Text>
+            <Text style={styles.txtName}>{userInfo?.name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text>Have a nice day !</Text>
               <TouchableOpacity>
@@ -124,7 +188,7 @@ export default function Screen_04({ navigation }) {
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>02/10/2003</Text>
+                  <Text style={styles.txtInput}>{userInfo.dateOfBirth.day}/{userInfo.dateOfBirth.month}/{userInfo.dateOfBirth.year}</Text>
                 </View>
               </View>
 
@@ -134,7 +198,7 @@ export default function Screen_04({ navigation }) {
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>Male</Text>
+                  <Text style={styles.txtInput}>{userInfo?.gender}</Text>
                 </View>
               </View>
             </View>
@@ -145,7 +209,7 @@ export default function Screen_04({ navigation }) {
               </View>
 
               <View style={styles.fTxtInput}>
-                <Text style={styles.txtInput}>userName@gmail.com</Text>
+                <Text style={styles.txtInput}>{userInfo?.username}</Text>
               </View>
             </View>
             <View style={styles.fRow}>
@@ -154,7 +218,7 @@ export default function Screen_04({ navigation }) {
               </View>
 
               <View style={styles.fTxtInput}>
-                <Text style={styles.txtInput}>Your hobbies</Text>
+                <Text style={styles.txtInput}>{userInfo?.hobbies}</Text>
               </View>
             </View>
           </Text>
@@ -193,6 +257,7 @@ export default function Screen_04({ navigation }) {
                 style={styles.iconLock}></Image>
               <Text style={styles.txtChangePass}>Đổi Mật Khẩu</Text>
             </View>
+
             <View style={styles.fRow}>
               <View style={styles.fPro}>
                 <Text style={styles.txtPro}>Current password</Text>
@@ -202,8 +267,16 @@ export default function Screen_04({ navigation }) {
                 <TextInput
                   style={styles.txtInput}
                   placeholder="Enter current password"
-                  placeholderTextColor={'#086DC0'}></TextInput>
+                  placeholderTextColor={'#086DC0'}
+                  secureTextEntry={true}></TextInput>
               </View>
+
+              <View style={styles.fRow}>
+              </View>
+            </View>
+            <View style={styles.errorContainer}>
+              <TextInput style={styles.errorText} value={'7'}
+                onChangeText={"setCurrentPasswordError"} editable={false} pointerEvents="none" />
             </View>
 
             <View style={styles.fRow}>
@@ -215,9 +288,18 @@ export default function Screen_04({ navigation }) {
                 <TextInput
                   style={styles.txtInput}
                   placeholder="Enter New password"
-                  placeholderTextColor={'#086DC0'}></TextInput>
+                  placeholderTextColor={'#086DC0'}
+                  secureTextEntry={true}></TextInput>
+              </View>
+
+              <View style={styles.fRow}>
               </View>
             </View>
+            <View style={styles.errorContainer}>
+              <TextInput style={styles.errorText} value={''}
+                onChangeText={''} editable={false} pointerEvents="none" />
+            </View>
+
             <View style={styles.fRow}>
               <View style={styles.fPro}>
                 <Text style={styles.txtPro}>Confirm password</Text>
@@ -227,9 +309,18 @@ export default function Screen_04({ navigation }) {
                 <TextInput
                   style={styles.txtInput}
                   placeholder="Enter Confirm password"
-                  placeholderTextColor={'#086DC0'}></TextInput>
+                  placeholderTextColor={'#086DC0'}
+                  secureTextEntry={true}></TextInput>
+              </View>
+
+              <View style={styles.fRow}>
               </View>
             </View>
+            <View style={styles.errorContainer}>
+              <TextInput style={styles.errorText} value={'notifi'}
+                onChangeText={'setNotifi'} editable={false} pointerEvents="none" />
+            </View>
+
             <View style={styles.header}>
               <TouchableOpacity style={styles.btnCapNhat}>
                 <Text style={styles.txtUpdate}>Cập nhật</Text>
@@ -501,4 +592,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 500,
   },
+  redAsterisk: {
+    color: 'red',
+    fontSize: 18,
+    marginLeft: 5,
+  },
+  errorContainer: {
+    paddingHorizontal: 10,
+    marginTop: 5,
+
+    marginBottom: 5,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+  }
 });
