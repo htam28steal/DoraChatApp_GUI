@@ -2,12 +2,14 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView, ImageBackground } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import bg from '../Images/bground.png';
+import { useRoute } from '@react-navigation/native';
 
 const WelcomeScreen = () => {
   const navigation = useNavigation();
-
+  const route = useRoute();
+  const { token } = route.params;
   const handleGetStarted = () => {
-    navigation.navigate("HomeScreen"); // Navigate to HomeScreen
+    navigation.navigate("HomeScreen", { token }); // Navigate to HomeScreen
   };
 
   return (
@@ -24,15 +26,15 @@ const WelcomeScreen = () => {
           <Image source={require('../Images/Cat.png')} style={styles.catImage} />
           <View>
             <Text style={styles.welcomeTitle}>
-              WELCOME TO <Text style={{color:'#086DC0'}}>D<Text style={{color:'#FFBD59'}}>O</Text>RA</Text>
+              WELCOME TO <Text style={{ color: '#086DC0' }}>D<Text style={{ color: '#FFBD59' }}>O</Text>RA</Text>
             </Text>
             <Text style={styles.subtitle}>Let's start a conversation with everyone</Text>
           </View>
         </View>
 
         {/* Get Started Button */}
-        <TouchableOpacity 
-          style={styles.getStartedBtn} 
+        <TouchableOpacity
+          style={styles.getStartedBtn}
           onPress={handleGetStarted}
         >
           <Image source={require('../icons/rocket.png')} style={styles.rocketIcon} />

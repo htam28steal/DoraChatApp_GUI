@@ -11,71 +11,87 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { updatePassword } from '../api/meSevice';
+
 export default function Screen_04({ navigation, route }) {
   const [screen, setScreen] = useState('home');
   const { userInfo } = route.params;
+  const { token } = route.params;
+  console.log(token);
+  console.log(userInfo._id);
+  const [uId, setUId] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [currentPasswordError, setCurrentPasswordError] = useState('*');
+  const [newPasswordError, setNewPasswordError] = useState('*');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('*');
+
+  // State for success message
+  const [successMessage, setSuccessMessage] = useState('');
 
 
-
-  const ChangePasswordScreen = () => {
-    // State for input fields
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-
-    // State for error messages
-    const [currentPasswordError, setCurrentPasswordError] = useState('*');
-    const [newPasswordError, setNewPasswordError] = useState('*');
-    const [confirmPasswordError, setConfirmPasswordError] = useState('*');
-
-    // State for success message
-    const [successMessage, setSuccessMessage] = useState('');
-
-    const clearInputs = () => {
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    };
-    const clearErrors = () => {
-      setCurrentPasswordError('');
-      setNewPasswordError('');
-      setConfirmPasswordError('');
-      setSuccessMessage('');
-    };
-
-    const handleUpdatePassword = async () => {
-      // Clear previous error messages
-      clearErrors();
-
-      // Client-side validation
-      let hasError = false;
-
-      if (!currentPassword) {
-        setCurrentPasswordError('Vui lòng nhập mật khẩu hiện tại');
-        hasError = true;
-      }
-
-      if (!newPassword) {
-        setNewPasswordError('Vui lòng nhập mật khẩu mới');
-        hasError = true;
-      } else if (newPassword.length < 8) {
-        setNewPasswordError('Mật khẩu mới phải có ít nhất 8 ký tự');
-        hasError = true;
-      }
-
-      if (!confirmPassword) {
-        setConfirmPasswordError('Vui lòng xác nhận mật khẩu mới');
-        hasError = true;
-      } else if (confirmPassword !== newPassword) {
-        setConfirmPasswordError('Mật khẩu xác nhận không khớp');
-        hasError = true;
-      }
-
-      if (currentPassword != curPW) {
-        setCurrentPasswordError('Mật khẩu cũ không đúng');
-      }
-
+  useEffect(() => {
+    if (userInfo && userInfo._id) {
+      setUId(userInfo._id);
     }
+  }, [userInfo]);
+
+  const clearInputs = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+  const clearErrors = () => {
+    setCurrentPasswordError('');
+    setNewPasswordError('');
+    setConfirmPasswordError('');
+    setSuccessMessage('');
+  };
+
+  const handleUpdatePassword = async () => {
+    // Clear previous error messages
+    clearErrors();
+
+    // Client-side validation
+    let hasError = false;
+
+    if (!currentPassword) {
+      setCurrentPasswordError('Vui lòng nhập mật khẩu hiện tại');
+      hasError = true;
+    }
+
+    if (!newPassword) {
+      setNewPasswordError('Vui lòng nhập mật khẩu mới');
+      hasError = true;
+    } else if (newPassword.length < 8) {
+      setNewPasswordError('Mật khẩu mới phải có ít nhất 8 ký tự');
+      hasError = true;
+    }
+
+    if (!confirmPassword) {
+      setConfirmPasswordError('Vui lòng xác nhận mật khẩu mới');
+      hasError = true;
+    } else if (confirmPassword !== newPassword) {
+
+      setConfirmPasswordError('Mật khẩu xác nhận không khớp');
+      hasError = true;
+    }
+
+
+
+    try {
+      const response = await updatePassword(uId, currentPassword, newPassword, token);
+      console.log(currentPassword)
+      console.log(newPassword)
+
+    } catch (error) {
+      console.log(error)
+    } finally {
+    }
+
+
   }
 
   return (
@@ -89,7 +105,6 @@ export default function Screen_04({ navigation, route }) {
         <Text style={styles.title}>My profile</Text>
         <View style={styles.fEdit}>
           <TouchableOpacity style={styles.btnEdit}>
-            {' '}
             <Text style={styles.txtEdit}>Chỉnh sửa</Text>{' '}
             <Image
               source={require('../icons/edit.png')}
@@ -159,7 +174,7 @@ export default function Screen_04({ navigation, route }) {
 
       <View style={styles.fDetailInfor}>
         {screen === 'home' && (
-          <Text>
+          <View>
             <View style={styles.fRow}>
               <View style={styles.fHalfRow}>
                 <View style={styles.fPro}>
@@ -198,7 +213,7 @@ export default function Screen_04({ navigation, route }) {
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>{userInfo?.gender}</Text>
+                  <Text style={styles.txtInput}>{userInfo?.gender === true ? 'Nữ' : 'Nam'}</Text>
                 </View>
               </View>
             </View>
@@ -221,11 +236,11 @@ export default function Screen_04({ navigation, route }) {
                 <Text style={styles.txtInput}>{userInfo?.hobbies}</Text>
               </View>
             </View>
-          </Text>
+          </View>
         )}
 
         {screen === 'friends' && (
-          <Text>
+          <View>
             <TouchableOpacity style={styles.fMessage}>
               <View style={styles.fRow}>
                 <Image
@@ -246,11 +261,13 @@ export default function Screen_04({ navigation, route }) {
                 </View>
               </View>
             </TouchableOpacity>
-          </Text>
+          </View>
         )}
 
         {screen === 'account' && (
-          <Text>
+
+          <View>
+
             <View style={styles.header}>
               <Image
                 source={require('../icons/lock.png')}
@@ -268,6 +285,8 @@ export default function Screen_04({ navigation, route }) {
                   style={styles.txtInput}
                   placeholder="Enter current password"
                   placeholderTextColor={'#086DC0'}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
                   secureTextEntry={true}></TextInput>
               </View>
 
@@ -275,8 +294,8 @@ export default function Screen_04({ navigation, route }) {
               </View>
             </View>
             <View style={styles.errorContainer}>
-              <TextInput style={styles.errorText} value={'7'}
-                onChangeText={"setCurrentPasswordError"} editable={false} pointerEvents="none" />
+              <TextInput style={styles.errorText} value={currentPasswordError}
+                onChangeText={setCurrentPasswordError} editable={false} pointerEvents="none" />
             </View>
 
             <View style={styles.fRow}>
@@ -289,6 +308,8 @@ export default function Screen_04({ navigation, route }) {
                   style={styles.txtInput}
                   placeholder="Enter New password"
                   placeholderTextColor={'#086DC0'}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
                   secureTextEntry={true}></TextInput>
               </View>
 
@@ -296,8 +317,8 @@ export default function Screen_04({ navigation, route }) {
               </View>
             </View>
             <View style={styles.errorContainer}>
-              <TextInput style={styles.errorText} value={''}
-                onChangeText={''} editable={false} pointerEvents="none" />
+              <TextInput style={styles.errorText} value={newPasswordError}
+                onChangeText={setNewPasswordError} editable={false} pointerEvents="none" />
             </View>
 
             <View style={styles.fRow}>
@@ -310,6 +331,8 @@ export default function Screen_04({ navigation, route }) {
                   style={styles.txtInput}
                   placeholder="Enter Confirm password"
                   placeholderTextColor={'#086DC0'}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
                   secureTextEntry={true}></TextInput>
               </View>
 
@@ -317,16 +340,16 @@ export default function Screen_04({ navigation, route }) {
               </View>
             </View>
             <View style={styles.errorContainer}>
-              <TextInput style={styles.errorText} value={'notifi'}
-                onChangeText={'setNotifi'} editable={false} pointerEvents="none" />
+              <TextInput style={styles.errorText} value={confirmPasswordError}
+                onChangeText={setConfirmPasswordError} editable={false} pointerEvents="none" />
             </View>
 
             <View style={styles.header}>
-              <TouchableOpacity style={styles.btnCapNhat}>
+              <TouchableOpacity style={styles.btnCapNhat} onPress={handleUpdatePassword}>
                 <Text style={styles.txtUpdate}>Cập nhật</Text>
               </TouchableOpacity>
             </View>
-          </Text>
+          </View>
         )}
       </View>
 

@@ -22,14 +22,13 @@ const LoginScreen = () => {
     try {
       setLoading(true);
       const response = await authService.login(username, password); // Gọi authService.login
-      console.log('Login response:', response); // Log dữ liệu trả về
       if (response && response.data?.token) { // Kiểm tra token
         const accessToken = response.data?.token; // Access token
         const refreshToken = response.data?.refreshToken; // Refresh token
         // Log để kiểm tra
         await AsyncStorage.setItem('userToken', accessToken);
         //   // await AsyncStorage.setItem('userData', JSON.stringify(response.user || {}));
-        navigation.navigate("WelcomeScreen");
+        navigation.navigate("WelcomeScreen", { token: accessToken });
       } else {
 
       }

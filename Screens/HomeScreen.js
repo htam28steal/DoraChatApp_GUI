@@ -9,6 +9,7 @@ import { getUserInfo } from '../api/meSevice';
 
 import bg from '../Images/bground.png';
 
+import { useRoute } from '@react-navigation/native';
 
 
 
@@ -31,13 +32,16 @@ const HomeScreen = () => {
   const [error, setError] = useState(null);
   const [avatar, setAvatar] = useState(true);
 
+  const route = useRoute();
+  const { token } = route.params;
 
+  console
   const hardcodedUserId = '67db942e2ff39db93c82b11d'; // ID được set cứng
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const data = await getUserInfo(hardcodedUserId);
+        const data = await getUserInfo(hardcodedUserId, token);
         setUserInfo(data);
       } catch (err) {
         setError(err);
@@ -49,7 +53,7 @@ const HomeScreen = () => {
     fetchUser();
   }, []);
 
-
+  console.log(userInfo);
   useEffect(() => {
     if (userInfo) {
       setAvatar(userInfo.avatar);
@@ -122,7 +126,7 @@ const HomeScreen = () => {
           <Image source={require('../icons/searchicon.png')} style={styles.icon} />
           <Image source={require('../icons/Home.png')} style={styles.icon} />
           <Image source={require('../icons/friends.png')} style={styles.icon} />
-          <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen', { userInfo })}>
+          <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen', { userInfo, token })}>
             <Image
               source={{ uri: avatar }}
               style={styles.icon}
