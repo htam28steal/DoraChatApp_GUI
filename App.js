@@ -15,13 +15,15 @@ import Home from './Screens/HomeScreen';
 import Detail from './Screens/DetailScreen';
 import GroupDetail from './Screens/GroupDetailScreen';
 import Chat from './Screens/ChatScreen';
+import ResetPasswordStep1 from './Screens/ResetPasswordStep1.js'
+import ResetPasswordStep2 from './Screens/ResetPasswordStep2.js'
 
 const Stack = createStackNavigator();
 
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="SignupScreen">
+      <Stack.Navigator initialRouteName="ResetPasswordStep1Screen">
         <Stack.Screen name="Screen_01" component={Screen_01} options={{ headerShown: false }} />
         <Stack.Screen name="Screen_02" component={Screen_02} options={{ headerShown: false }} />
         <Stack.Screen name="Screen_03" component={Screen_03} options={{ headerShown: false }} />
@@ -66,6 +68,16 @@ export default function App() {
         <Stack.Screen 
           name="ChatScreen" 
           component={Chat}  
+          options={{ headerShown: false }} 
+        />
+          <Stack.Screen 
+          name="ResetPasswordStep1Screen" 
+          component={ResetPasswordStep1}  
+          options={{ headerShown: false }} 
+        />
+           <Stack.Screen 
+          name="ResetPasswordStep2Screen" 
+          component={ResetPasswordStep2}  
           options={{ headerShown: false }} 
         />
       </Stack.Navigator>
