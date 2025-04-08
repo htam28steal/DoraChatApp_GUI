@@ -107,7 +107,7 @@ export default function ResetPassStep1Page() {
             {/* Login Link */}
             <View style={styles.loginLinkContainer}>
               <Text style={styles.loginText}>You had an account?</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')}>
                 <Text style={styles.loginLink}>Login</Text>
               </TouchableOpacity>
             </View>

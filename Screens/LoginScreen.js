@@ -45,7 +45,9 @@ const LoginScreen = () => {
   const handleSignup = () => {
     navigation.navigate("SignupScreen");
   };
-
+  const handleForgotPassword = () => {
+    navigation.navigate("ResetPasswordStep1Screen");
+  };
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
@@ -69,7 +71,10 @@ const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
           />
-          <TouchableOpacity style={styles.forgotPasswordBtn}>
+          <TouchableOpacity style={styles.forgotPasswordBtn}   onPress={() => {
+            console.log('Login button pressed');
+            handleForgotPassword();
+          }}>
             <Text style={styles.forgotPasswordText}>Forgot password</Text>
           </TouchableOpacity>
         </View>

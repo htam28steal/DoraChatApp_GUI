@@ -102,7 +102,7 @@ export default function ResetPassStep2Page() {
         return;
       } else {
         Alert.alert('Success', 'Information saved successfully!', [
-          { text: 'OK', onPress: () => navigation.navigate('Login') },
+          { text: 'OK', onPress: () => navigation.navigate('LoginScreen') },
         ]);
       }
     } catch (error) {
@@ -118,6 +118,7 @@ export default function ResetPassStep2Page() {
   
   return (
     <View style={styles.container}>
+        
       <View style={styles.contentWrapper}>
         {/* Left side - Form section */}
         <View style={styles.leftPanel}>
@@ -125,7 +126,7 @@ export default function ResetPassStep2Page() {
             {/* Login link */}
             <View style={styles.loginLinkContainer}>
               <Text style={styles.loginText}>You had an account?</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')}>
                 <Text style={styles.loginLink}>Login</Text>
               </TouchableOpacity>
             </View>
