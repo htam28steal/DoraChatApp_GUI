@@ -15,15 +15,7 @@ import axios from '../api/apiConfig';
 // Import your assets – adjust the paths as needed
 import Logo from '../Images/logoDoRa.png';
 
-// A simple progress step indicator component.
-// You can expand on this to visually represent multiple steps.
-const ProgressSteps = ({ currentStep }) => {
-  return (
-    <View style={styles.progressSteps}>
-      <Text>Step {currentStep} of 3</Text>
-    </View>
-  );
-};
+
 
 // A spinner component using the built-in ActivityIndicator.
 const Spinner = () => {
@@ -127,8 +119,6 @@ export default function ResetPassStep1Page() {
               </Text>
             </View>
 
-            {/* Progress steps */}
-            <ProgressSteps currentStep={1} />
 
             {/* Conditional rendering for loading spinner or form */}
             {loading ? (

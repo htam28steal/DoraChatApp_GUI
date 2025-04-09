@@ -81,7 +81,9 @@ const SignupScreen = () => {
     }
     return true;
   };
-
+  const handleLogin = () => {
+    navigation.navigate("LoginScreen");
+  };
   const handleNext = async () => {
     if (!validateForm()) return;
 
@@ -98,7 +100,7 @@ const SignupScreen = () => {
       });
 
       if (registrationResponse.data.message === 'Đã lưu thông tin người dùng') {
-        navigation.navigate('OtpScreen', {
+        navigation.navigate('WelcomeScreen', {
           email: formData.contact,
         });
       }
@@ -202,7 +204,7 @@ const SignupScreen = () => {
 
         <View style={styles.signInSection}>
           <Text style={styles.noAccountText}>Already have an account? </Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={handleLogin}>
             <Text style={styles.signInText}>Sign in</Text>
           </TouchableOpacity>
         </View>

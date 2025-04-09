@@ -19,14 +19,7 @@ import Logo from '../Images/logoDoRa.png';
 // Import your API configuration (adjust the path accordingly)
 import axios from '../api/apiConfig';
 
-// Simple progress step indicator component
-const ProgressSteps = ({ currentStep }) => {
-  return (
-    <View style={styles.progressSteps}>
-      <Text>Step {currentStep} of 3</Text>
-    </View>
-  );
-};
+
 
 // A spinner component using the built-in ActivityIndicator
 const Spinner = () => {
@@ -104,6 +97,7 @@ export default function ResetPassStep2Page() {
         Alert.alert('Success', 'Information saved successfully!', [
           { text: 'OK', onPress: () => navigation.navigate('LoginScreen') },
         ]);
+        navigation.navigate('LoginScreen');
       }
     } catch (error) {
       console.log('Error response:', error.response);
@@ -146,7 +140,6 @@ export default function ResetPassStep2Page() {
               </Text>
             </View>
 
-            <ProgressSteps currentStep={2} />
 
             {/* Show spinner if loading; otherwise display form */}
             {loading ? <Spinner /> : <ResetPassStep2Form onSubmit={handleResetStep2} />}
