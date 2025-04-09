@@ -29,7 +29,7 @@ const LoginScreen = () => {
         // Log để kiểm tra
         await AsyncStorage.setItem('userToken', accessToken);
         //   // await AsyncStorage.setItem('userData', JSON.stringify(response.user || {}));
-        navigation.navigate("WelcomeScreen");
+        navigation.navigate("HomeScreen");
       } else {
 
       }
