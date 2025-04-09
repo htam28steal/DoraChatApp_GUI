@@ -10,6 +10,7 @@ import { getUserInfo } from '../api/meSevice';
 import bg from '../Images/bground.png';
 
 import { useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 
@@ -35,15 +36,22 @@ const HomeScreen = () => {
   const route = useRoute();
   const { token } = route.params;
 
-  console
-  const hardcodedUserId = '67db942e2ff39db93c82b11d'; // ID được set cứng
-
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const data = await getUserInfo(hardcodedUserId, token);
+        const userStorage = await AsyncStorage.getItem('userData');
+        const user = JSON.parse(userStorage);
+
+        if (!user || !user._id) {
+          console.log("User or user._id is missing:", user);
+          throw new Error("Invalid user data");
+        }
+
+        const data = await getUserInfo(user._id, token);
+        console.log("User data fetched:", data);
         setUserInfo(data);
       } catch (err) {
+        console.error("Error getting user info:", err);
         setError(err);
       } finally {
         setLoading(false);
@@ -53,12 +61,12 @@ const HomeScreen = () => {
     fetchUser();
   }, []);
 
-  console.log(userInfo);
-  useEffect(() => {
-    if (userInfo) {
-      setAvatar(userInfo.avatar);
-    }
-  }, [userInfo]);
+  // console.log("User Info " + userInfo);
+  // useEffect(() => {
+  //   if (userInfo) {
+  //     setAvatar(userInfo.avatar);
+  //   }
+  // }, [userInfo]);
 
   const navigation = useNavigation();
 
@@ -95,7 +103,7 @@ const HomeScreen = () => {
             {filteredData.length > 0 ? (
               filteredData.map((item, index) => (
                 <View key={index} style={styles.personItem}>
-                  <Image source={item.avt} style={styles.personAvatar} />
+                  {/* <Image source={item.avt} style={styles.personAvatar} /> */}
                   <View>
                     <Text style={styles.personName}>{item.name}</Text>
                     <Text style={styles.personPhone}>{item.phoneNum}</Text>
@@ -125,12 +133,16 @@ const HomeScreen = () => {
           <Image source={require('../icons/mess.png')} style={styles.icon} />
           <Image source={require('../icons/searchicon.png')} style={styles.icon} />
           <Image source={require('../icons/Home.png')} style={styles.icon} />
+          <TouchableOpacity onPress={() => navigation.navigate('QRScreen', { userInfo, token })}>
+            <Image source={require('../icons/camera.png')} style={styles.icon} />
+          </TouchableOpacity>
           <Image source={require('../icons/friends.png')} style={styles.icon} />
           <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen', { userInfo, token })}>
-            <Image
+            <Image source={require('../icons/user.png')} style={styles.icon} />
+            {/* <Image
               source={{ uri: avatar }}
               style={styles.icon}
-            />
+            /> */}
           </TouchableOpacity>
         </View>
       </ImageBackground>

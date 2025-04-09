@@ -9,7 +9,7 @@ const WelcomeScreen = () => {
   const route = useRoute();
   const { token } = route.params;
   const handleGetStarted = () => {
-    navigation.navigate("HomeScreen", { token }); // Navigate to HomeScreen
+    navigation.navigate("HomeScreen", { token });
   };
 
   return (

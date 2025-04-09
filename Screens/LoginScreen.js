@@ -18,7 +18,7 @@ const LoginScreen = () => {
       Alert.alert('Error', 'Please enter both username and password');
       return;
     }
-    Alert.alert('Data sent to API:', { username, password });
+    console.log('Data sent to API:', { username, password });
     try {
       setLoading(true);
       const response = await authService.login(username, password); // Gọi authService.login
@@ -27,7 +27,14 @@ const LoginScreen = () => {
         const refreshToken = response.data?.refreshToken; // Refresh token
         // Log để kiểm tra
         await AsyncStorage.setItem('userToken', accessToken);
-        //   // await AsyncStorage.setItem('userData', JSON.stringify(response.user || {}));
+        await AsyncStorage.setItem('userData', JSON.stringify(response.data?.user || {}));
+        const userStorage = await AsyncStorage.getItem('userData');
+        console.log('User data stored:', userStorage);
+        const user = JSON.parse(userStorage);
+
+        console.log('User data stored Object:', user);
+        console.log('User Id:', user._id);
+
         navigation.navigate("WelcomeScreen", { token: accessToken });
       } else {
 

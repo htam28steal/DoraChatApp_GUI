@@ -15,6 +15,7 @@ import Home from './Screens/HomeScreen';
 import Detail from './Screens/DetailScreen';
 import GroupDetail from './Screens/GroupDetailScreen';
 import Chat from './Screens/ChatScreen';
+import QRScreen from './Screens/QRScreen';
 
 const Stack = createStackNavigator();
 
@@ -28,6 +29,8 @@ export default function App() {
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AddFriendScreen" component={AddFriendScreen} options={{ headerShown: false }} />
         <Stack.Screen name="YourFriendScreen" component={YourFriendScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="QRScreen" component={QRScreen} options={{ headerShown: false }} />
+
         <Stack.Screen
           name="LoginScreen"
           component={Login}
