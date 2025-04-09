@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, SafeAreaVie
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import bg from '../Images/bground.png';
-import { authService } from '../api/authService'; // Giữ import này
+import { authService } from '../api/authService';
 
 const LoginScreen = () => {
   const navigation = useNavigation();
@@ -13,29 +13,23 @@ const LoginScreen = () => {
 
   const handleLogin = async () => {
     console.log('handleLogin started');
+    console.log(username, password);
     if (!username || !password) {
       console.log('Validation failed');
-      Alert.alert('Error', 'Please enter both username and password');
       return;
     }
-    Alert.alert('Data sent to API:', { username, password });
     try {
       setLoading(true);
-      const response = await authService.login(username, password); // Gọi authService.login
-      console.log('Login response:', response); // Log dữ liệu trả về
-      if (response && response.data?.token) { // Kiểm tra token
-        const accessToken = response.data?.token; // Access token
-        const refreshToken = response.data?.refreshToken; // Refresh token
-        // Log để kiểm tra
+      const response = await authService.login(username, password);
+      if (response && response.data?.token) {
+        const id = response.data?.user._id;
+        const accessToken = response.data?.token;
+        const refreshToken = response.data?.refreshToken;
         await AsyncStorage.setItem('userToken', accessToken);
-        //   // await AsyncStorage.setItem('userData', JSON.stringify(response.user || {}));
-        navigation.navigate("HomeScreen");
-      } else {
-
+        navigation.navigate("WelcomeScreen", { token: accessToken, uID: id });
       }
     } catch (error) {
-      console.log('Login error:', error); // Log lỗi
-      Alert.alert('Login Failed', error.message || 'An error occurred during login');
+      console.log('Login error:', error);
     } finally {
       setLoading(false);
       console.log('handleLogin finished');
