@@ -12,13 +12,13 @@ import {
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { updatePassword } from '../api/meSevice';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { updateAvatarUser } from '../api/meSevice';
 
 export default function Screen_04({ navigation, route }) {
   const [screen, setScreen] = useState('home');
   const { userInfo } = route.params;
   const { token } = route.params;
-  console.log(token);
-  console.log(userInfo._id);
   const [uId, setUId] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -44,10 +44,43 @@ export default function Screen_04({ navigation, route }) {
     setConfirmPassword('');
   };
   const clearErrors = () => {
-    setCurrentPasswordError('');
-    setNewPasswordError('');
-    setConfirmPasswordError('');
-    setSuccessMessage('');
+    setCurrentPasswordError('*');
+    setNewPasswordError('*');
+    setConfirmPasswordError('*');
+    setSuccessMessage('*');
+  };
+
+  const [avatarUrl, setAvatarUrl] = useState(userInfo?.avatar || null);
+  const [timestamp, setTimestamp] = useState(Date.now());
+
+  const handleChooseAvatar = () => {
+    launchImageLibrary({ mediaType: 'photo', includeBase64: true }, async (response) => {
+      const asset = response.assets?.[0];
+      if (!asset) return;
+
+      try {
+        const res = await updateAvatarUser(userInfo._id, asset, token);
+        console.log('Cập nhật avatar thành công:', res);
+        setTimestamp(Date.now());
+        if (res && res.avatar) {
+          setAvatarUrl(res.avatar);
+        } else {
+          setAvatarUrl(`${userInfo.avatar}?t=${Date.now()}`);
+        }
+
+      } catch (e) {
+        console.error('Lỗi khi cập nhật avatar:', e);
+      }
+    });
+  };
+  const getAvatarUrlWithTimestamp = () => {
+    if (!avatarUrl) return null;
+
+    if (avatarUrl.includes('?')) {
+      return `${avatarUrl}&t=${timestamp}`;
+    } else {
+      return `${avatarUrl}?t=${timestamp}`;
+    }
   };
 
   const handleUpdatePassword = async () => {
@@ -83,15 +116,13 @@ export default function Screen_04({ navigation, route }) {
 
     try {
       const response = await updatePassword(uId, currentPassword, newPassword, token);
-      console.log(currentPassword)
-      console.log(newPassword)
 
+      clearInputs();
+      clearErrors();
     } catch (error) {
       console.log(error)
     } finally {
     }
-
-
   }
 
   return (
@@ -120,9 +151,11 @@ export default function Screen_04({ navigation, route }) {
 
         <View style={styles.detailProfile}>
           <View style={styles.favatar}>
-            <Image
-              source={{ uri: userInfo?.avatar }}
-              style={styles.imgAvatar}></Image>
+            <TouchableOpacity onPress={handleChooseAvatar}>
+              <Image
+                source={{ uri: getAvatarUrlWithTimestamp() }}
+                style={styles.imgAvatar}></Image>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.fName}>
@@ -144,31 +177,48 @@ export default function Screen_04({ navigation, route }) {
 
       <View style={styles.fFunction}>
         <TouchableOpacity
-          style={styles.btnInfor}
-          onPress={() => setScreen('home')}>
+          style={[
+            styles.btnTab,
+            screen === 'home' ? styles.btnActive : styles.btnInactive
+          ]} onPress={() => setScreen('home')}>
           <Image
             source={require('../icons/profile.png')}
             style={styles.iconEdit}
           />
-          <Text style={styles.txtFunction}>Information</Text>
+          <Text style={[
+            styles.txtTab,
+            screen === 'home' ? styles.txtActive : styles.txtInactive
+          ]}>Information</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.btnInforS}
+          style={[
+            styles.btnTab,
+            screen === 'friends' ? styles.btnActive : styles.btnInactive
+          ]}
           onPress={() => setScreen('friends')}>
           <Image
             source={require('../icons/friends.png')}
             style={styles.iconEdit}
           />
-          <Text style={styles.txtFunctionS}>Friends (10)</Text>
+          <Text style={[
+            styles.txtTab,
+            screen === 'friends' ? styles.txtActive : styles.txtInactive
+          ]}>Friends (10)</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.btnInforS}
+          style={[
+            styles.btnTab,
+            screen === 'account' ? styles.btnActive : styles.btnInactive
+          ]}
           onPress={() => setScreen('account')}>
           <Image
             source={require('../icons/setting.png')}
             style={styles.iconEdit}
           />
-          <Text style={styles.txtFunctionS}>Account</Text>
+          <Text style={[
+            styles.txtTab,
+            screen === 'account' ? styles.txtActive : styles.txtInactive
+          ]}>Account</Text>
         </TouchableOpacity>
       </View>
 
@@ -434,15 +484,17 @@ const styles = StyleSheet.create({
     borderRadius: '50%',
   },
   imgAvatar: {
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    borderRadius: 100,
-  },
+    width: 80,
+    height: 80,
+    borderRadius: 50,
+    backgroundColor: '#ccc', // có thể thêm để dễ debug
+  }
+  ,
   fName: {
     width: '75%',
     height: 50,
     alignSelf: 'flex-end',
+    marginLeft: 20
   },
   txtName: {
     fontSize: 18,
@@ -538,7 +590,7 @@ const styles = StyleSheet.create({
   btnLogout: {
     position: 'absolute',
     bottom: 20,
-    width: 100,
+    width: 110,
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
@@ -629,5 +681,34 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     fontSize: 12,
-  }
+  },
+  btnTab: {
+    width: 106,
+    height: '100%',
+    borderRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+
+  btnActive: {
+    backgroundColor: '#086DC0',
+  },
+
+  btnInactive: {
+    backgroundColor: '#F5F5F5',
+  },
+
+  txtTab: {
+    fontWeight: '600',
+  },
+
+  txtActive: {
+    color: 'white',
+  },
+
+  txtInactive: {
+    color: '#086DC0',
+  },
+
 });

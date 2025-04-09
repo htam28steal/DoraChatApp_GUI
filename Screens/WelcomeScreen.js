@@ -8,8 +8,9 @@ const WelcomeScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { token } = route.params;
+  const { uID } = route.params;
   const handleGetStarted = () => {
-    navigation.navigate("HomeScreen", { token }); // Navigate to HomeScreen
+    navigation.navigate("HomeScreen", { token, uID }); 
   };
 
   return (

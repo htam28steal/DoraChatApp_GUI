@@ -13,16 +13,6 @@ import { useRoute } from '@react-navigation/native';
 
 
 
-
-
-const dataPerson = [
-  {
-    name: 'John Nguyen',
-    avt: require('../Images/avt.png'),
-    phoneNum: '0923090945'
-  }
-];
-
 const HomeScreen = () => {
 
 
@@ -34,26 +24,20 @@ const HomeScreen = () => {
 
   const route = useRoute();
   const { token } = route.params;
+  const { uID } = route.params;
 
-  console
-  const hardcodedUserId = '67db942e2ff39db93c82b11d'; // ID được set cứng
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const data = await getUserInfo(hardcodedUserId, token);
-        setUserInfo(data);
-      } catch (err) {
-        setError(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchUser = async () => {
+    try {
+      const data = await getUserInfo(uID, token);
+      setUserInfo(data);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchUser();
-  }, []);
-
-  console.log(userInfo);
   useEffect(() => {
     if (userInfo) {
       setAvatar(userInfo.avatar);
@@ -64,11 +48,19 @@ const HomeScreen = () => {
 
   const [searchText, setSearchText] = useState('');
 
+  useEffect(() => {
+    fetchUser();
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchUser();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Filter persons based on the search text (name or phone number match)
-  const filteredData = dataPerson.filter(person =>
-    person.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    person.phoneNum.includes(searchText)
-  );
+  // const filteredData = dataPerson.filter(person =>
+  //   person.name.toLowerCase().includes(searchText.toLowerCase()) ||
+  //   person.phoneNum.includes(searchText)
+  // );
 
   return (
     <SafeAreaView style={styles.container}>
