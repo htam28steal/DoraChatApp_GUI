@@ -79,6 +79,7 @@ export default function App() {
           name="ResetPasswordStep2Screen" 
           component={ResetPasswordStep2}  
           options={{ headerShown: false }} 
+
         />
       </Stack.Navigator>
     </NavigationContainer>
