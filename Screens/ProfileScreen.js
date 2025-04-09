@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   FlatList,
@@ -11,8 +11,119 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-export default function Screen_04({ navigation }) {
+import { updatePassword } from '../api/meSevice';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { updateAvatarUser } from '../api/meSevice';
+
+export default function Screen_04({ navigation, route }) {
   const [screen, setScreen] = useState('home');
+  const { userInfo } = route.params;
+  const { token } = route.params;
+  const [uId, setUId] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [currentPasswordError, setCurrentPasswordError] = useState('*');
+  const [newPasswordError, setNewPasswordError] = useState('*');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('*');
+
+  // State for success message
+  const [successMessage, setSuccessMessage] = useState('');
+
+
+  useEffect(() => {
+    if (userInfo && userInfo._id) {
+      setUId(userInfo._id);
+    }
+  }, [userInfo]);
+
+  const clearInputs = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+  };
+  const clearErrors = () => {
+    setCurrentPasswordError('*');
+    setNewPasswordError('*');
+    setConfirmPasswordError('*');
+    setSuccessMessage('*');
+  };
+
+  const [avatarUrl, setAvatarUrl] = useState(userInfo?.avatar || null);
+  const [timestamp, setTimestamp] = useState(Date.now());
+
+  const handleChooseAvatar = () => {
+    launchImageLibrary({ mediaType: 'photo', includeBase64: true }, async (response) => {
+      const asset = response.assets?.[0];
+      if (!asset) return;
+
+      try {
+        const res = await updateAvatarUser(userInfo._id, asset, token);
+        console.log('Cập nhật avatar thành công:', res);
+        setTimestamp(Date.now());
+        if (res && res.avatar) {
+          setAvatarUrl(res.avatar);
+        } else {
+          setAvatarUrl(`${userInfo.avatar}?t=${Date.now()}`);
+        }
+
+      } catch (e) {
+        console.error('Lỗi khi cập nhật avatar:', e);
+      }
+    });
+  };
+  const getAvatarUrlWithTimestamp = () => {
+    if (!avatarUrl) return null;
+
+    if (avatarUrl.includes('?')) {
+      return `${avatarUrl}&t=${timestamp}`;
+    } else {
+      return `${avatarUrl}?t=${timestamp}`;
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    // Clear previous error messages
+    clearErrors();
+
+    // Client-side validation
+    let hasError = false;
+
+    if (!currentPassword) {
+      setCurrentPasswordError('Vui lòng nhập mật khẩu hiện tại');
+      hasError = true;
+    }
+
+    if (!newPassword) {
+      setNewPasswordError('Vui lòng nhập mật khẩu mới');
+      hasError = true;
+    } else if (newPassword.length < 8) {
+      setNewPasswordError('Mật khẩu mới phải có ít nhất 8 ký tự');
+      hasError = true;
+    }
+
+    if (!confirmPassword) {
+      setConfirmPasswordError('Vui lòng xác nhận mật khẩu mới');
+      hasError = true;
+    } else if (confirmPassword !== newPassword) {
+
+      setConfirmPasswordError('Mật khẩu xác nhận không khớp');
+      hasError = true;
+    }
+
+
+
+    try {
+      const response = await updatePassword(uId, currentPassword, newPassword, token);
+
+      clearInputs();
+      clearErrors();
+    } catch (error) {
+      console.log(error)
+    } finally {
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -25,7 +136,6 @@ export default function Screen_04({ navigation }) {
         <Text style={styles.title}>My profile</Text>
         <View style={styles.fEdit}>
           <TouchableOpacity style={styles.btnEdit}>
-            {' '}
             <Text style={styles.txtEdit}>Chỉnh sửa</Text>{' '}
             <Image
               source={require('../icons/edit.png')}
@@ -41,13 +151,15 @@ export default function Screen_04({ navigation }) {
 
         <View style={styles.detailProfile}>
           <View style={styles.favatar}>
-            <Image
-              source={require('../Images/nike.png')}
-              style={styles.imgAvatar}></Image>
+            <TouchableOpacity onPress={handleChooseAvatar}>
+              <Image
+                source={{ uri: getAvatarUrlWithTimestamp() }}
+                style={styles.imgAvatar}></Image>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.fName}>
-            <Text style={styles.txtName}>User Admin</Text>
+            <Text style={styles.txtName}>{userInfo?.name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text>Have a nice day !</Text>
               <TouchableOpacity>
@@ -65,37 +177,54 @@ export default function Screen_04({ navigation }) {
 
       <View style={styles.fFunction}>
         <TouchableOpacity
-          style={styles.btnInfor}
-          onPress={() => setScreen('home')}>
+          style={[
+            styles.btnTab,
+            screen === 'home' ? styles.btnActive : styles.btnInactive
+          ]} onPress={() => setScreen('home')}>
           <Image
             source={require('../icons/profile.png')}
             style={styles.iconEdit}
           />
-          <Text style={styles.txtFunction}>Information</Text>
+          <Text style={[
+            styles.txtTab,
+            screen === 'home' ? styles.txtActive : styles.txtInactive
+          ]}>Information</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.btnInforS}
+          style={[
+            styles.btnTab,
+            screen === 'friends' ? styles.btnActive : styles.btnInactive
+          ]}
           onPress={() => setScreen('friends')}>
           <Image
             source={require('../icons/friends.png')}
             style={styles.iconEdit}
           />
-          <Text style={styles.txtFunctionS}>Friends (10)</Text>
+          <Text style={[
+            styles.txtTab,
+            screen === 'friends' ? styles.txtActive : styles.txtInactive
+          ]}>Friends (10)</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.btnInforS}
+          style={[
+            styles.btnTab,
+            screen === 'account' ? styles.btnActive : styles.btnInactive
+          ]}
           onPress={() => setScreen('account')}>
           <Image
             source={require('../icons/setting.png')}
             style={styles.iconEdit}
           />
-          <Text style={styles.txtFunctionS}>Account</Text>
+          <Text style={[
+            styles.txtTab,
+            screen === 'account' ? styles.txtActive : styles.txtInactive
+          ]}>Account</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.fDetailInfor}>
         {screen === 'home' && (
-          <Text>
+          <View>
             <View style={styles.fRow}>
               <View style={styles.fHalfRow}>
                 <View style={styles.fPro}>
@@ -124,7 +253,7 @@ export default function Screen_04({ navigation }) {
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>02/10/2003</Text>
+                  <Text style={styles.txtInput}>{userInfo.dateOfBirth.day}/{userInfo.dateOfBirth.month}/{userInfo.dateOfBirth.year}</Text>
                 </View>
               </View>
 
@@ -134,7 +263,7 @@ export default function Screen_04({ navigation }) {
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>Male</Text>
+                  <Text style={styles.txtInput}>{userInfo?.gender === true ? 'Nữ' : 'Nam'}</Text>
                 </View>
               </View>
             </View>
@@ -145,7 +274,7 @@ export default function Screen_04({ navigation }) {
               </View>
 
               <View style={styles.fTxtInput}>
-                <Text style={styles.txtInput}>userName@gmail.com</Text>
+                <Text style={styles.txtInput}>{userInfo?.username}</Text>
               </View>
             </View>
             <View style={styles.fRow}>
@@ -154,14 +283,14 @@ export default function Screen_04({ navigation }) {
               </View>
 
               <View style={styles.fTxtInput}>
-                <Text style={styles.txtInput}>Your hobbies</Text>
+                <Text style={styles.txtInput}>{userInfo?.hobbies}</Text>
               </View>
             </View>
-          </Text>
+          </View>
         )}
 
         {screen === 'friends' && (
-          <Text>
+          <View>
             <TouchableOpacity style={styles.fMessage}>
               <View style={styles.fRow}>
                 <Image
@@ -182,17 +311,20 @@ export default function Screen_04({ navigation }) {
                 </View>
               </View>
             </TouchableOpacity>
-          </Text>
+          </View>
         )}
 
         {screen === 'account' && (
-          <Text>
+
+          <View>
+
             <View style={styles.header}>
               <Image
                 source={require('../icons/lock.png')}
                 style={styles.iconLock}></Image>
               <Text style={styles.txtChangePass}>Đổi Mật Khẩu</Text>
             </View>
+
             <View style={styles.fRow}>
               <View style={styles.fPro}>
                 <Text style={styles.txtPro}>Current password</Text>
@@ -202,8 +334,18 @@ export default function Screen_04({ navigation }) {
                 <TextInput
                   style={styles.txtInput}
                   placeholder="Enter current password"
-                  placeholderTextColor={'#086DC0'}></TextInput>
+                  placeholderTextColor={'#086DC0'}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry={true}></TextInput>
               </View>
+
+              <View style={styles.fRow}>
+              </View>
+            </View>
+            <View style={styles.errorContainer}>
+              <TextInput style={styles.errorText} value={currentPasswordError}
+                onChangeText={setCurrentPasswordError} editable={false} pointerEvents="none" />
             </View>
 
             <View style={styles.fRow}>
@@ -215,9 +357,20 @@ export default function Screen_04({ navigation }) {
                 <TextInput
                   style={styles.txtInput}
                   placeholder="Enter New password"
-                  placeholderTextColor={'#086DC0'}></TextInput>
+                  placeholderTextColor={'#086DC0'}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={true}></TextInput>
+              </View>
+
+              <View style={styles.fRow}>
               </View>
             </View>
+            <View style={styles.errorContainer}>
+              <TextInput style={styles.errorText} value={newPasswordError}
+                onChangeText={setNewPasswordError} editable={false} pointerEvents="none" />
+            </View>
+
             <View style={styles.fRow}>
               <View style={styles.fPro}>
                 <Text style={styles.txtPro}>Confirm password</Text>
@@ -227,15 +380,26 @@ export default function Screen_04({ navigation }) {
                 <TextInput
                   style={styles.txtInput}
                   placeholder="Enter Confirm password"
-                  placeholderTextColor={'#086DC0'}></TextInput>
+                  placeholderTextColor={'#086DC0'}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={true}></TextInput>
+              </View>
+
+              <View style={styles.fRow}>
               </View>
             </View>
+            <View style={styles.errorContainer}>
+              <TextInput style={styles.errorText} value={confirmPasswordError}
+                onChangeText={setConfirmPasswordError} editable={false} pointerEvents="none" />
+            </View>
+
             <View style={styles.header}>
-              <TouchableOpacity style={styles.btnCapNhat}>
+              <TouchableOpacity style={styles.btnCapNhat} onPress={handleUpdatePassword}>
                 <Text style={styles.txtUpdate}>Cập nhật</Text>
               </TouchableOpacity>
             </View>
-          </Text>
+          </View>
         )}
       </View>
 
@@ -320,15 +484,17 @@ const styles = StyleSheet.create({
     borderRadius: '50%',
   },
   imgAvatar: {
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    borderRadius: 100,
-  },
+    width: 80,
+    height: 80,
+    borderRadius: 50,
+    backgroundColor: '#ccc', // có thể thêm để dễ debug
+  }
+  ,
   fName: {
     width: '75%',
     height: 50,
     alignSelf: 'flex-end',
+    marginLeft: 20
   },
   txtName: {
     fontSize: 18,
@@ -424,7 +590,7 @@ const styles = StyleSheet.create({
   btnLogout: {
     position: 'absolute',
     bottom: 20,
-    width: 100,
+    width: 110,
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
@@ -501,4 +667,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 500,
   },
+  redAsterisk: {
+    color: 'red',
+    fontSize: 18,
+    marginLeft: 5,
+  },
+  errorContainer: {
+    paddingHorizontal: 10,
+    marginTop: 5,
+
+    marginBottom: 5,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+  },
+  btnTab: {
+    width: 106,
+    height: '100%',
+    borderRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+
+  btnActive: {
+    backgroundColor: '#086DC0',
+  },
+
+  btnInactive: {
+    backgroundColor: '#F5F5F5',
+  },
+
+  txtTab: {
+    fontWeight: '600',
+  },
+
+  txtActive: {
+    color: 'white',
+  },
+
+  txtInactive: {
+    color: '#086DC0',
+  },
+
 });

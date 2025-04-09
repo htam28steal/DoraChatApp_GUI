@@ -1,40 +1,80 @@
-import React, { useState } from 'react';
-import { 
-  View, Text, Image, StyleSheet, TouchableOpacity, 
-  TextInput, SafeAreaView, ImageBackground 
+import React, { useEffect, useState } from 'react';
+import {
+  View, Text, Image, StyleSheet, TouchableOpacity,
+  TextInput, SafeAreaView, ImageBackground
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { getUserInfo } from '../api/meSevice';
+
+
 import bg from '../Images/bground.png';
 
-const dataPerson = [
-  {
-    name: 'John Nguyen',
-    avt: require('../Images/avt.png'),
-    phoneNum: '0923090945'
-  }
-];
+import { useRoute } from '@react-navigation/native';
+
+
 
 const HomeScreen = () => {
+
+
+
+  const [userInfo, setUserInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [avatar, setAvatar] = useState(true);
+
+  const route = useRoute();
+  const { token } = route.params;
+  const { uID } = route.params;
+
+
+  const fetchUser = async () => {
+    try {
+      const data = await getUserInfo(uID, token);
+      setUserInfo(data);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userInfo) {
+      setAvatar(userInfo.avatar);
+    }
+  }, [userInfo]);
+
+  const navigation = useNavigation();
+
   const [searchText, setSearchText] = useState('');
 
+  useEffect(() => {
+    fetchUser();
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchUser();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   // Filter persons based on the search text (name or phone number match)
-  const filteredData = dataPerson.filter(person =>
-    person.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    person.phoneNum.includes(searchText)
-  );
+  // const filteredData = dataPerson.filter(person =>
+  //   person.name.toLowerCase().includes(searchText.toLowerCase()) ||
+  //   person.phoneNum.includes(searchText)
+  // );
 
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
         {/* Search Input Section */}
         <View style={styles.searchSection}>
-          <TextInput 
-            style={styles.usernameInput} 
-            placeholder="Search" 
+          <TextInput
+            style={styles.usernameInput}
+            placeholder="Search"
             placeholderTextColor="#086DC080"
             value={searchText}
             onChangeText={(text) => setSearchText(text)}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.searchButton}
           >
             <Image source={require('../icons/plus.png')} style={styles.searchButtonText} />
@@ -62,8 +102,8 @@ const HomeScreen = () => {
 
         {/* Main Content */}
         <View style={styles.mainContent}>
-          <Image 
-            source={require('../Images/HomeBG.png')} 
+          <Image
+            source={require('../Images/HomeBG.png')}
             style={{ width: 200, height: 200, alignSelf: 'center' }}
           />
           <Text style={{ fontSize: 30 }}>Good morning,</Text>
@@ -72,12 +112,18 @@ const HomeScreen = () => {
         </View>
 
         {/* Bottom Options */}
+        {/* Bottom Options */}
         <View style={styles.option}>
           <Image source={require('../icons/mess.png')} style={styles.icon} />
           <Image source={require('../icons/searchicon.png')} style={styles.icon} />
           <Image source={require('../icons/Home.png')} style={styles.icon} />
           <Image source={require('../icons/friends.png')} style={styles.icon} />
-          <Image source={require('../Images/avt.png')} style={styles.icon} />
+          <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen', { userInfo, token })}>
+            <Image
+              source={{ uri: avatar }}
+              style={styles.icon}
+            />
+          </TouchableOpacity>
         </View>
       </ImageBackground>
     </SafeAreaView>
@@ -127,8 +173,8 @@ const styles = StyleSheet.create({
   searchButtonText: {
     color: '#ffffff',
     fontWeight: 'bold',
-    width:14,
-    height:14
+    width: 14,
+    height: 14
   },
   searchResults: {
     position: 'absolute',
@@ -139,7 +185,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     maxHeight: 150,
-    width:'90%'
+    width: '90%'
   },
   personItem: {
     flexDirection: 'row',
