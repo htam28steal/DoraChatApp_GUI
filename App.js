@@ -23,7 +23,7 @@ const Stack = createStackNavigator();
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="LoginScreen">
+      <Stack.Navigator initialRouteName="ChatScreen">
         <Stack.Screen name="FriendList_Screen" component={FriendList_Screen} options={{ headerShown: false }} />
         <Stack.Screen name="AllFriendAndGroup" component={AllFriendAndGroup} options={{ headerShown: false }} />
         <Stack.Screen name="Screen_03" component={Screen_03} options={{ headerShown: false }} />
