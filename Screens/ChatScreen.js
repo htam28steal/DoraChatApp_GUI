@@ -1,4 +1,3 @@
-// ChatScreen.js
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -10,29 +9,24 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
 
+// ICONS / IMAGES
+const AvatarImage = require("../Images/avt.png");
+const CallIcon = require("../assets/Call.png");
+const VideoCallIcon = require("../assets/VideoCall.png");
+const DetailChatIcon = require("../icons/userdetail.png");
+const FileIcon = require("../icons/attachment.png");
+const PictureIcon = require("../icons/Photos.png");
+const EmojiIcon = require("../icons/emoji.png");
+const SendIcon = require("../icons/send.png");
 
-const AvatarImage = require('../Images/avt.png');
-const CallIcon = require('../assets/Call.png'); 
-const VideoCallIcon = require('../assets/VideoCall.png'); 
-const DetailChatIcon = require('../icons/userdetail.png'); 
-const FileIcon = require('../icons/attachment.png'); 
-const PictureIcon = require('../icons/Photos.png'); 
-const EmojiIcon = require('../icons/emoji.png'); 
-const SendIcon = require('../icons/send.png');
-
-
-// Dummy current user id (replace or manage via your auth context/state)
+// Dummy current user id
 const CURRENT_USER_ID = "current_user_id";
 
-/* ===========================
-   MessageItem Component
-   ---------------------------
-   Renders a single message. Uses the msg.memberId.userId field for grouping.
-=========================== */
 function MessageItem({ msg, showAvatar, showTime }) {
   const [expanded, setExpanded] = useState(false);
   const MAX_TEXT_LENGTH = 350;
@@ -74,9 +68,7 @@ function MessageItem({ msg, showAvatar, showTime }) {
                 : messageItemStyles.theirMessage,
             ]}
           >
-            {expanded
-              ? msg.content
-              : msg.content.slice(0, MAX_TEXT_LENGTH)}
+            {expanded ? msg.content : msg.content.slice(0, MAX_TEXT_LENGTH)}
             {msg.content.length > MAX_TEXT_LENGTH && (
               <Text
                 style={messageItemStyles.expandText}
@@ -174,11 +166,6 @@ const messageItemStyles = StyleSheet.create({
   },
 });
 
-/* ===========================
-   ChatBox Component
-   ---------------------------
-   Renders a scrollable list of messages and auto-scrolls to the end when messages change.
-=========================== */
 function ChatBox({ messages }) {
   const scrollViewRef = useRef(null);
 
@@ -225,12 +212,7 @@ const chatBoxStyles = StyleSheet.create({
   },
 });
 
-/* ===========================
-   MessageInput Component
-   ---------------------------
-   Renders an input field and send button. (File upload and emoji support are represented as icons.)
-=========================== */
-function MessageInput({ onSend }) {
+function MessageInput({ onSend, onPickImage }) {
   const [input, setInput] = useState("");
 
   const handleSend = () => {
@@ -253,7 +235,7 @@ function MessageInput({ onSend }) {
           onSubmitEditing={handleSend}
           returnKeyType="send"
         />
-        <TouchableOpacity style={messageInputStyles.iconButton}>
+        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickImage}>
           <Image source={PictureIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
         <TouchableOpacity style={messageInputStyles.iconButton}>
@@ -309,11 +291,6 @@ const messageInputStyles = StyleSheet.create({
   },
 });
 
-/* ===========================
-   HeaderSingleChat Component
-   ---------------------------
-   Renders the header with avatar, name, status, and action buttons.
-=========================== */
 function HeaderSingleChat({ handleDetail }) {
   return (
     <View style={headerStyles.container}>
@@ -332,9 +309,7 @@ function HeaderSingleChat({ handleDetail }) {
         <TouchableOpacity style={headerStyles.iconButton}>
           <Image source={VideoCallIcon} style={headerStyles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={headerStyles.iconButton}
-        >
+        <TouchableOpacity style={headerStyles.iconButton}>
           <Image source={DetailChatIcon} style={headerStyles.icon} />
         </TouchableOpacity>
       </View>
@@ -351,7 +326,7 @@ const headerStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#ccc",
     alignItems: "center",
-    marginTop:10
+    marginTop: 10,
   },
   avatar: {
     width: 70,
@@ -397,59 +372,11 @@ const headerStyles = StyleSheet.create({
   },
 });
 
-/* ===========================
-   DetailChat Component
-   ---------------------------
-   Displays additional chat details. (You can expand this by converting your MainDetail,
-   MediaDetail, and MemberList components in a similar fashion.)
-=========================== */
-function DetailChat({ handleSetActiveTab }) {
-  const [activeTab, setActiveTab] = useState({ tab: "detail" });
-  const handleSetTab = (tab) => {
-    setActiveTab((prev) => ({ ...prev, ...tab }));
-  };
-  return (
-    <View style={detailChatStyles.container}>
-      {activeTab.tab === "detail" && (
-        <Text style={detailChatStyles.text}>Main Detail (Coming soon...)</Text>
-      )}
-      {activeTab.tab === "media" && (
-        <Text style={detailChatStyles.text}>Media Detail (Coming soon...)</Text>
-      )}
-      {activeTab.tab === "members" && (
-        <Text style={detailChatStyles.text}>Member List (Coming soon...)</Text>
-      )}
-    </View>
-  );
-}
-
-const detailChatStyles = StyleSheet.create({
-  container: {
-    height: "100%",
-    width: 385,
-    padding: 16,
-    backgroundColor: "#E8F4FF",
-    borderRadius: 20,
-  },
-  text: {
-    fontSize: 16,
-    color: "#086DC0",
-    textAlign: "center",
-  },
-});
-
-/* ===========================
-   ChatSingle (Main Chat Screen)
-   ---------------------------
-   Combines header, chat box, message input, and toggles detail view.
-=========================== */
 export default function ChatSingle() {
   const conversationId = "67ee2539dc14e5903dc8b4ce";
   const [messages, setMessages] = useState([]);
   const [showDetail, setShowDetail] = useState(false);
 
-  // Dummy socket and API integration:
-  // (Replace these with your actual implementation.)
   const handleNewMessage = (message) => {
     setMessages((prevMessages) => {
       const exists = prevMessages.some((m) => m._id === message._id);
@@ -465,11 +392,47 @@ export default function ChatSingle() {
     // socket.on("receive_message", callback);
   };
 
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission required", "We need permission to access your gallery!");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const selectedImage = result.assets[0];
+      const newImageMessage = {
+        _id: String(new Date().getTime()),
+        memberId: { userId: CURRENT_USER_ID },
+        type: "IMAGE",
+        content: selectedImage.uri,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, newImageMessage]);
+    }
+  };
+
+  const handleSendMessage = async (message) => {
+    if (!message.trim()) return;
+    const newMsg = {
+      _id: String(new Date().getTime()),
+      memberId: { userId: CURRENT_USER_ID },
+      type: "TEXT",
+      content: message,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, newMsg]);
+  };
+
   useEffect(() => {
     joinConversation(conversationId);
-    // Example: fetch messages from an API
-    // messageApi.fetchMessages(conversationId).then(setMessages).catch(console.error);
-    // For demo, let’s add some dummy messages:
     setMessages([
       {
         _id: "1",
@@ -485,43 +448,9 @@ export default function ChatSingle() {
         content: "Riêng m",
         createdAt: "2025-04-08T10:01:00Z",
       },
-      {
-        _id: "3",
-        memberId: { userId: "user1" },
-        type: "IMAGE",
-        content: "https://picsum.photos/id/237/200/300",
-        createdAt: "2025-04-08T10:02:00Z",
-      },
-      {
-        _id: "4",
-        memberId: { userId: CURRENT_USER_ID },
-        type: "FILE",
-        content: "https://example.com/file.pdf",
-        fileName: "ExampleFile.pdf",
-        createdAt: "2025-04-08T10:03:00Z",
-      },
     ]);
     onNewMessage(handleNewMessage);
   }, [conversationId]);
-
-  const handleSendMessage = async (message) => {
-    if (!message.trim()) return;
-    try {
-      // Replace with your API call, then the server should broadcast via socket.
-      // messageApi.sendMessage({ conversationId, content: message });
-      // For demo, we add the message locally:
-      const newMsg = {
-        _id: String(new Date().getTime()),
-        memberId: { userId: CURRENT_USER_ID },
-        type: "TEXT",
-        content: message,
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, newMsg]);
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
 
   return (
     <View style={chatScreenStyles.container}>
@@ -529,12 +458,12 @@ export default function ChatSingle() {
       <View style={chatScreenStyles.chatContainer}>
         <ChatBox messages={messages} />
       </View>
-      <MessageInput onSend={handleSendMessage} />
+      <MessageInput onSend={handleSendMessage} onPickImage={pickImage} />
       {showDetail && (
         <View style={chatScreenStyles.detailContainer}>
-          <DetailChat />
+          <Text style={chatScreenStyles.closeText}>Chi tiết chat (coming soon)</Text>
           <TouchableOpacity onPress={() => setShowDetail(false)}>
-            <Text style={chatScreenStyles.closeText}>Close</Text>
+            <Text style={chatScreenStyles.closeText}>Đóng</Text>
           </TouchableOpacity>
         </View>
       )}
