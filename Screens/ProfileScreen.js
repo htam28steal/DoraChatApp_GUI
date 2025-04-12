@@ -23,6 +23,8 @@ export default function Screen_04({ navigation, route }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [avatarColor, setAvatarColor] = useState(true);
+
 
   const [currentPasswordError, setCurrentPasswordError] = useState('*');
   const [newPasswordError, setNewPasswordError] = useState('*');
@@ -35,6 +37,7 @@ export default function Screen_04({ navigation, route }) {
   useEffect(() => {
     if (userInfo && userInfo._id) {
       setUId(userInfo._id);
+      setAvatarColor(userInfo.avatarColor);
     }
   }, [userInfo]);
 
@@ -82,7 +85,7 @@ export default function Screen_04({ navigation, route }) {
       return `${avatarUrl}?t=${timestamp}`;
     }
   };
-
+  console.log(avatarColor)
   const handleUpdatePassword = async () => {
     // Clear previous error messages
     clearErrors();
@@ -152,9 +155,14 @@ export default function Screen_04({ navigation, route }) {
         <View style={styles.detailProfile}>
           <View style={styles.favatar}>
             <TouchableOpacity onPress={handleChooseAvatar}>
-              <Image
-                source={{ uri: getAvatarUrlWithTimestamp() }}
-                style={styles.imgAvatar}></Image>
+              {getAvatarUrlWithTimestamp() ? (
+                <Image
+                  source={{ uri: getAvatarUrlWithTimestamp() }}
+                  style={styles.imgAvatar}
+                />
+              ) : (
+                <View style={[styles.imgAvatar, { backgroundColor: avatarColor }]} />
+              )}
             </TouchableOpacity>
           </View>
 

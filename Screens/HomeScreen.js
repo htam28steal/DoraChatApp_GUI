@@ -22,6 +22,7 @@ const HomeScreen = () => {
   const [error, setError] = useState(null);
   const [avatar, setAvatar] = useState(true);
 
+  const [avatarColor, setAvatarColor] = useState(true);
   const route = useRoute();
   const { token } = route.params;
   const { uID } = route.params;
@@ -41,6 +42,7 @@ const HomeScreen = () => {
   useEffect(() => {
     if (userInfo) {
       setAvatar(userInfo.avatar);
+      setAvatarColor(userInfo.avatarColor);
     }
   }, [userInfo]);
 
@@ -119,11 +121,18 @@ const HomeScreen = () => {
           <Image source={require('../icons/Home.png')} style={styles.icon} />
           <Image source={require('../icons/friends.png')} style={styles.icon} />
           <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen', { userInfo, token })}>
-            <Image
-              source={{ uri: avatar }}
-              style={styles.icon}
-            />
+            {avatar ? (
+              <Image
+                source={{ uri: avatar }}
+                style={[styles.icon, { borderRadius: 15 }]}
+              />
+            ) : (
+              <View
+                style={[styles.icon, { backgroundColor: avatarColor, borderRadius: 15 }]}
+              />
+            )}
           </TouchableOpacity>
+
         </View>
       </ImageBackground>
     </SafeAreaView>
