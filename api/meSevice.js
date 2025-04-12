@@ -57,7 +57,7 @@ export const updateAvatarUser = async (userId, reqFile, token) => {
             headers: {
                 'Content-Type': 'multipart/form-data',
                 ...(token && { Authorization: `Bearer ${token}` }),
-            },
+            }, timeout: 10000,
         });
 
         return response.data;

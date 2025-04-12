@@ -20,6 +20,8 @@ export default function Screen_04({ navigation, route }) {
   const { userInfo } = route.params;
   const { token } = route.params;
   const [uId, setUId] = useState('');
+  const [avatarColor, setAvatarColor] = useState(true);
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,6 +33,14 @@ export default function Screen_04({ navigation, route }) {
   // State for success message
   const [successMessage, setSuccessMessage] = useState('');
 
+
+
+  useEffect(() => {
+    if (userInfo) {
+      setAvatarColor(userInfo.avatarColor || 'gray');
+
+    }
+  }, [userInfo]);
 
   useEffect(() => {
     if (userInfo && userInfo._id) {
@@ -50,16 +60,27 @@ export default function Screen_04({ navigation, route }) {
     setSuccessMessage('*');
   };
 
-  const [avatarUrl, setAvatarUrl] = useState(userInfo?.avatar || null);
+  const [avatarUrl, setAvatarUrl] = useState(userInfo?.avatar || userInfo?.userInfo);
   const [timestamp, setTimestamp] = useState(Date.now());
 
   const handleChooseAvatar = () => {
     launchImageLibrary({ mediaType: 'photo', includeBase64: true }, async (response) => {
       const asset = response.assets?.[0];
-      if (!asset) return;
+      if (!asset) {
+        console.error('Không có ảnh nào được chọn');
+        return;
+      }
+
+      // Tạo đối tượng file cho việc upload
+      const file = {
+        uri: asset.uri,
+        name: asset.fileName || `avatar-${Date.now()}.jpg`, // Tạo tên file nếu không có
+        type: asset.type || 'image/jpeg', // Loại file mặc định là 'image/jpeg'
+      };
+
 
       try {
-        const res = await updateAvatarUser(userInfo._id, asset, token);
+        const res = await updateAvatarUser(userInfo._id, file, token);
         console.log('Cập nhật avatar thành công:', res);
         setTimestamp(Date.now());
         if (res && res.avatar) {
@@ -70,6 +91,8 @@ export default function Screen_04({ navigation, route }) {
 
       } catch (e) {
         console.error('Lỗi khi cập nhật avatar:', e);
+        console.error('Lỗi khi cập nhật avatar:', e.response?.data || e.message);
+
       }
     });
   };
@@ -152,9 +175,14 @@ export default function Screen_04({ navigation, route }) {
         <View style={styles.detailProfile}>
           <View style={styles.favatar}>
             <TouchableOpacity onPress={handleChooseAvatar}>
-              <Image
-                source={{ uri: getAvatarUrlWithTimestamp() }}
-                style={styles.imgAvatar}></Image>
+              {getAvatarUrlWithTimestamp() ? (
+                <Image
+                  source={{ uri: getAvatarUrlWithTimestamp() }}
+                  style={styles.imgAvatar}
+                />
+              ) : (
+                <View style={[styles.imgAvatar, { backgroundColor: avatarColor }]} />
+              )}
             </TouchableOpacity>
           </View>
 
