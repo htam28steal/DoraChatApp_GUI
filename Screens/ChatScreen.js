@@ -52,7 +52,10 @@ function MessageItem({ msg, showAvatar, showTime }) {
       )}
       <View style={messageItemStyles.contentContainer}>
         {isImage ? (
-          <Image source={{ uri: msg.content }} style={messageItemStyles.imageContent} />
+          <Image
+            source={{ uri: msg.content }}
+            style={messageItemStyles.imageContent}
+          />
         ) : isFile ? (
           <TouchableOpacity
             style={messageItemStyles.fileContainer}
@@ -108,7 +111,7 @@ const messageItemStyles = StyleSheet.create({
   container: { flexDirection: "row", marginVertical: 4, alignItems: "flex-end" },
   leftAlign: { justifyContent: "flex-start" },
   rightAlign: { flexDirection: "row-reverse" },
-  avatar: { width: 40, height: 40, borderRadius: 20},
+  avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarPlaceholder: { width: 40, height: 40 },
   contentContainer: { maxWidth: 468, marginHorizontal: 8 },
   imageContent: {
@@ -163,9 +166,11 @@ function ChatBox({ messages }) {
     >
       {messages.map((msg, index) => {
         const isFirstInGroup =
-          index === 0 || messages[index - 1].memberId.userId !== msg.memberId.userId;
+          index === 0 ||
+          messages[index - 1].memberId.userId !== msg.memberId.userId;
         const isLastInGroup =
-          index === messages.length - 1 || messages[index + 1].memberId.userId !== msg.memberId.userId;
+          index === messages.length - 1 ||
+          messages[index + 1].memberId.userId !== msg.memberId.userId;
 
         return (
           <MessageItem
@@ -186,7 +191,12 @@ const chatBoxStyles = StyleSheet.create({
 });
 
 function MessageInput({
-  input, setInput, onSend, onPickImage, onPickFile, onEmojiPress
+  input,
+  setInput,
+  onSend,
+  onPickImage,
+  onPickFile,
+  onEmojiPress,
 }) {
   const handleSend = () => {
     if (!input.trim()) return;
@@ -196,7 +206,10 @@ function MessageInput({
 
   return (
     <View style={messageInputStyles.container}>
-      <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickFile}>
+      <TouchableOpacity
+        style={messageInputStyles.iconButton}
+        onPress={onPickFile}
+      >
         <Image source={FileIcon} style={messageInputStyles.icon} />
       </TouchableOpacity>
 
@@ -209,15 +222,24 @@ function MessageInput({
           onSubmitEditing={handleSend}
           returnKeyType="send"
         />
-        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickImage}>
+        <TouchableOpacity
+          style={messageInputStyles.iconButton}
+          onPress={onPickImage}
+        >
           <Image source={PictureIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onEmojiPress}>
+        <TouchableOpacity
+          style={messageInputStyles.iconButton}
+          onPress={onEmojiPress}
+        >
           <Image source={EmojiIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={messageInputStyles.sendButton} onPress={handleSend}>
+      <TouchableOpacity
+        style={messageInputStyles.sendButton}
+        onPress={handleSend}
+      >
         <Image source={SendIcon} style={messageInputStyles.sendIcon} />
       </TouchableOpacity>
     </View>
@@ -272,7 +294,10 @@ function HeaderSingleChat({ handleDetail }) {
         <TouchableOpacity style={headerStyles.iconButton}>
           <Image source={VideoCallIcon} style={headerStyles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={headerStyles.iconButton} onPress={handleDetail}>
+        <TouchableOpacity
+          style={headerStyles.iconButton}
+          onPress={handleDetail}
+        >
           <Image source={DetailChatIcon} style={headerStyles.icon} />
         </TouchableOpacity>
       </View>
@@ -315,7 +340,10 @@ export default function ChatSingle() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission required", "We need permission to access your gallery!");
+      Alert.alert(
+        "Permission required",
+        "We need permission to access your gallery!"
+      );
       return;
     }
 
@@ -338,32 +366,35 @@ export default function ChatSingle() {
     }
   };
 
-  // const pickDocument = async () => {
-  //   try {
-  //     const result = await DocumentPicker.getDocumentAsync({
-  //       type: "*/*",
-  //       copyToCacheDirectory: true,
-  //       multiple: false,
-  //     });
+  // Updated pickDocument function using the new assets array approach
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
 
-  //     if (result.type === "success") {
-  //       const { name, uri } = result;
-
-  //       const newFileMessage = {
-  //         _id: String(new Date().getTime()),
-  //         memberId: { userId: CURRENT_USER_ID },
-  //         type: "FILE",
-  //         fileName: name,
-  //         content: uri,
-  //         createdAt: new Date().toISOString(),
-  //       };
-
-  //       setMessages((prev) => [...prev, newFileMessage]);
-  //     }
-  //   } catch (error) {
-  //     console.error("File picking error:", error);
-  //   }
-  // };
+      // Check if the new API returns an assets array
+      if (result && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        const newFileMessage = {
+          _id: String(new Date().getTime()),
+          memberId: { userId: CURRENT_USER_ID },
+          type: "FILE",
+          fileName: file.name,
+          content: file.uri,
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, newFileMessage]);
+      } else {
+        Alert.alert("No file selected");
+      }
+    } catch (error) {
+      console.error("File picking error:", error);
+      Alert.alert("Error", error.message || "Something went wrong while picking the file.");
+    }
+  };
 
   const handleSendMessage = (message) => {
     if (!message.trim()) return;
@@ -407,7 +438,7 @@ export default function ChatSingle() {
         setInput={setInput}
         onSend={handleSendMessage}
         onPickImage={pickImage}
-        // onPickFile={pickDocument}
+        onPickFile={pickDocument}  
         onEmojiPress={() => setEmojiOpen(true)}
       />
       <EmojiPicker
