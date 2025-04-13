@@ -27,6 +27,7 @@ const FileIcon = require("../icons/paperclip.png");
 const PictureIcon = require("../icons/picture.png");
 const EmojiIcon = require("../icons/emoji.png");
 const SendIcon = require("../icons/send.png");
+const FileSent = require("../icons/filesent.png")
 
 const screenWidth = Dimensions.get("window").width;
 const CURRENT_USER_ID = "current_user_id";
@@ -69,7 +70,7 @@ function MessageItem({ msg, showAvatar, showTime }) {
               }
             }}
           >
-            <Image source={FileIcon} style={messageItemStyles.fileIcon} />
+            <Image source={FileSent} style={messageItemStyles.fileIcon} />
             <Text style={messageItemStyles.fileText}>
               {msg.fileName || "Mở File"}
             </Text>
