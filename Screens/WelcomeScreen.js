@@ -10,7 +10,7 @@ const WelcomeScreen = () => {
   const { token } = route.params;
   const { uID } = route.params;
   const handleGetStarted = () => {
-    navigation.navigate("HomeScreen", { token, uID }); 
+    navigation.navigate("ChatScreen", { token, uID });
   };
 
   return (
