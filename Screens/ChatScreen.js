@@ -20,7 +20,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
-
+import * as Sharing from 'expo-sharing';
 dayjs.extend(relativeTime);
 
 // ASSETS
@@ -50,6 +50,57 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
   // Nếu có onLongPress (chỉ dành cho tin nhắn của chính mình) thì bọc trong TouchableOpacity.
   const Container = onLongPress ? TouchableOpacity : View;
 
+
+  const getFileIcon = (fileName = "") => {
+    const extension = fileName.split(".").pop().toLowerCase();
+
+    console.log(extension);
+
+
+    switch (extension) {
+      case "pdf":
+        return require("../icons/pdf.png");
+      case "xls":
+      case "xlsx":
+        return require("../icons/xls.png");
+      case "doc":
+      case "docx":
+        return require("../icons/doc.png");
+      case "ppt":
+      case "pptx":
+        return require("../icons/ppt.png");
+      case "txt":
+        return require("../icons/txt.png");
+      default:
+        return require("../icons/fileDefault.png");
+    }
+  };
+
+  const openFile = async (uri, fileName = "") => {
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+
+      if (canShare) {
+        await Sharing.shareAsync(uri);
+      } else if (Platform.OS === "android") {
+        const mimeType = getMimeType(fileName);
+
+        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+          data: uri,
+          flags: 1,
+          type: mimeType,
+        });
+      } else {
+        Alert.alert("Không thể mở file", "Thiết bị không hỗ trợ mở file này.");
+      }
+    } catch (error) {
+      console.error("Mở file lỗi:", error);
+      Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
+    }
+  };
+
+
+
   return (
     <Container
       onLongPress={onLongPress}
@@ -73,15 +124,9 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
         ) : msg.type === "FILE" ? (
           <TouchableOpacity
             style={messageItemStyles.fileContainer}
-            onPress={() => {
-              try {
-                if (content) Linking.openURL(content);
-              } catch {
-                Alert.alert("Cannot open file", "Error opening file.");
-              }
-            }}
+            onPress={() => openFile(msg.content, msg.fileName)}
           >
-            <Image source={FileSent} style={messageItemStyles.fileIcon} />
+            <Image source={getFileIcon(msg.fileName)} style={messageItemStyles.fileIcon} />
             <Text style={messageItemStyles.fileText}>
               {msg.fileName || "Open File"}
             </Text>
@@ -135,17 +180,26 @@ const messageItemStyles = StyleSheet.create({
     resizeMode: "cover",
   },
   fileContainer: {
-    padding: 10,
+    padding: 12,
     backgroundColor: "#EFF8FF",
     borderRadius: 12,
     alignItems: "center",
+    flexDirection: "column",
+    minWidth: 100,
+    maxWidth: 200,
   },
-  fileIcon: { width: 48, height: 48, tintColor: "#086DC0" },
+  fileIcon: {
+    width: 48,
+    height: 48,
+    marginBottom: 4,
+  },
   fileText: {
-    marginTop: 4,
     color: "#086DC0",
     fontSize: 14,
     textDecorationLine: "underline",
+    textAlign: "center",
+    marginTop: 4,
+    flexWrap: "wrap",
   },
   textContent: {
     paddingHorizontal: 12,
@@ -206,10 +260,13 @@ const chatBoxStyles = StyleSheet.create({
   contentContainer: { padding: 8, paddingBottom: 20 },
 });
 
-/**
- * MessageInput Component (không thay đổi gì)
- */
-function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmojiPress }) {
+function MessageInput({
+
+  input, setInput, onSend, onPickImage, onPickFile, onEmojiPress
+}) {
+  const [selectedFile, setSelectedFile] = useState(null);
+
+
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -220,6 +277,7 @@ function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmoj
     <View style={messageInputStyles.container}>
       <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickFile}>
         <Image source={FileIcon} style={messageInputStyles.icon} />
+
       </TouchableOpacity>
       <View style={messageInputStyles.inputContainer}>
         <TextInput
@@ -412,27 +470,156 @@ export default function ChatSingle() {
     }
   };
 
-  // Pick Document (cho tin nhắn file)
   const pickDocument = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: "*/*" });
-      if (!result.canceled && result.assets?.length > 0) {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "text/plain",
+          "application/vnd.ms-project",
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled === false && result.assets && result.assets.length > 0) {
+        // Expo DocumentPicker mới trả về kết quả trong assets array
         const file = result.assets[0];
-        const newMsg = {
-          _id: String(Date.now()),
-          memberId: { userId: userId || "" },
+        const newFileMessage = {
+          _id: String(new Date().getTime()),
+          memberId: { userId: CURRENT_USER_ID },
           type: "FILE",
           fileName: file.name,
           content: file.uri,
           createdAt: new Date().toISOString(),
         };
-        setMessages((prev) => [...prev, newMsg]);
-        // Optionally, process file upload to the server here.
+
+        setMessages((prev) => [...prev, newFileMessage]);
+      } else if (result.type === "success") {
+        const { name, uri } = result;
+        const newFileMessage = {
+          _id: String(new Date().getTime()),
+          memberId: { userId: CURRENT_USER_ID },
+          type: "FILE",
+          fileName: name,
+          content: uri,
+          createdAt: new Date().toISOString(),
+        };
+
+        setMessages((prev) => [...prev, newFileMessage]);
       }
-    } catch (err) {
-      Alert.alert("Error choosing file", err.message);
+    } catch (error) {
+      console.error("File picking error:", error);
+      Alert.alert("Lỗi", "Không thể chọn file, vui lòng thử lại.");
     }
   };
+
+  // function MessageItem({ msg, showAvatar, showTime }) {
+  //   const [expanded, setExpanded] = useState(false);
+  //   const MAX_TEXT_LENGTH = 350;
+  //   const isMe = msg.memberId.userId === CURRENT_USER_ID;
+  //   const isImage = msg.type === "IMAGE";
+
+  //   const isFile = msg.type === "FILE";
+
+  //   const getFileIcon = (fileName = "") => {
+  //     const extension = fileName.split(".").pop().toLowerCase();
+
+  //     console.log(extension);
+
+
+  //     switch (extension) {
+  //       case "pdf":
+  //         return require("../icons/pdf.png");
+  //       case "xls":
+  //       case "xlsx":
+  //         return require("../icons/xls.png");
+  //       case "doc":
+  //       case "docx":
+  //         return require("../icons/doc.png");
+  //       case "ppt":
+  //       case "pptx":
+  //         return require("../icons/ppt.png");
+  //       case "txt":
+  //         return require("../icons/txt.png");
+  //       default:
+  //         return require("../icons/fileDefault.png");
+  //     }
+  //   };
+
+
+
+  //   return (
+  //     <View
+  //       style={[
+  //         messageItemStyles.container,
+  //         isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
+  //       ]}
+  //     >
+  //       {showAvatar ? (
+  //         <Image source={AvatarImage} style={messageItemStyles.avatar} />
+  //       ) : (
+  //         <View style={messageItemStyles.avatarPlaceholder} />
+  //       )}
+  //       <View style={messageItemStyles.contentContainer}>
+  //         {isImage ? (
+  //           <Image source={{ uri: msg.content }} style={messageItemStyles.imageContent} />
+  //         ) : isFile ? (
+  //           // Hiển thị tin nhắn file
+  //           <TouchableOpacity
+  //             style={messageItemStyles.fileContainer}
+  //             onPress={() => {
+  //               try {
+  //                 if (msg.content) {
+  //                   Linking.openURL(msg.content); // Mở file khi nhấn vào
+  //                 }
+  //               } catch (error) {
+  //                 Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
+  //               }
+  //             }}
+  //           >
+  //             <Image source={getFileIcon(msg.fileName)} style={messageItemStyles.fileIcon} />
+  //             <Text style={messageItemStyles.fileText}>
+  //               {msg.fileName || "Mở File"} {/* Hiển thị tên file */}
+  //             </Text>
+  //           </TouchableOpacity>
+  //         ) : (
+  //           <Text
+  //             style={[
+  //               messageItemStyles.textContent,
+  //               isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
+  //             ]}
+  //           >
+  //             {expanded ? msg.content : msg.content.slice(0, MAX_TEXT_LENGTH)}
+  //             {msg.content.length > MAX_TEXT_LENGTH && (
+  //               <Text
+  //                 style={messageItemStyles.expandText}
+  //                 onPress={() => setExpanded(!expanded)}
+  //               >
+  //                 {expanded ? " Thu gọn" : " Xem thêm"}
+  //               </Text>
+  //             )}
+  //           </Text>
+  //         )}
+  //         {showTime && (
+  //           <Text
+  //             style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}
+  //           >
+  //             {dayjs(msg.createdAt).fromNow()}
+  //           </Text>
+  //         )}
+  //       </View>
+  //     </View>
+  //   );
+  // }
+
+
+
+
 
   // Gửi tin nhắn text qua axios và socket.
   const handleSendMessage = async (message) => {

@@ -36,23 +36,64 @@ function AppContainer() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="ChatScreen" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="FriendList_Screen" component={FriendList_Screen} />
-        <Stack.Screen name="AllFriendAndGroup" component={AllFriendAndGroup} />
-        <Stack.Screen name="Screen_03" component={Screen_03} />
-        <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-        <Stack.Screen name="AddFriendScreen" component={AddFriendScreen} />
-        <Stack.Screen name="YourFriendScreen" component={YourFriendScreen} />
-        <Stack.Screen name="LoginScreen" component={Login} />
-        <Stack.Screen name="SignupScreen" component={Signup} />
-        <Stack.Screen name="OtpScreen" component={Otp} />
-        <Stack.Screen name="WelcomeScreen" component={Welcome} />
-        <Stack.Screen name="HomeScreen" component={Home} />
-        <Stack.Screen name="DetailScreen" component={Detail} />
-        <Stack.Screen name="GroupDetailScreen" component={GroupDetail} />
-        <Stack.Screen name="ChatScreen" component={Chat} />
-        <Stack.Screen name="ResetPasswordStep1Screen" component={ResetPasswordStep1} />
-        <Stack.Screen name="ResetPasswordStep2Screen" component={ResetPasswordStep2} />
+      <Stack.Navigator initialRouteName="LoginScreen">
+        <Stack.Screen name="FriendList_Screen" component={FriendList_Screen} options={{ headerShown: false }} />
+        <Stack.Screen name="AllFriendAndGroup" component={AllFriendAndGroup} options={{ headerShown: false }} />
+        <Stack.Screen name="Screen_03" component={Screen_03} options={{ headerShown: false }} />
+        <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AddFriendScreen" component={AddFriendScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="YourFriendScreen" component={YourFriendScreen} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="LoginScreen"
+          component={Login}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="SignupScreen"
+          component={Signup}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="OtpScreen"
+          component={Otp}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="WelcomeScreen"
+          component={Welcome}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="HomeScreen"
+          component={Home}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DetailScreen"
+          component={Detail}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="GroupDetailScreen"
+          component={GroupDetail}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ChatScreen"
+          component={Chat}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ResetPasswordStep1Screen"
+          component={ResetPasswordStep1}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ResetPasswordStep2Screen"
+          component={ResetPasswordStep2}
+          options={{ headerShown: false }}
+
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
