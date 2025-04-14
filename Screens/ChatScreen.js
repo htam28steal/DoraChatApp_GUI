@@ -639,7 +639,9 @@ export default function ChatSingle() {
         conversationId: CONVERSATION_ID,
         content: message,
       });
+      console.log(response);
       const newMsg = response.data;
+      setMessages(prev => [...prev, newMsg]);
       // Emit message đến các client khác qua socket.
       socket.emit(SOCKET_EVENTS.SEND_MESSAGE, newMsg);
     } catch (err) {
