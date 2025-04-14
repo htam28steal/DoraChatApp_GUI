@@ -11,14 +11,19 @@ import {
   Linking,
   Dimensions,
 } from "react-native";
+import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import EmojiPicker from "rn-emoji-keyboard";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
+
 dayjs.extend(relativeTime);
 
-// ICONS / IMAGES
+// ASSETS
 const AvatarImage = require("../Images/avt.png");
 const CallIcon = require("../assets/Call.png");
 const VideoCallIcon = require("../assets/VideoCall.png");
@@ -27,20 +32,28 @@ const FileIcon = require("../icons/paperclip.png");
 const PictureIcon = require("../icons/picture.png");
 const EmojiIcon = require("../icons/emoji.png");
 const SendIcon = require("../icons/send.png");
-const FileSent = require("../icons/filesent.png")
+const FileSent = require("../icons/filesent.png");
 
+// CONSTANTS
+const CONVERSATION_ID = "67dcf8eac3a67270b6534c60"; // Có thể đổi thành dynamic nếu cần.
 const screenWidth = Dimensions.get("window").width;
-const CURRENT_USER_ID = "current_user_id";
 
-function MessageItem({ msg, showAvatar, showTime }) {
-  const [expanded, setExpanded] = useState(false);
+/**
+ * Message Bubble Component với hỗ trợ onLongPress để recall tin nhắn.
+ */
+function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) {
+  // Kiểm tra nếu tin nhắn do chính người dùng gửi.
+  const isMe = msg.memberId?.userId === currentUserId;
+  const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
-  const isMe = msg.memberId.userId === CURRENT_USER_ID;
-  const isImage = msg.type === "IMAGE";
-  const isFile = msg.type === "FILE";
+
+  // Nếu có onLongPress (chỉ dành cho tin nhắn của chính mình) thì bọc trong TouchableOpacity.
+  const Container = onLongPress ? TouchableOpacity : View;
 
   return (
-    <View
+    <Container
+      onLongPress={onLongPress}
+      activeOpacity={0.7}
       style={[
         messageItemStyles.container,
         isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
@@ -52,27 +65,25 @@ function MessageItem({ msg, showAvatar, showTime }) {
         <View style={messageItemStyles.avatarPlaceholder} />
       )}
       <View style={messageItemStyles.contentContainer}>
-        {isImage ? (
+        {msg.type === "IMAGE" ? (
           <Image
-            source={{ uri: msg.content }}
+            source={{ uri: content }}
             style={messageItemStyles.imageContent}
           />
-        ) : isFile ? (
+        ) : msg.type === "FILE" ? (
           <TouchableOpacity
             style={messageItemStyles.fileContainer}
             onPress={() => {
               try {
-                if (msg.content) {
-                  Linking.openURL(msg.content);
-                }
-              } catch (error) {
-                Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
+                if (content) Linking.openURL(content);
+              } catch {
+                Alert.alert("Cannot open file", "Error opening file.");
               }
             }}
           >
             <Image source={FileSent} style={messageItemStyles.fileIcon} />
             <Text style={messageItemStyles.fileText}>
-              {msg.fileName || "Mở File"}
+              {msg.fileName || "Open File"}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -80,17 +91,15 @@ function MessageItem({ msg, showAvatar, showTime }) {
             style={[
               messageItemStyles.textContent,
               isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
+              // Nếu đây là tin nhắn đã recall, ta có thể thay đổi style (ví dụ: in nghiêng)
+              msg.type === "RECALL" && { fontStyle: "italic", color: "#999" },
             ]}
           >
-            {expanded ? msg.content : msg.content.slice(0, MAX_TEXT_LENGTH)}
-            {msg.content.length > MAX_TEXT_LENGTH && (
-              <Text
-                style={messageItemStyles.expandText}
-                onPress={() => setExpanded(!expanded)}
-              >
-                {expanded ? " Thu gọn" : " Xem thêm"}
-              </Text>
-            )}
+            {msg.type === "RECALL"
+              ? "[Message recalled]"
+              : content.length > MAX_TEXT_LENGTH
+              ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+              : content}
           </Text>
         )}
         {showTime && (
@@ -104,12 +113,16 @@ function MessageItem({ msg, showAvatar, showTime }) {
           </Text>
         )}
       </View>
-    </View>
+    </Container>
   );
 }
 
 const messageItemStyles = StyleSheet.create({
-  container: { flexDirection: "row", marginVertical: 4, alignItems: "flex-end" },
+  container: { 
+    flexDirection: "row", 
+    marginVertical: 4, 
+    alignItems: "flex-end" 
+  },
   leftAlign: { justifyContent: "flex-start" },
   rightAlign: { flexDirection: "row-reverse" },
   avatar: { width: 40, height: 40, borderRadius: 20 },
@@ -127,11 +140,7 @@ const messageItemStyles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   },
-  fileIcon: {
-    width: 48,
-    height: 48,
-    tintColor: "#086DC0",
-  },
+  fileIcon: { width: 48, height: 48, tintColor: "#086DC0" },
   fileText: {
     marginTop: 4,
     color: "#086DC0",
@@ -147,16 +156,18 @@ const messageItemStyles = StyleSheet.create({
   },
   myMessage: { backgroundColor: "#EFF8FF", alignSelf: "flex-end" },
   theirMessage: { backgroundColor: "#F5F5F5" },
-  expandText: { color: "#086DC0" },
   timeText: { fontSize: 10, color: "#959595", marginTop: 4 },
 });
 
-function ChatBox({ messages }) {
+/**
+ * ChatBox Component nhận thêm hàm onMessageLongPress.
+ */
+function ChatBox({ messages, currentUserId, onMessageLongPress }) {
   const scrollViewRef = useRef(null);
+
   useEffect(() => {
-    if (scrollViewRef.current) {
+    if (scrollViewRef.current)
       scrollViewRef.current.scrollToEnd({ animated: true });
-    }
   }, [messages]);
 
   return (
@@ -166,19 +177,23 @@ function ChatBox({ messages }) {
       contentContainerStyle={chatBoxStyles.contentContainer}
     >
       {messages.map((msg, index) => {
-        const isFirstInGroup =
-          index === 0 ||
-          messages[index - 1].memberId.userId !== msg.memberId.userId;
-        const isLastInGroup =
-          index === messages.length - 1 ||
-          messages[index + 1].memberId.userId !== msg.memberId.userId;
+        // Nhóm các tin nhắn liên tiếp cùng người gửi.
+        const userId = msg.memberId?.userId || "";
+        const prevId = messages[index - 1]?.memberId?.userId || "";
+        const nextId = messages[index + 1]?.memberId?.userId || "";
+        const isFirstInGroup = index === 0 || prevId !== userId;
+        const isLastInGroup = index === messages.length - 1 || nextId !== userId;
+        const key = `${msg._id}-${index}`;
 
         return (
           <MessageItem
-            key={msg._id || index}
+            key={key}
             msg={msg}
             showAvatar={isFirstInGroup}
             showTime={isLastInGroup}
+            currentUserId={currentUserId}
+            // Chỉ cho phép recall tin nhắn của chính người dùng, nên onLongPress mới được truyền.
+            onLongPress={msg.memberId?.userId === currentUserId ? () => onMessageLongPress(msg) : null}
           />
         );
       })}
@@ -191,14 +206,10 @@ const chatBoxStyles = StyleSheet.create({
   contentContainer: { padding: 8, paddingBottom: 20 },
 });
 
-function MessageInput({
-  input,
-  setInput,
-  onSend,
-  onPickImage,
-  onPickFile,
-  onEmojiPress,
-}) {
+/**
+ * MessageInput Component (không thay đổi gì)
+ */
+function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmojiPress }) {
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -207,13 +218,9 @@ function MessageInput({
 
   return (
     <View style={messageInputStyles.container}>
-      <TouchableOpacity
-        style={messageInputStyles.iconButton}
-        onPress={onPickFile}
-      >
+      <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickFile}>
         <Image source={FileIcon} style={messageInputStyles.icon} />
       </TouchableOpacity>
-
       <View style={messageInputStyles.inputContainer}>
         <TextInput
           style={messageInputStyles.textInput}
@@ -223,24 +230,14 @@ function MessageInput({
           onSubmitEditing={handleSend}
           returnKeyType="send"
         />
-        <TouchableOpacity
-          style={messageInputStyles.iconButton}
-          onPress={onPickImage}
-        >
+        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickImage}>
           <Image source={PictureIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={messageInputStyles.iconButton}
-          onPress={onEmojiPress}
-        >
+        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onEmojiPress}>
           <Image source={EmojiIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        style={messageInputStyles.sendButton}
-        onPress={handleSend}
-      >
+      <TouchableOpacity style={messageInputStyles.sendButton} onPress={handleSend}>
         <Image source={SendIcon} style={messageInputStyles.sendIcon} />
       </TouchableOpacity>
     </View>
@@ -277,6 +274,9 @@ const messageInputStyles = StyleSheet.create({
   sendIcon: { width: 24, height: 24, resizeMode: "contain" },
 });
 
+/**
+ * Header Component (không thay đổi)
+ */
 function HeaderSingleChat({ handleDetail }) {
   return (
     <View style={headerStyles.container}>
@@ -295,10 +295,7 @@ function HeaderSingleChat({ handleDetail }) {
         <TouchableOpacity style={headerStyles.iconButton}>
           <Image source={VideoCallIcon} style={headerStyles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={headerStyles.iconButton}
-          onPress={handleDetail}
-        >
+        <TouchableOpacity style={headerStyles.iconButton} onPress={handleDetail}>
           <Image source={DetailChatIcon} style={headerStyles.icon} />
         </TouchableOpacity>
       </View>
@@ -332,114 +329,194 @@ const headerStyles = StyleSheet.create({
   icon: { width: 24, height: 24, resizeMode: "contain" },
 });
 
+/**
+ * Main ChatScreen Component với recallMessage tích hợp.
+ */
 export default function ChatSingle() {
-  const conversationId = "67ee2539dc14e5903dc8b4ce";
+  const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
 
+  // Lấy user id từ AsyncStorage.
+  useEffect(() => {
+    const fetchUserId = async () => {
+      try {
+        const storedUserId = await AsyncStorage.getItem("userId");
+        if (storedUserId) {
+          setUserId(storedUserId);
+        } else {
+          Alert.alert("Error", "User id not found.");
+        }
+      } catch (error) {
+        Alert.alert("Error fetching user id", error.message);
+      }
+    };
+    fetchUserId();
+  }, []);
+
+  // Hàm recall message khi nhấn giữ vào tin nhắn.
+  const handleRecallMessage = (message) => {
+    // Chỉ cho phép recall tin nhắn của chính người dùng.
+    if (message.memberId?.userId !== userId) return;
+
+    Alert.alert("Recall Message", "Do you want to recall this message?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "OK",
+        onPress: async () => {
+          try {
+            // Gọi API recall message theo route DELETE đã định nghĩa:
+            // router.delete("/:id/conversation/:conversationId", messageController.recallMessage)
+            await axios.delete(`/api/messages/${message._id}/conversation/${CONVERSATION_ID}`);
+            // Cập nhật state: đổi nội dung và type thành RECALL.
+            setMessages((prev) =>
+              prev.map((m) =>
+                m._id === message._id
+                  ? { ...m, content: "[Message recalled]", type: "RECALL" }
+                  : m
+              )
+            );
+          } catch (err) {
+            Alert.alert("Error", err.response?.data?.message || err.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  // Pick Image (cho tin nhắn media)
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        "Permission required",
-        "We need permission to access your gallery!"
-      );
+      Alert.alert("Permission denied", "Gallery access needed.");
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
       quality: 1,
     });
 
     if (!result.canceled && result.assets.length > 0) {
       const selectedImage = result.assets[0];
-      const newImageMessage = {
-        _id: String(new Date().getTime()),
-        memberId: { userId: CURRENT_USER_ID },
+      const newMsg = {
+        _id: String(Date.now()),
+        memberId: { userId: userId || "" },
         type: "IMAGE",
         content: selectedImage.uri,
         createdAt: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, newImageMessage]);
+      setMessages((prev) => [...prev, newMsg]);
+      // Optionally, upload the image to the server here.
     }
   };
 
-  // Updated pickDocument function using the new assets array approach
+  // Pick Document (cho tin nhắn file)
   const pickDocument = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-
-      // Check if the new API returns an assets array
-      if (result && result.assets && result.assets.length > 0) {
+      const result = await DocumentPicker.getDocumentAsync({ type: "*/*" });
+      if (!result.canceled && result.assets?.length > 0) {
         const file = result.assets[0];
-        const newFileMessage = {
-          _id: String(new Date().getTime()),
-          memberId: { userId: CURRENT_USER_ID },
+        const newMsg = {
+          _id: String(Date.now()),
+          memberId: { userId: userId || "" },
           type: "FILE",
           fileName: file.name,
           content: file.uri,
           createdAt: new Date().toISOString(),
         };
-        setMessages((prev) => [...prev, newFileMessage]);
-      } else {
-        Alert.alert("No file selected");
+        setMessages((prev) => [...prev, newMsg]);
+        // Optionally, process file upload to the server here.
       }
-    } catch (error) {
-      console.error("File picking error:", error);
-      Alert.alert("Error", error.message || "Something went wrong while picking the file.");
+    } catch (err) {
+      Alert.alert("Error choosing file", err.message);
     }
   };
 
-  const handleSendMessage = (message) => {
+  // Gửi tin nhắn text qua axios và socket.
+  const handleSendMessage = async (message) => {
     if (!message.trim()) return;
-    const newMsg = {
-      _id: String(new Date().getTime()),
-      memberId: { userId: CURRENT_USER_ID },
-      type: "TEXT",
-      content: message,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, newMsg]);
+    if (!userId) {
+      Alert.alert("User not loaded", "Unable to send message without a valid user.");
+      return;
+    }
+
+    console.log("Sending message from user:", userId);
+    console.log("Message content:", message);
+
+    try {
+      // Giả sử accessToken được lưu trong AsyncStorage
+      const token = await AsyncStorage.getItem("accessToken");
+      const response = await axios.post("/api/messages/text", {
+        conversationId: CONVERSATION_ID,
+        content: message,
+      });
+      const newMsg = response.data;
+      // Emit message đến các client khác qua socket.
+      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, newMsg);
+    } catch (err) {
+      Alert.alert("Cannot send message", err.response?.data?.message || err.message);
+    }
   };
 
+  // Lắng nghe tin nhắn đến từ socket.
+  useEffect(() => {
+    if (!socket) return;
+
+    const receiveHandler = (message) => {
+      setMessages((prev) => {
+        const exists = prev.some((m) => m._id === message._id);
+        if (exists) return prev;
+        return [...prev, message];
+      });
+    };
+
+    socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, CONVERSATION_ID);
+
+    return () => {
+      socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, CONVERSATION_ID);
+    };
+  }, []);
+
+  // Seed initial messages cho mục demo.
   useEffect(() => {
     setMessages([
       {
         _id: "1",
         memberId: { userId: "user1" },
         type: "TEXT",
-        content: "Qua cam khong?",
+        content: "Hello, how are you?",
         createdAt: "2025-04-07T10:00:00Z",
       },
       {
         _id: "2",
-        memberId: { userId: CURRENT_USER_ID },
+        memberId: { userId: userId || "current_user" },
         type: "TEXT",
-        content: "Riêng m",
+        content: "I'm good, thanks!",
         createdAt: "2025-04-08T10:01:00Z",
       },
     ]);
-  }, [conversationId]);
+  }, [userId]);
 
   return (
     <View style={chatScreenStyles.container}>
       <HeaderSingleChat />
       <View style={chatScreenStyles.chatContainer}>
-        <ChatBox messages={messages} />
+        <ChatBox
+          messages={messages}
+          currentUserId={userId}
+          onMessageLongPress={handleRecallMessage}
+        />
       </View>
       <MessageInput
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
         onPickImage={pickImage}
-        onPickFile={pickDocument}  
+        onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
       />
       <EmojiPicker

@@ -26,6 +26,8 @@ const LoginScreen = () => {
         const accessToken = response.data?.token;
         const refreshToken = response.data?.refreshToken;
         await AsyncStorage.setItem('userToken', accessToken);
+        await AsyncStorage.setItem('userId', id);
+        console.log('Logged in userId:', id);
         navigation.navigate("WelcomeScreen", { token: accessToken, uID: id });
       }
     } catch (error) {
