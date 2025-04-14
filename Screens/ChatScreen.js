@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   Dimensions,
+  Platform,
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -20,8 +21,9 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
-import * as Sharing from 'expo-sharing';
+import * as Sharing from "expo-sharing";
 dayjs.extend(relativeTime);
+import { useNavigation } from '@react-navigation/native';
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
@@ -33,30 +35,25 @@ const PictureIcon = require("../icons/picture.png");
 const EmojiIcon = require("../icons/emoji.png");
 const SendIcon = require("../icons/send.png");
 const FileSent = require("../icons/filesent.png");
-
+const Return = require("../icons/back.png");
 // CONSTANTS
-const CONVERSATION_ID = "67dcf8eac3a67270b6534c60"; // Có thể đổi thành dynamic nếu cần.
+const CONVERSATION_ID = "67dcf8eac3a67270b6534c60";
 const screenWidth = Dimensions.get("window").width;
 
 /**
- * Message Bubble Component với hỗ trợ onLongPress để recall tin nhắn.
+ * Message Bubble Component with support for onLongPress to recall a message.
  */
 function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) {
-  // Kiểm tra nếu tin nhắn do chính người dùng gửi.
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
 
-  // Nếu có onLongPress (chỉ dành cho tin nhắn của chính mình) thì bọc trong TouchableOpacity.
+  // If onLongPress exists, wrap in TouchableOpacity (for own messages)
   const Container = onLongPress ? TouchableOpacity : View;
-
 
   const getFileIcon = (fileName = "") => {
     const extension = fileName.split(".").pop().toLowerCase();
-
     console.log(extension);
-
-
     switch (extension) {
       case "pdf":
         return require("../icons/pdf.png");
@@ -79,17 +76,12 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
   const openFile = async (uri, fileName = "") => {
     try {
       const canShare = await Sharing.isAvailableAsync();
-
       if (canShare) {
         await Sharing.shareAsync(uri);
       } else if (Platform.OS === "android") {
-        const mimeType = getMimeType(fileName);
-
-        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
-          data: uri,
-          flags: 1,
-          type: mimeType,
-        });
+        // If needed, set your mime type here. For now, it's a placeholder.
+        const mimeType = "application/octet-stream";
+        await Linking.openURL(uri);
       } else {
         Alert.alert("Không thể mở file", "Thiết bị không hỗ trợ mở file này.");
       }
@@ -98,8 +90,6 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
       Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
     }
   };
-
-
 
   return (
     <Container
@@ -117,10 +107,7 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
       )}
       <View style={messageItemStyles.contentContainer}>
         {msg.type === "IMAGE" ? (
-          <Image
-            source={{ uri: content }}
-            style={messageItemStyles.imageContent}
-          />
+          <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
         ) : msg.type === "FILE" ? (
           <TouchableOpacity
             style={messageItemStyles.fileContainer}
@@ -136,24 +123,18 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
             style={[
               messageItemStyles.textContent,
               isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
-              // Nếu đây là tin nhắn đã recall, ta có thể thay đổi style (ví dụ: in nghiêng)
               msg.type === "RECALL" && { fontStyle: "italic", color: "#999" },
             ]}
           >
             {msg.type === "RECALL"
-              ? "[Message recalled]"
+              ? "Tin nhắn đã được thu hồi"
               : content.length > MAX_TEXT_LENGTH
-                ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-                : content}
+              ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+              : content}
           </Text>
         )}
         {showTime && (
-          <Text
-            style={[
-              messageItemStyles.timeText,
-              isMe && { alignSelf: "flex-end" },
-            ]}
-          >
+          <Text style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}>
             {dayjs(msg.createdAt).fromNow()}
           </Text>
         )}
@@ -166,7 +147,7 @@ const messageItemStyles = StyleSheet.create({
   container: {
     flexDirection: "row",
     marginVertical: 4,
-    alignItems: "flex-end"
+    alignItems: "flex-end",
   },
   leftAlign: { justifyContent: "flex-start" },
   rightAlign: { flexDirection: "row-reverse" },
@@ -214,14 +195,13 @@ const messageItemStyles = StyleSheet.create({
 });
 
 /**
- * ChatBox Component nhận thêm hàm onMessageLongPress.
+ * ChatBox Component to render a scrollable list of messages.
  */
 function ChatBox({ messages, currentUserId, onMessageLongPress }) {
   const scrollViewRef = useRef(null);
 
   useEffect(() => {
-    if (scrollViewRef.current)
-      scrollViewRef.current.scrollToEnd({ animated: true });
+    if (scrollViewRef.current) scrollViewRef.current.scrollToEnd({ animated: true });
   }, [messages]);
 
   return (
@@ -231,7 +211,6 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
       contentContainerStyle={chatBoxStyles.contentContainer}
     >
       {messages.map((msg, index) => {
-        // Nhóm các tin nhắn liên tiếp cùng người gửi.
         const userId = msg.memberId?.userId || "";
         const prevId = messages[index - 1]?.memberId?.userId || "";
         const nextId = messages[index + 1]?.memberId?.userId || "";
@@ -246,8 +225,9 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
             showAvatar={isFirstInGroup}
             showTime={isLastInGroup}
             currentUserId={currentUserId}
-            // Chỉ cho phép recall tin nhắn của chính người dùng, nên onLongPress mới được truyền.
-            onLongPress={msg.memberId?.userId === currentUserId ? () => onMessageLongPress(msg) : null}
+            onLongPress={
+              msg.memberId?.userId === currentUserId ? () => onMessageLongPress(msg) : null
+            }
           />
         );
       })}
@@ -260,13 +240,10 @@ const chatBoxStyles = StyleSheet.create({
   contentContainer: { padding: 8, paddingBottom: 20 },
 });
 
-function MessageInput({
-
-  input, setInput, onSend, onPickImage, onPickFile, onEmojiPress
-}) {
-  const [selectedFile, setSelectedFile] = useState(null);
-
-
+/**
+ * MessageInput Component for composing messages.
+ */
+function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmojiPress }) {
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -277,7 +254,6 @@ function MessageInput({
     <View style={messageInputStyles.container}>
       <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickFile}>
         <Image source={FileIcon} style={messageInputStyles.icon} />
-
       </TouchableOpacity>
       <View style={messageInputStyles.inputContainer}>
         <TextInput
@@ -333,11 +309,16 @@ const messageInputStyles = StyleSheet.create({
 });
 
 /**
- * Header Component (không thay đổi)
+ * Header Component for the chat screen.
  */
 function HeaderSingleChat({ handleDetail }) {
+  const navigation = useNavigation();
   return (
     <View style={headerStyles.container}>
+      <TouchableOpacity onPress={()=>{
+        navigation.navigate("ConversationScreen")
+      }}><Image source={Return} style={headerStyles.avatar} /></TouchableOpacity>
+     
       <Image source={AvatarImage} style={headerStyles.avatar} />
       <View style={headerStyles.infoContainer}>
         <Text style={headerStyles.name}>John Doe</Text>
@@ -388,7 +369,7 @@ const headerStyles = StyleSheet.create({
 });
 
 /**
- * Main ChatScreen Component với recallMessage tích hợp.
+ * Main ChatScreen Component with message recall and fetching messages using axios.
  */
 export default function ChatSingle() {
   const [userId, setUserId] = useState(null);
@@ -396,7 +377,7 @@ export default function ChatSingle() {
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
 
-  // Lấy user id từ AsyncStorage.
+  // Retrieve userId from AsyncStorage.
   useEffect(() => {
     const fetchUserId = async () => {
       try {
@@ -413,9 +394,27 @@ export default function ChatSingle() {
     fetchUserId();
   }, []);
 
-  // Hàm recall message khi nhấn giữ vào tin nhắn.
+  // Fetch all messages from the conversation using axios.
+  useEffect(() => {
+    const fetchAllMessages = async () => {
+      try {
+        const response = await axios.get("/api/messages/" + CONVERSATION_ID);
+        // Assuming response.data is an array of messages.
+        setMessages(response.data);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+        Alert.alert(
+          "Error fetching messages",
+          error.response?.data?.message || error.message
+        );
+      }
+    };
+
+    fetchAllMessages();
+  }, []);
+
+  // Handle recall message when user long presses on their own message.
   const handleRecallMessage = (message) => {
-    // Chỉ cho phép recall tin nhắn của chính người dùng.
     if (message.memberId?.userId !== userId) return;
 
     Alert.alert("Recall Message", "Do you want to recall this message?", [
@@ -424,10 +423,7 @@ export default function ChatSingle() {
         text: "OK",
         onPress: async () => {
           try {
-            // Gọi API recall message theo route DELETE đã định nghĩa:
-            // router.delete("/:id/conversation/:conversationId", messageController.recallMessage)
             await axios.delete(`/api/messages/${message._id}/conversation/${CONVERSATION_ID}`);
-            // Cập nhật state: đổi nội dung và type thành RECALL.
             setMessages((prev) =>
               prev.map((m) =>
                 m._id === message._id
@@ -443,7 +439,7 @@ export default function ChatSingle() {
     ]);
   };
 
-  // Pick Image (cho tin nhắn media)
+  // Pick image for media message.
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -466,10 +462,11 @@ export default function ChatSingle() {
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, newMsg]);
-      // Optionally, upload the image to the server here.
+      // Optionally, you could also upload the image to the server here.
     }
   };
 
+  // Pick document for file message.
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -487,7 +484,6 @@ export default function ChatSingle() {
       });
 
       if (result.canceled === false && result.assets && result.assets.length > 0) {
-        // Expo DocumentPicker mới trả về kết quả trong assets array
         const file = result.assets[0];
         const newFileMessage = {
           _id: String(new Date().getTime()),
@@ -497,7 +493,6 @@ export default function ChatSingle() {
           content: file.uri,
           createdAt: new Date().toISOString(),
         };
-
         setMessages((prev) => [...prev, newFileMessage]);
       } else if (result.type === "success") {
         const { name, uri } = result;
@@ -509,7 +504,6 @@ export default function ChatSingle() {
           content: uri,
           createdAt: new Date().toISOString(),
         };
-
         setMessages((prev) => [...prev, newFileMessage]);
       }
     } catch (error) {
@@ -518,138 +512,28 @@ export default function ChatSingle() {
     }
   };
 
-  // function MessageItem({ msg, showAvatar, showTime }) {
-  //   const [expanded, setExpanded] = useState(false);
-  //   const MAX_TEXT_LENGTH = 350;
-  //   const isMe = msg.memberId.userId === CURRENT_USER_ID;
-  //   const isImage = msg.type === "IMAGE";
-
-  //   const isFile = msg.type === "FILE";
-
-  //   const getFileIcon = (fileName = "") => {
-  //     const extension = fileName.split(".").pop().toLowerCase();
-
-  //     console.log(extension);
-
-
-  //     switch (extension) {
-  //       case "pdf":
-  //         return require("../icons/pdf.png");
-  //       case "xls":
-  //       case "xlsx":
-  //         return require("../icons/xls.png");
-  //       case "doc":
-  //       case "docx":
-  //         return require("../icons/doc.png");
-  //       case "ppt":
-  //       case "pptx":
-  //         return require("../icons/ppt.png");
-  //       case "txt":
-  //         return require("../icons/txt.png");
-  //       default:
-  //         return require("../icons/fileDefault.png");
-  //     }
-  //   };
-
-
-
-  //   return (
-  //     <View
-  //       style={[
-  //         messageItemStyles.container,
-  //         isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
-  //       ]}
-  //     >
-  //       {showAvatar ? (
-  //         <Image source={AvatarImage} style={messageItemStyles.avatar} />
-  //       ) : (
-  //         <View style={messageItemStyles.avatarPlaceholder} />
-  //       )}
-  //       <View style={messageItemStyles.contentContainer}>
-  //         {isImage ? (
-  //           <Image source={{ uri: msg.content }} style={messageItemStyles.imageContent} />
-  //         ) : isFile ? (
-  //           // Hiển thị tin nhắn file
-  //           <TouchableOpacity
-  //             style={messageItemStyles.fileContainer}
-  //             onPress={() => {
-  //               try {
-  //                 if (msg.content) {
-  //                   Linking.openURL(msg.content); // Mở file khi nhấn vào
-  //                 }
-  //               } catch (error) {
-  //                 Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
-  //               }
-  //             }}
-  //           >
-  //             <Image source={getFileIcon(msg.fileName)} style={messageItemStyles.fileIcon} />
-  //             <Text style={messageItemStyles.fileText}>
-  //               {msg.fileName || "Mở File"} {/* Hiển thị tên file */}
-  //             </Text>
-  //           </TouchableOpacity>
-  //         ) : (
-  //           <Text
-  //             style={[
-  //               messageItemStyles.textContent,
-  //               isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
-  //             ]}
-  //           >
-  //             {expanded ? msg.content : msg.content.slice(0, MAX_TEXT_LENGTH)}
-  //             {msg.content.length > MAX_TEXT_LENGTH && (
-  //               <Text
-  //                 style={messageItemStyles.expandText}
-  //                 onPress={() => setExpanded(!expanded)}
-  //               >
-  //                 {expanded ? " Thu gọn" : " Xem thêm"}
-  //               </Text>
-  //             )}
-  //           </Text>
-  //         )}
-  //         {showTime && (
-  //           <Text
-  //             style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}
-  //           >
-  //             {dayjs(msg.createdAt).fromNow()}
-  //           </Text>
-  //         )}
-  //       </View>
-  //     </View>
-  //   );
-  // }
-
-
-
-
-
-  // Gửi tin nhắn text qua axios và socket.
+  // Handle sending a text message.
   const handleSendMessage = async (message) => {
     if (!message.trim()) return;
     if (!userId) {
       Alert.alert("User not loaded", "Unable to send message without a valid user.");
       return;
     }
-
-    console.log("Sending message from user:", userId);
-    console.log("Message content:", message);
-
     try {
-      // Giả sử accessToken được lưu trong AsyncStorage
-      const token = await AsyncStorage.getItem("accessToken");
-      const response = await axios.post("/api/messages/text", {
+      // Optionally, retrieve token if needed.
+      await axios.post("/api/messages/text", {
         conversationId: CONVERSATION_ID,
         content: message,
       });
-      console.log(response);
-      const newMsg = response.data;
-      setMessages(prev => [...prev, newMsg]);
-      // Emit message đến các client khác qua socket.
-      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, newMsg);
+      // Emit the message over socket; the server should broadcast it back.
+      // (The socket listener will update the state upon receiving the new message.)
+      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, { conversationId: CONVERSATION_ID, content: message });
     } catch (err) {
       Alert.alert("Cannot send message", err.response?.data?.message || err.message);
     }
   };
 
-  // Lắng nghe tin nhắn đến từ socket.
+  // Listen for incoming messages from the socket.
   useEffect(() => {
     if (!socket) return;
 
@@ -670,25 +554,7 @@ export default function ChatSingle() {
     };
   }, []);
 
-  // Seed initial messages cho mục demo.
-  useEffect(() => {
-    setMessages([
-      {
-        _id: "1",
-        memberId: { userId: "user1" },
-        type: "TEXT",
-        content: "Hello, how are you?",
-        createdAt: "2025-04-07T10:00:00Z",
-      },
-      {
-        _id: "2",
-        memberId: { userId: userId || "current_user" },
-        type: "TEXT",
-        content: "I'm good, thanks!",
-        createdAt: "2025-04-08T10:01:00Z",
-      },
-    ]);
-  }, [userId]);
+
 
   return (
     <View style={chatScreenStyles.container}>

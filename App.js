@@ -23,6 +23,7 @@ import Chat from './Screens/ChatScreen';
 import ResetPasswordStep1 from './Screens/ResetPasswordStep1';
 import ResetPasswordStep2 from './Screens/ResetPasswordStep2';
 import useSocketListeners from './hooks/useSocketListeners';
+import Conversations from './Screens/ConversationScreen'
 
 const Stack = createStackNavigator();
 
@@ -61,6 +62,11 @@ function AppContainer() {
         <Stack.Screen
           name="WelcomeScreen"
           component={Welcome}
+          options={{ headerShown: false }}
+        />
+         <Stack.Screen
+          name="ConversationScreen"
+          component={Conversations}
           options={{ headerShown: false }}
         />
         <Stack.Screen
