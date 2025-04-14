@@ -143,8 +143,8 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
             {msg.type === "RECALL"
               ? "[Message recalled]"
               : content.length > MAX_TEXT_LENGTH
-              ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-              : content}
+                ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+                : content}
           </Text>
         )}
         {showTime && (
@@ -163,10 +163,10 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
 }
 
 const messageItemStyles = StyleSheet.create({
-  container: { 
-    flexDirection: "row", 
-    marginVertical: 4, 
-    alignItems: "flex-end" 
+  container: {
+    flexDirection: "row",
+    marginVertical: 4,
+    alignItems: "flex-end"
   },
   leftAlign: { justifyContent: "flex-start" },
   rightAlign: { flexDirection: "row-reverse" },
@@ -491,7 +491,7 @@ export default function ChatSingle() {
         const file = result.assets[0];
         const newFileMessage = {
           _id: String(new Date().getTime()),
-          memberId: { userId: CURRENT_USER_ID },
+          memberId: { userId: userId },
           type: "FILE",
           fileName: file.name,
           content: file.uri,
@@ -503,7 +503,7 @@ export default function ChatSingle() {
         const { name, uri } = result;
         const newFileMessage = {
           _id: String(new Date().getTime()),
-          memberId: { userId: CURRENT_USER_ID },
+          memberId: { userId: userId },
           type: "FILE",
           fileName: name,
           content: uri,
@@ -639,7 +639,9 @@ export default function ChatSingle() {
         conversationId: CONVERSATION_ID,
         content: message,
       });
+      console.log(response);
       const newMsg = response.data;
+      setMessages(prev => [...prev, newMsg]);
       // Emit message đến các client khác qua socket.
       socket.emit(SOCKET_EVENTS.SEND_MESSAGE, newMsg);
     } catch (err) {
