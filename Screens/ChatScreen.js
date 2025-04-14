@@ -16,6 +16,8 @@ import * as DocumentPicker from "expo-document-picker";
 import EmojiPicker from "rn-emoji-keyboard";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 dayjs.extend(relativeTime);
 
 // ICONS / IMAGES
@@ -38,6 +40,57 @@ function MessageItem({ msg, showAvatar, showTime }) {
   const isImage = msg.type === "IMAGE";
   const isFile = msg.type === "FILE";
 
+
+  const getFileIcon = (fileName = "") => {
+    const extension = fileName.split(".").pop().toLowerCase();
+
+    console.log(extension);
+
+
+    switch (extension) {
+      case "pdf":
+        return require("../icons/pdf.png");
+      case "xls":
+      case "xlsx":
+        return require("../icons/xls.png");
+      case "doc":
+      case "docx":
+        return require("../icons/doc.png");
+      case "ppt":
+      case "pptx":
+        return require("../icons/ppt.png");
+      case "txt":
+        return require("../icons/txt.png");
+      default:
+        return require("../icons/fileDefault.png");
+    }
+  };
+
+  const openFile = async (uri, fileName = "") => {
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+
+      if (canShare) {
+        await Sharing.shareAsync(uri);
+      } else if (Platform.OS === "android") {
+        const mimeType = getMimeType(fileName);
+
+        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+          data: uri,
+          flags: 1,
+          type: mimeType,
+        });
+      } else {
+        Alert.alert("Không thể mở file", "Thiết bị không hỗ trợ mở file này.");
+      }
+    } catch (error) {
+      console.error("Mở file lỗi:", error);
+      Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
+    }
+  };
+
+
+
   return (
     <View
       style={[
@@ -56,17 +109,9 @@ function MessageItem({ msg, showAvatar, showTime }) {
         ) : isFile ? (
           <TouchableOpacity
             style={messageItemStyles.fileContainer}
-            onPress={() => {
-              try {
-                if (msg.content) {
-                  Linking.openURL(msg.content);
-                }
-              } catch (error) {
-                Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
-              }
-            }}
+            onPress={() => openFile(msg.content, msg.fileName)}
           >
-            <Image source={FileIcon} style={messageItemStyles.fileIcon} />
+            <Image source={getFileIcon(msg.fileName)} style={messageItemStyles.fileIcon} />
             <Text style={messageItemStyles.fileText}>
               {msg.fileName || "Mở File"}
             </Text>
@@ -108,7 +153,7 @@ const messageItemStyles = StyleSheet.create({
   container: { flexDirection: "row", marginVertical: 4, alignItems: "flex-end" },
   leftAlign: { justifyContent: "flex-start" },
   rightAlign: { flexDirection: "row-reverse" },
-  avatar: { width: 40, height: 40, borderRadius: 20},
+  avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarPlaceholder: { width: 40, height: 40 },
   contentContainer: { maxWidth: 468, marginHorizontal: 8 },
   imageContent: {
@@ -118,21 +163,26 @@ const messageItemStyles = StyleSheet.create({
     resizeMode: "cover",
   },
   fileContainer: {
-    padding: 10,
+    padding: 12,
     backgroundColor: "#EFF8FF",
     borderRadius: 12,
     alignItems: "center",
+    flexDirection: "column",
+    minWidth: 100,
+    maxWidth: 200,
   },
   fileIcon: {
     width: 48,
     height: 48,
-    tintColor: "#086DC0",
+    marginBottom: 4,
   },
   fileText: {
-    marginTop: 4,
     color: "#086DC0",
     fontSize: 14,
     textDecorationLine: "underline",
+    textAlign: "center",
+    marginTop: 4,
+    flexWrap: "wrap",
   },
   textContent: {
     paddingHorizontal: 12,
@@ -149,6 +199,7 @@ const messageItemStyles = StyleSheet.create({
 
 function ChatBox({ messages }) {
   const scrollViewRef = useRef(null);
+
   useEffect(() => {
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollToEnd({ animated: true });
@@ -169,10 +220,10 @@ function ChatBox({ messages }) {
 
         return (
           <MessageItem
-            key={msg._id || index}
-            msg={msg}
-            showAvatar={isFirstInGroup}
-            showTime={isLastInGroup}
+            key={msg._id || index} // Dùng _id của tin nhắn làm key
+            msg={msg} // Truyền đối tượng tin nhắn
+            showAvatar={isFirstInGroup} // Hiển thị avatar nếu là tin nhắn đầu tiên trong nhóm
+            showTime={isLastInGroup} // Hiển thị thời gian nếu là tin nhắn cuối cùng trong nhóm
           />
         );
       })}
@@ -186,8 +237,12 @@ const chatBoxStyles = StyleSheet.create({
 });
 
 function MessageInput({
+
   input, setInput, onSend, onPickImage, onPickFile, onEmojiPress
 }) {
+  const [selectedFile, setSelectedFile] = useState(null);
+
+
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -198,6 +253,7 @@ function MessageInput({
     <View style={messageInputStyles.container}>
       <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickFile}>
         <Image source={FileIcon} style={messageInputStyles.icon} />
+
       </TouchableOpacity>
 
       <View style={messageInputStyles.inputContainer}>
@@ -338,32 +394,155 @@ export default function ChatSingle() {
     }
   };
 
-  // const pickDocument = async () => {
-  //   try {
-  //     const result = await DocumentPicker.getDocumentAsync({
-  //       type: "*/*",
-  //       copyToCacheDirectory: true,
-  //       multiple: false,
-  //     });
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "text/plain",
+          "application/vnd.ms-project",
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
 
-  //     if (result.type === "success") {
-  //       const { name, uri } = result;
+      if (result.canceled === false && result.assets && result.assets.length > 0) {
+        // Expo DocumentPicker mới trả về kết quả trong assets array
+        const file = result.assets[0];
+        const newFileMessage = {
+          _id: String(new Date().getTime()),
+          memberId: { userId: CURRENT_USER_ID },
+          type: "FILE",
+          fileName: file.name,
+          content: file.uri,
+          createdAt: new Date().toISOString(),
+        };
 
-  //       const newFileMessage = {
-  //         _id: String(new Date().getTime()),
-  //         memberId: { userId: CURRENT_USER_ID },
-  //         type: "FILE",
-  //         fileName: name,
-  //         content: uri,
-  //         createdAt: new Date().toISOString(),
-  //       };
+        setMessages((prev) => [...prev, newFileMessage]);
+      } else if (result.type === "success") {
+        const { name, uri } = result;
+        const newFileMessage = {
+          _id: String(new Date().getTime()),
+          memberId: { userId: CURRENT_USER_ID },
+          type: "FILE",
+          fileName: name,
+          content: uri,
+          createdAt: new Date().toISOString(),
+        };
 
-  //       setMessages((prev) => [...prev, newFileMessage]);
+        setMessages((prev) => [...prev, newFileMessage]);
+      }
+    } catch (error) {
+      console.error("File picking error:", error);
+      Alert.alert("Lỗi", "Không thể chọn file, vui lòng thử lại.");
+    }
+  };
+
+  // function MessageItem({ msg, showAvatar, showTime }) {
+  //   const [expanded, setExpanded] = useState(false);
+  //   const MAX_TEXT_LENGTH = 350;
+  //   const isMe = msg.memberId.userId === CURRENT_USER_ID;
+  //   const isImage = msg.type === "IMAGE";
+
+  //   const isFile = msg.type === "FILE";
+
+  //   const getFileIcon = (fileName = "") => {
+  //     const extension = fileName.split(".").pop().toLowerCase();
+
+  //     console.log(extension);
+
+
+  //     switch (extension) {
+  //       case "pdf":
+  //         return require("../icons/pdf.png");
+  //       case "xls":
+  //       case "xlsx":
+  //         return require("../icons/xls.png");
+  //       case "doc":
+  //       case "docx":
+  //         return require("../icons/doc.png");
+  //       case "ppt":
+  //       case "pptx":
+  //         return require("../icons/ppt.png");
+  //       case "txt":
+  //         return require("../icons/txt.png");
+  //       default:
+  //         return require("../icons/fileDefault.png");
   //     }
-  //   } catch (error) {
-  //     console.error("File picking error:", error);
-  //   }
-  // };
+  //   };
+
+
+
+  //   return (
+  //     <View
+  //       style={[
+  //         messageItemStyles.container,
+  //         isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
+  //       ]}
+  //     >
+  //       {showAvatar ? (
+  //         <Image source={AvatarImage} style={messageItemStyles.avatar} />
+  //       ) : (
+  //         <View style={messageItemStyles.avatarPlaceholder} />
+  //       )}
+  //       <View style={messageItemStyles.contentContainer}>
+  //         {isImage ? (
+  //           <Image source={{ uri: msg.content }} style={messageItemStyles.imageContent} />
+  //         ) : isFile ? (
+  //           // Hiển thị tin nhắn file
+  //           <TouchableOpacity
+  //             style={messageItemStyles.fileContainer}
+  //             onPress={() => {
+  //               try {
+  //                 if (msg.content) {
+  //                   Linking.openURL(msg.content); // Mở file khi nhấn vào
+  //                 }
+  //               } catch (error) {
+  //                 Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
+  //               }
+  //             }}
+  //           >
+  //             <Image source={getFileIcon(msg.fileName)} style={messageItemStyles.fileIcon} />
+  //             <Text style={messageItemStyles.fileText}>
+  //               {msg.fileName || "Mở File"} {/* Hiển thị tên file */}
+  //             </Text>
+  //           </TouchableOpacity>
+  //         ) : (
+  //           <Text
+  //             style={[
+  //               messageItemStyles.textContent,
+  //               isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
+  //             ]}
+  //           >
+  //             {expanded ? msg.content : msg.content.slice(0, MAX_TEXT_LENGTH)}
+  //             {msg.content.length > MAX_TEXT_LENGTH && (
+  //               <Text
+  //                 style={messageItemStyles.expandText}
+  //                 onPress={() => setExpanded(!expanded)}
+  //               >
+  //                 {expanded ? " Thu gọn" : " Xem thêm"}
+  //               </Text>
+  //             )}
+  //           </Text>
+  //         )}
+  //         {showTime && (
+  //           <Text
+  //             style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}
+  //           >
+  //             {dayjs(msg.createdAt).fromNow()}
+  //           </Text>
+  //         )}
+  //       </View>
+  //     </View>
+  //   );
+  // }
+
+
+
 
   const handleSendMessage = (message) => {
     if (!message.trim()) return;
@@ -407,7 +586,7 @@ export default function ChatSingle() {
         setInput={setInput}
         onSend={handleSendMessage}
         onPickImage={pickImage}
-        // onPickFile={pickDocument}
+        onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
       />
       <EmojiPicker
