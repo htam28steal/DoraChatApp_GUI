@@ -14,11 +14,13 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { updatePassword } from '../api/meSevice';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { updateAvatarUser } from '../api/meSevice';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Screen_04({ navigation, route }) {
   const [screen, setScreen] = useState('home');
   const { userInfo } = route.params;
   const { token } = route.params;
+
   const [uId, setUId] = useState('');
   const [avatarColor, setAvatarColor] = useState(true);
 
@@ -32,6 +34,9 @@ export default function Screen_04({ navigation, route }) {
 
   // State for success message
   const [successMessage, setSuccessMessage] = useState('');
+
+
+
 
 
 

@@ -64,7 +64,7 @@ function AppContainer() {
           component={Welcome}
           options={{ headerShown: false }}
         />
-         <Stack.Screen
+        <Stack.Screen
           name="ConversationScreen"
           component={Conversations}
           options={{ headerShown: false }}
