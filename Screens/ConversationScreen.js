@@ -50,14 +50,14 @@ export default function HomeScreen({ navigation }) {
   
     return (
       <TouchableOpacity
-        style={styles.conversationItem}
-        onPress={() =>
-          navigation.navigate('ChatScreen', {
-            conversation: item,
-            userId: userId, // Thêm dòng này
-          })
-        }
-      >
+      style={styles.conversationItem}
+      onPress={() =>
+        navigation.navigate('ChatScreen', {
+          conversation: item,
+          userId: userId, // Make sure userId is defined here.
+        })
+      }
+    >
         <Image
           source={
             otherMember?.avatar

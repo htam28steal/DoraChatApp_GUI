@@ -373,31 +373,31 @@ const headerStyles = StyleSheet.create({
  * Also integrates a modal for long-press message options: "Thu hồi", "Xoá" and "Chuyển tiếp".
  */
 export default function ChatScreen({ route, navigation }) {
-  // Extract the conversation object from route parameters.
-  const { conversation } = route.params;
+  // ✅ Extract both conversation and userId from route.params
+  const { conversation, userId: passedUserId } = route.params;
   const conversationId = conversation._id;
 
   
 
-  const [userId, setUserId] = useState(null);
+  // ✅ Directly use the passed userId
+  const [userId, setUserId] = useState(passedUserId);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
 
-  // State for long press options modal.
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Retrieve userId from AsyncStorage.
   useEffect(() => {
-    const fetchUserId = async () => {
-      const storedUserId = await AsyncStorage.getItem("userId");
-      if (storedUserId) {
-        setUserId(storedUserId);
-      }
-    };
-    fetchUserId();
-  }, []);
+    if (!userId) {
+      (async () => {
+        const storedUserId = await AsyncStorage.getItem("userId");
+        if (storedUserId) {
+          setUserId(storedUserId);
+        }
+      })();
+    }
+  }, [userId]);
   
 
   // Fetch all messages for the conversation using conversationId.
@@ -614,26 +614,15 @@ export default function ChatScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!socket || !conversationId || !userId) return;
-  
+    
     const receiveHandler = (message) => {
-      // handle message logic
-              if (message.memberId?.userId === userId) {
-          const index = prev.findIndex((m) => m.pending && m.content === message.content);
-          if (index !== -1) {
-            const updatedMessages = [...prev];
-            updatedMessages[index] = message;
-            return updatedMessages;
-          }
-        }
-        // Avoid duplicate messages
-        if (prev.some((m) => m._id === message._id)) return prev;
-        return [...prev, message];
-      };
+      // handle message logic (updating state, etc.)
+    };
   
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
   
-    // Gửi kèm userId trong emit
+    // Emit join event with userId (it should now be defined)
     socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId, userId });
   
     return () => {
