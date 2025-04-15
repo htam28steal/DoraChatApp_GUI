@@ -377,6 +377,8 @@ export default function ChatScreen({ route, navigation }) {
   const { conversation } = route.params;
   const conversationId = conversation._id;
 
+  
+
   const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -389,19 +391,14 @@ export default function ChatScreen({ route, navigation }) {
   // Retrieve userId from AsyncStorage.
   useEffect(() => {
     const fetchUserId = async () => {
-      try {
-        const storedUserId = await AsyncStorage.getItem("userId");
-        if (storedUserId) {
-          setUserId(storedUserId);
-        } else {
-          Alert.alert("Error", "User id not found.");
-        }
-      } catch (error) {
-        Alert.alert("Error fetching user id", error.message);
+      const storedUserId = await AsyncStorage.getItem("userId");
+      if (storedUserId) {
+        setUserId(storedUserId);
       }
     };
     fetchUserId();
   }, []);
+  
 
   // Fetch all messages for the conversation using conversationId.
   useEffect(() => {
@@ -463,11 +460,52 @@ export default function ChatScreen({ route, navigation }) {
     setModalVisible(false);
   };
 
-  // Forward action: For now, just show an alert (placeholder).
-  const handleForwardAction = () => {
-    Alert.alert("Chuyển tiếp", "Forward action triggered.");
+  const handleForwardAction = async () => {
+    try {
+      const response = await axios.get("/api/friends");
+      const friends = response.data;
+  
+      if (!friends || friends.length === 0) {
+        Alert.alert("Không có bạn bè nào để chuyển tiếp.");
+        return;
+      }
+  
+      // Hiện danh sách bạn bè bằng Alert để chọn
+      Alert.alert(
+        "Chọn người nhận",
+        "Hãy chọn người để chuyển tiếp:",
+        friends.map((friend) => ({
+          text: friend.name || friend.username,
+          onPress: async () => {
+            try {
+              // Gọi API tạo cuộc trò chuyện nếu chưa có
+              const convResponse = await axios.post(
+                `/api/conversations/individuals/${friend._id}`
+              );
+  
+              const newConv = convResponse.data;
+              const messageToForward = {
+                conversationId: newConv._id,
+                content: selectedMessage.content,
+                type: selectedMessage.type,
+                fileName: selectedMessage.fileName,
+              };
+  
+              // Gửi message chuyển tiếp
+              await axios.post("/api/messages/text", messageToForward);
+              Alert.alert("Chuyển tiếp thành công!");
+            } catch (err) {
+              Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
+            }
+          },
+        }))
+      );
+    } catch (error) {
+      Alert.alert("Lỗi lấy danh sách bạn bè", error.response?.data?.message || error.message);
+    }
     setModalVisible(false);
   };
+  
 
   // Pick image for media message.
   const pickImage = async () => {
@@ -574,37 +612,37 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
-  // Listen for incoming messages from the socket.
   useEffect(() => {
-    if (!socket || !conversationId) return;
+    if (!socket || !conversationId || !userId) return;
+  
     const receiveHandler = (message) => {
-      setMessages((prev) => {
-        // If the message is from the current user, try to update the pending message.
-        if (message.memberId?.userId === userId) {
-          const index = prev.findIndex(
-            (m) => m.pending && m.content === message.content
-          );
+      // handle message logic
+              if (message.memberId?.userId === userId) {
+          const index = prev.findIndex((m) => m.pending && m.content === message.content);
           if (index !== -1) {
             const updatedMessages = [...prev];
             updatedMessages[index] = message;
             return updatedMessages;
           }
         }
-        // If the message already exists (by _id), don't add it again.
-        const exists = prev.some((m) => m._id === message._id);
-        if (exists) return prev;
+        // Avoid duplicate messages
+        if (prev.some((m) => m._id === message._id)) return prev;
         return [...prev, message];
-      });
-    };
+      };
+  
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+  
+    // Gửi kèm userId trong emit
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId, userId });
+  
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId, userId });
     };
   }, [socket, conversationId, userId]);
-
+  
+  
   return (
     <View style={chatScreenStyles.container}>
       <HeaderSingleChat />
