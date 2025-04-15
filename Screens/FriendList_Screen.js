@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     FlatList,
@@ -8,15 +8,82 @@ import {
     TextInput,
     TouchableOpacity,
     Image,
+    Alert
 } from 'react-native';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import FriendService from "../api/firendService";
 
-export default function HomeScreen({ navigation }) {
+export default function ListFirendScreen({ navigation }) {
+    const [userId, setUserId] = useState(null);
+    const [friends, setFriends] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchUserId = async () => {
+            try {
+                const storedUserId = await AsyncStorage.getItem("userId");
+                if (storedUserId) {
+                    setUserId(storedUserId);
+                } else {
+                    Alert.alert("Error", "User id not found.");
+                }
+            } catch (error) {
+                Alert.alert("Error fetching user id", error.message);
+            }
+        };
+        fetchUserId();
+    }, []);
+
+    useEffect(() => {
+        const fetchFriends = async () => {
+            try {
+                const friendsData = await FriendService.getListFriends();
+                setFriends(friendsData);
+            } catch (err) {
+                console.log(err);
+            }
+        };
+        fetchFriends();
+    }, []);
+
+    const renderFriend = ({ item }) => (
+
+
+        <TouchableOpacity style={styles.fMessage}>
+            <Image
+                source={item.avatar ? { uri: item.avatar } : null}
+                style={styles.avatar}
+            />
+
+            {!item.avatar && item.avatarColor ? (
+                <View style={[styles.avatar, { backgroundColor: item.avatarColor }, { backgroundColor: item.avatarColor, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={styles.avatarText}>{item.name?.charAt(0)}</Text> { }
+                </View>
+            ) : null}
+            <View style={styles.fInfor}>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.email}>{item.username}</Text>
+
+                <View style={styles.fbtn}>
+                    <TouchableOpacity style={styles.btnDetail}>
+                        <Image
+                            source={require('../icons/detail.png')}
+                            style={styles.iconDetail}
+                        />
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </TouchableOpacity>
+
+    );
+
     return (
         <View style={styles.container}>
             <View style={styles.fbg}>
                 <Image
                     source={require('../Images/bground.png')}
-                    style={styles.bg}></Image>
+                    style={styles.bg}
+                />
             </View>
 
             <View style={styles.fcontent}>
@@ -24,14 +91,16 @@ export default function HomeScreen({ navigation }) {
                     <View style={styles.fFriendList}>
                         <Image
                             source={require('../icons/friend.png')}
-                            style={styles.icons}></Image>
+                            style={styles.icons}
+                        />
                         <Text style={styles.txtfriendlist}>Friend list</Text>
                     </View>
 
                     <View style={styles.fRequest}>
                         <Image
                             source={require('../icons/friendrequest.png')}
-                            style={styles.icons}></Image>
+                            style={styles.icons}
+                        />
                         <Text style={styles.txtRequest}>Friend request</Text>
                         <Text style={styles.txtRequest}>(1)</Text>
                     </View>
@@ -39,7 +108,8 @@ export default function HomeScreen({ navigation }) {
                     <View style={styles.fContact}>
                         <Image
                             source={require('../icons/contact.png')}
-                            style={styles.icons}></Image>
+                            style={styles.icons}
+                        />
                         <Text style={styles.txtRequest}>Contact</Text>
                     </View>
                 </View>
@@ -47,57 +117,50 @@ export default function HomeScreen({ navigation }) {
                     <View>
                         <Image
                             source={require('../icons/addFriend.png')}
-                            style={styles.iconAdd}></Image>
+                            style={styles.iconAdd}
+                        />
                     </View>
                 </TouchableOpacity>
             </View>
-
             <View style={styles.fListFriend}>
-                <View style={styles.fMessage}>
-                    <Image
-                        source={require('../Images/nike.png')}
-                        style={styles.avatar}></Image>
-                    <View style={styles.fInfor}>
-                        <Text style={styles.name}>John Nguyen</Text>
-                        <Text style={styles.email}>johnNguyen@gmail.com</Text>
-
-                        <View style={styles.fbtn}>
-                            <TouchableOpacity style={styles.btnDetail}>
-                                <Image
-                                    source={require('../icons/detail.png')}
-                                    style={styles.iconDetail}></Image>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
+                <FlatList
+                    data={friends}
+                    renderItem={renderFriend}
+                    keyExtractor={(item) => item._id}
+                    ListEmptyComponent={<Text>No friends found.</Text>} // Hiển thị khi mảng rỗng
+                />
             </View>
-
             <View style={styles.fFooter}>
                 <TouchableOpacity style={styles.btnTags}>
                     <Image
                         source={require('../icons/mess.png')}
-                        style={styles.iconfooter}></Image>
+                        style={styles.iconfooter}
+                    />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnTags}>
                     <Image
                         source={require('../icons/searchicon.png')}
-                        style={styles.iconfooter}></Image>
+                        style={styles.iconfooter}
+                    />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnTags}>
                     <Image
                         source={require('../icons/Home.png')}
-                        style={styles.iconfooter}></Image>
+                        style={styles.iconfooter}
+                    />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnTag}>
                     <Image
                         source={require('../icons/calen.png')}
-                        style={styles.iconfooter}></Image>
+                        style={styles.iconfooter}
+                    />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.avatarFooter}>
                     <View style={styles.fImaFooter}>
                         <Image
                             source={require('../Images/nike.png')}
-                            style={styles.imgAva}></Image>
+                            style={styles.imgAva}
+                        />
                     </View>
                 </TouchableOpacity>
             </View>
@@ -195,7 +258,6 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '80%',
         padding: 5,
-        borderWidth: 1,
     },
     fMessage: {
         width: '100%',
@@ -283,5 +345,11 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         borderRadius: '50%',
+    },
+
+    avatarText: {
+        fontSize: 25,
+        fontWeight: 'bold',
+        color: 'white',
     },
 });
