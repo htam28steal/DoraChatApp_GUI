@@ -23,6 +23,7 @@ import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import * as Sharing from "expo-sharing";
 import { useNavigation } from '@react-navigation/native';
+import * as FileSystem from 'expo-file-system';
 
 dayjs.extend(relativeTime);
 
@@ -51,7 +52,8 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
   const Container = onLongPress ? TouchableOpacity : View;
 
   const getFileIcon = (fileName = "") => {
-    const extension = fileName.split(".").pop().toLowerCase();
+
+    const extension = fileName.split(".").pop().toLowerCase(); // lấy đuôi
     switch (extension) {
       case "pdf":
         return require("../icons/pdf.png");
@@ -126,8 +128,8 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
             {msg.type === "RECALL"
               ? "Message has been recalled"
               : content.length > MAX_TEXT_LENGTH
-              ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-              : content}
+                ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+                : content}
           </Text>
         )}
         {showTime && (
@@ -381,7 +383,7 @@ export default function ChatScreen({ route, navigation }) {
   const conversationId = conversation._id;
   // Use the conversation _id received from HomeScreen.
 
-  
+
   const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -452,76 +454,148 @@ export default function ChatScreen({ route, navigation }) {
     ]);
   };
 
-  // Pick image for media message.
   const pickImage = async () => {
+    const formData = new FormData();
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert("Permission denied", "Gallery access needed.");
       return;
     }
 
+    // Mở thư viện hình ảnh
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
+      allowsEditing: false, // Bạn có thể bật chế độ chỉnh sửa nếu cần
     });
 
     if (!result.canceled && result.assets.length > 0) {
       const selectedImage = result.assets[0];
-      const newMsg = {
-        _id: String(Date.now()),
-        memberId: { userId: userId || "" },
-        type: "IMAGE",
-        content: selectedImage.uri,
-        createdAt: new Date().toISOString(),
+      console.log(selectedImage); // Kiểm tra thông tin của hình ảnh được chọn
+
+      // Lấy URI hình ảnh
+      const imageUri = selectedImage.uri;
+      const fileName = selectedImage.uri.split('/').pop(); // Lấy tên file từ URI
+      const mimeType = selectedImage.mimeType;
+
+      // Tạo một đối tượng `File` cho FormData
+      const file = {
+        uri: imageUri,
+        name: fileName,
+        type: mimeType,
       };
-      setMessages((prev) => [...prev, newMsg]);
-      // Optionally, you could also upload the image to the server here.
+
+      formData.append('id', userId);
+      formData.append('image', file);
+      formData.append('conversationId', conversationId);
+
+      try {
+        // Gửi tệp lên server
+        const response = await axios.post('/api/messages/images', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 20000,
+        });
+
+        // Nhận URL hình ảnh từ phản hồi và tạo thông điệp mới
+        const imageUrl = response.data?.file?.url;
+        const newMsg = {
+          _id: String(Date.now()),
+          memberId: { userId: userId || "" },
+          type: "IMAGE",
+          content: imageUrl,
+          createdAt: new Date().toISOString(),
+        };
+
+        // Cập nhật danh sách tin nhắn với ảnh mới
+        setMessages((prev) => [...prev, newMsg]);
+        console.log('Image uploaded successfully:', imageUrl);
+
+      } catch (err) {
+        console.log('Error uploading image:', err);
+        Alert.alert('Error', 'Failed to upload image');
+      }
     }
   };
 
-  // Pick document for file message.
+
+  const base64ToBlob = (base64Data, contentType = '', sliceSize = 512) => {
+    const byteCharacters = atob(base64Data); // decode base64
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+
+    return new Blob(byteArrays, { type: contentType });
+  };
+
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "text/plain",
-          "application/vnd.ms-project",
-        ],
-        copyToCacheDirectory: true,
+        type: "*/*", // cho tất cả định dạng
+        copyToCacheDirectory: true, // rất quan trọng trên iOS
         multiple: false,
       });
 
-      if (result.canceled === false && result.assets && result.assets.length > 0) {
-        const file = result.assets[0];
-        const newFileMessage = {
-          _id: String(new Date().getTime()),
-          memberId: { userId: userId },
-          type: "FILE",
-          fileName: file.name,
-          content: file.uri,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, newFileMessage]);
-      } else if (result.type === "success") {
-        const { name, uri } = result;
-        const newFileMessage = {
-          _id: String(new Date().getTime()),
-          memberId: { userId: userId },
-          type: "FILE",
-          fileName: name,
-          content: uri,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, newFileMessage]);
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        Alert.alert("No file selected", "You didn't select any file.");
+        return;
       }
+
+      const file = result.assets[0];
+      const fileUri = file.uri;
+      const fileName = file.name;
+      const mimeType = file.mimeType || 'application/octet-stream';
+
+      // Đọc file thành blob
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      if (!fileInfo.exists) {
+        Alert.alert("Error", "File not found.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('id', userId);
+      formData.append('conversationId', conversationId);
+      formData.append('file', {
+        uri: fileUri,
+        name: fileName,
+        type: mimeType,
+      });
+
+      const response = await axios.post('/api/messages/file', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const uploadedUrl = response.data?.file?.url;
+
+      const newFileMessage = {
+        _id: String(new Date().getTime()),
+        memberId: { userId },
+        type: "FILE",
+        fileName: fileName,
+        content: uploadedUrl,
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages(prev => [...prev, newFileMessage]);
+
     } catch (error) {
-      console.error("File picking error:", error);
-      Alert.alert("Error", "Cannot pick file. Please try again.");
+      console.error("Error uploading file:", error);
+      Alert.alert("Upload error", "Không thể upload file.");
     }
   };
 
@@ -542,12 +616,12 @@ export default function ChatScreen({ route, navigation }) {
       };
       // Update local state immediately (optimistic UI update)
       setMessages((prev) => [...prev, newMessage]);
-  
+
       await axios.post("/api/messages/text", {
         conversationId: conversationId, // ensure you’re using the dynamic conversationId here
         content: message,
       });
-  
+
       // Emit the message over socket; your server should broadcast it back
       socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
         conversationId: conversationId,
@@ -557,11 +631,11 @@ export default function ChatScreen({ route, navigation }) {
       Alert.alert("Cannot send message", err.response?.data?.message || err.message);
     }
   };
-  
+
   // Listen for incoming messages from the socket.
   useEffect(() => {
     if (!socket || !conversationId) return;
-  
+
     const receiveHandler = (message) => {
       console.log(message.content);
       setMessages((prev) => {
@@ -572,15 +646,15 @@ export default function ChatScreen({ route, navigation }) {
     };
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-    
+
     socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
-  
+
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
       socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
     };
   }, [socket, conversationId]);
-  
+
 
   return (
     <View style={chatScreenStyles.container}>
