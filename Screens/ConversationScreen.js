@@ -25,7 +25,7 @@ export default function HomeScreen({ navigation }) {
         const response = await axios.get('/api/conversations', {
           params: { userId: userId },
         });
-        console.log("Fetched conversations:", response.data); // Debug log
+
         // Ensure we get an array; otherwise, fallback to empty array.
         setConversations(Array.isArray(response.data) ? response.data : []);
       } catch (error) {

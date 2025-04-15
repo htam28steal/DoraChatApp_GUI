@@ -558,12 +558,14 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
   
-
   // Listen for incoming messages from the socket.
   useEffect(() => {
+
     if (!socket || !conversationId) return;
 
+
     const receiveHandler = (message) => {
+      console.log(message.content)
       setMessages((prev) => {
         const exists = prev.some((m) => m._id === message._id);
         if (exists) return prev;
