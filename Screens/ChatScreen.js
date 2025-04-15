@@ -47,7 +47,6 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
-
   const Container = onLongPress ? TouchableOpacity : View;
 
   const getFileIcon = (fileName = "") => {
@@ -223,11 +222,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
             showAvatar={isFirstInGroup}
             showTime={isLastInGroup}
             currentUserId={currentUserId}
-            onLongPress={
-              msg.memberId?.userId === currentUserId
-                ? () => onMessageLongPress(msg)
-                : null
-            }
+            onLongPress={msg.memberId?.userId === currentUserId ? () => onMessageLongPress(msg) : null}
           />
         );
       })}
@@ -315,14 +310,9 @@ function HeaderSingleChat({ handleDetail }) {
   const navigation = useNavigation();
   return (
     <View style={headerStyles.container}>
-      <TouchableOpacity
-        onPress={() => {
-          navigation.navigate("ConversationScreen");
-        }}
-      >
+      <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
         <Image source={Return} style={headerStyles.avatar} />
       </TouchableOpacity>
-
       <Image source={AvatarImage} style={headerStyles.avatar} />
       <View style={headerStyles.infoContainer}>
         <Text style={headerStyles.name}>John Doe</Text>
@@ -379,9 +369,7 @@ export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from the route parameters.
   const { conversation } = route.params;
   const conversationId = conversation._id;
-  // Use the conversation _id received from HomeScreen.
 
-  
   const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -420,14 +408,12 @@ export default function ChatScreen({ route, navigation }) {
         );
       }
     };
-
     fetchAllMessages();
   }, [conversationId]);
 
   // Handle recall message when user long presses on their own message.
   const handleRecallMessage = (message) => {
     if (message.memberId?.userId !== userId) return;
-
     Alert.alert("Recall Message", "Do you want to recall this message?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -459,12 +445,10 @@ export default function ChatScreen({ route, navigation }) {
       Alert.alert("Permission denied", "Gallery access needed.");
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
     });
-
     if (!result.canceled && result.assets.length > 0) {
       const selectedImage = result.assets[0];
       const newMsg = {
@@ -495,7 +479,6 @@ export default function ChatScreen({ route, navigation }) {
         copyToCacheDirectory: true,
         multiple: false,
       });
-
       if (result.canceled === false && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
         const newFileMessage = {
@@ -533,21 +516,23 @@ export default function ChatScreen({ route, navigation }) {
       return;
     }
     try {
+      // Create an optimistic message with a pending flag.
       const newMessage = {
-        _id: String(Date.now()), // temporary id if backend doesn't return one immediately
+        _id: String(Date.now()), // temporary id
         memberId: { userId: userId },
         type: "TEXT",
         content: message,
         createdAt: new Date().toISOString(),
+        pending: true,
       };
       // Update local state immediately (optimistic UI update)
       setMessages((prev) => [...prev, newMessage]);
-  
+
       await axios.post("/api/messages/text", {
-        conversationId: conversationId, // ensure you’re using the dynamic conversationId here
+        conversationId: conversationId,
         content: message,
       });
-  
+
       // Emit the message over socket; your server should broadcast it back
       socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
         conversationId: conversationId,
@@ -557,14 +542,24 @@ export default function ChatScreen({ route, navigation }) {
       Alert.alert("Cannot send message", err.response?.data?.message || err.message);
     }
   };
-  
+
   // Listen for incoming messages from the socket.
   useEffect(() => {
     if (!socket || !conversationId) return;
-  
     const receiveHandler = (message) => {
-      console.log(message.content);
       setMessages((prev) => {
+        // If the message is from the current user, try to update the pending message.
+        if (message.memberId?.userId === userId) {
+          const index = prev.findIndex(
+            (m) => m.pending && m.content === message.content
+          );
+          if (index !== -1) {
+            const updatedMessages = [...prev];
+            updatedMessages[index] = message;
+            return updatedMessages;
+          }
+        }
+        // If the message already exists (by _id), don't add it again.
         const exists = prev.some((m) => m._id === message._id);
         if (exists) return prev;
         return [...prev, message];
@@ -572,15 +567,12 @@ export default function ChatScreen({ route, navigation }) {
     };
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-    
     socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
-  
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
       socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
     };
-  }, [socket, conversationId]);
-  
+  }, [socket, conversationId, userId]);
 
   return (
     <View style={chatScreenStyles.container}>
