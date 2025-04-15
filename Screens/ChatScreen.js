@@ -11,6 +11,7 @@ import {
   Linking,
   Dimensions,
   Platform,
+  Modal,
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -41,7 +42,7 @@ const Return = require("../icons/back.png");
 const screenWidth = Dimensions.get("window").width;
 
 /**
- * Message Bubble Component with support for onLongPress to recall a message.
+ * Message Bubble Component with support for onLongPress to show message options.
  */
 function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) {
   const isMe = msg.memberId?.userId === currentUserId;
@@ -222,7 +223,11 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
             showAvatar={isFirstInGroup}
             showTime={isLastInGroup}
             currentUserId={currentUserId}
-            onLongPress={msg.memberId?.userId === currentUserId ? () => onMessageLongPress(msg) : null}
+            onLongPress={
+              msg.memberId?.userId === currentUserId
+                ? () => onMessageLongPress(msg)
+                : null
+            }
           />
         );
       })}
@@ -311,7 +316,7 @@ function HeaderSingleChat({ handleDetail }) {
   return (
     <View style={headerStyles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
-        <Image source={Return} style={headerStyles.avatar} />
+        <Image source={Return} style={headerStyles.backBtn} />
       </TouchableOpacity>
       <Image source={AvatarImage} style={headerStyles.avatar} />
       <View style={headerStyles.infoContainer}>
@@ -347,6 +352,7 @@ const headerStyles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
+  backBtn:{width:50, height:35, marginRight:20},
   avatar: { width: 70, height: 70, borderRadius: 35 },
   infoContainer: { marginLeft: 12, flex: 1 },
   name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
@@ -364,9 +370,10 @@ const headerStyles = StyleSheet.create({
 
 /**
  * Main ChatScreen Component which now uses the conversation details passed in via route params.
+ * Also integrates a modal for long-press message options: "Thu hồi", "Xoá" and "Chuyển tiếp".
  */
 export default function ChatScreen({ route, navigation }) {
-  // Extract the conversation object from the route parameters.
+  // Extract the conversation object from route parameters.
   const { conversation } = route.params;
   const conversationId = conversation._id;
 
@@ -374,6 +381,10 @@ export default function ChatScreen({ route, navigation }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
+
+  // State for long press options modal.
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Retrieve userId from AsyncStorage.
   useEffect(() => {
@@ -392,7 +403,7 @@ export default function ChatScreen({ route, navigation }) {
     fetchUserId();
   }, []);
 
-  // Fetch all messages for the conversation using the dynamic conversationId.
+  // Fetch all messages for the conversation using conversationId.
   useEffect(() => {
     if (!conversationId) return;
     const fetchAllMessages = async () => {
@@ -411,21 +422,27 @@ export default function ChatScreen({ route, navigation }) {
     fetchAllMessages();
   }, [conversationId]);
 
-  // Handle recall message when user long presses on their own message.
-  const handleRecallMessage = (message) => {
-    if (message.memberId?.userId !== userId) return;
-    Alert.alert("Recall Message", "Do you want to recall this message?", [
-      { text: "Cancel", style: "cancel" },
+  // Unified long press handler to show the custom modal with options.
+  const handleMessageLongPress = (message) => {
+    setSelectedMessage(message);
+    setModalVisible(true);
+  };
+
+  // Recall action (already implemented in your code).
+  const handleRecallAction = () => {
+    if (!selectedMessage) return;
+    Alert.alert("Thu hồi", "Bạn có muốn thu hồi tin nhắn này?", [
+      { text: "Hủy", style: "cancel" },
       {
         text: "OK",
         onPress: async () => {
           try {
             await axios.delete(
-              `/api/messages/${message._id}/conversation/${conversationId}`
+              `/api/messages/${selectedMessage._id}/conversation/${conversationId}`
             );
             setMessages((prev) =>
               prev.map((m) =>
-                m._id === message._id
+                m._id === selectedMessage._id
                   ? { ...m, content: "[Message recalled]", type: "RECALL" }
                   : m
               )
@@ -436,6 +453,20 @@ export default function ChatScreen({ route, navigation }) {
         },
       },
     ]);
+    setModalVisible(false);
+  };
+
+  // Delete action: Remove the message from local state.
+  const handleDeleteAction = () => {
+    if (!selectedMessage) return;
+    setMessages((prev) => prev.filter((m) => m._id !== selectedMessage._id));
+    setModalVisible(false);
+  };
+
+  // Forward action: For now, just show an alert (placeholder).
+  const handleForwardAction = () => {
+    Alert.alert("Chuyển tiếp", "Forward action triggered.");
+    setModalVisible(false);
   };
 
   // Pick image for media message.
@@ -581,7 +612,7 @@ export default function ChatScreen({ route, navigation }) {
         <ChatBox
           messages={messages}
           currentUserId={userId}
-          onMessageLongPress={handleRecallMessage}
+          onMessageLongPress={handleMessageLongPress}
         />
       </View>
       <MessageInput
@@ -597,6 +628,32 @@ export default function ChatScreen({ route, navigation }) {
         open={emojiOpen}
         onClose={() => setEmojiOpen(false)}
       />
+
+      {/* Modal for message actions on long press */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
+              <Text style={styles.modalButtonText}>Thu hồi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
+              <Text style={styles.modalButtonText}>Xoá</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
+              <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -604,4 +661,31 @@ export default function ChatScreen({ route, navigation }) {
 const chatScreenStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#D8EDFF" },
   chatContainer: { flex: 1 },
+});
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalButton: {
+    paddingVertical: 10,
+    width: "100%",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+  },
+  modalButtonText: {
+    fontSize: 16,
+    color: "#086DC0",
+  },
 });
