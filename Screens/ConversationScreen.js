@@ -48,7 +48,7 @@ export default function HomeScreen({ navigation }) {
     return (
       <TouchableOpacity
         style={styles.conversationItem}
-        onPress={() => navigation.navigate('ChatScreen')}
+        onPress={() => navigation.navigate('ChatScreen', { conversation: item })}
       >
         <Image
           source={

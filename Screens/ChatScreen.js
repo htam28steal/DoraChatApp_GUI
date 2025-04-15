@@ -22,8 +22,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import * as Sharing from "expo-sharing";
-dayjs.extend(relativeTime);
 import { useNavigation } from '@react-navigation/native';
+
+dayjs.extend(relativeTime);
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
@@ -36,8 +37,7 @@ const EmojiIcon = require("../icons/emoji.png");
 const SendIcon = require("../icons/send.png");
 const FileSent = require("../icons/filesent.png");
 const Return = require("../icons/back.png");
-// CONSTANTS
-const CONVERSATION_ID = "67dcf8eac3a67270b6534c60";
+
 const screenWidth = Dimensions.get("window").width;
 
 /**
@@ -48,12 +48,10 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
 
-  // If onLongPress exists, wrap in TouchableOpacity (for own messages)
   const Container = onLongPress ? TouchableOpacity : View;
 
   const getFileIcon = (fileName = "") => {
     const extension = fileName.split(".").pop().toLowerCase();
-    console.log(extension);
     switch (extension) {
       case "pdf":
         return require("../icons/pdf.png");
@@ -79,15 +77,14 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
       if (canShare) {
         await Sharing.shareAsync(uri);
       } else if (Platform.OS === "android") {
-        // If needed, set your mime type here. For now, it's a placeholder.
         const mimeType = "application/octet-stream";
         await Linking.openURL(uri);
       } else {
-        Alert.alert("Không thể mở file", "Thiết bị không hỗ trợ mở file này.");
+        Alert.alert("Cannot open file", "Device does not support opening this file.");
       }
     } catch (error) {
-      console.error("Mở file lỗi:", error);
-      Alert.alert("Không thể mở file", "Đã xảy ra lỗi khi mở file.");
+      console.error("Error opening file:", error);
+      Alert.alert("Cannot open file", "An error occurred when opening the file.");
     }
   };
 
@@ -127,7 +124,7 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
             ]}
           >
             {msg.type === "RECALL"
-              ? "Tin nhắn đã được thu hồi"
+              ? "Message has been recalled"
               : content.length > MAX_TEXT_LENGTH
               ? content.slice(0, MAX_TEXT_LENGTH) + "..."
               : content}
@@ -201,7 +198,8 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
   const scrollViewRef = useRef(null);
 
   useEffect(() => {
-    if (scrollViewRef.current) scrollViewRef.current.scrollToEnd({ animated: true });
+    if (scrollViewRef.current)
+      scrollViewRef.current.scrollToEnd({ animated: true });
   }, [messages]);
 
   return (
@@ -226,7 +224,9 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
             showTime={isLastInGroup}
             currentUserId={currentUserId}
             onLongPress={
-              msg.memberId?.userId === currentUserId ? () => onMessageLongPress(msg) : null
+              msg.memberId?.userId === currentUserId
+                ? () => onMessageLongPress(msg)
+                : null
             }
           />
         );
@@ -315,10 +315,14 @@ function HeaderSingleChat({ handleDetail }) {
   const navigation = useNavigation();
   return (
     <View style={headerStyles.container}>
-      <TouchableOpacity onPress={()=>{
-        navigation.navigate("ConversationScreen")
-      }}><Image source={Return} style={headerStyles.avatar} /></TouchableOpacity>
-     
+      <TouchableOpacity
+        onPress={() => {
+          navigation.navigate("ConversationScreen");
+        }}
+      >
+        <Image source={Return} style={headerStyles.avatar} />
+      </TouchableOpacity>
+
       <Image source={AvatarImage} style={headerStyles.avatar} />
       <View style={headerStyles.infoContainer}>
         <Text style={headerStyles.name}>John Doe</Text>
@@ -369,9 +373,15 @@ const headerStyles = StyleSheet.create({
 });
 
 /**
- * Main ChatScreen Component with message recall and fetching messages using axios.
+ * Main ChatScreen Component which now uses the conversation details passed in via route params.
  */
-export default function ChatSingle() {
+export default function ChatScreen({ route, navigation }) {
+  // Extract the conversation object from the route parameters.
+  const { conversation } = route.params;
+  const conversationId = conversation._id;
+  // Use the conversation _id received from HomeScreen.
+
+  
   const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -394,11 +404,12 @@ export default function ChatSingle() {
     fetchUserId();
   }, []);
 
-  // Fetch all messages from the conversation using axios.
+  // Fetch all messages for the conversation using the dynamic conversationId.
   useEffect(() => {
+    if (!conversationId) return;
     const fetchAllMessages = async () => {
       try {
-        const response = await axios.get("/api/messages/" + CONVERSATION_ID);
+        const response = await axios.get("/api/messages/" + conversationId);
         // Assuming response.data is an array of messages.
         setMessages(response.data);
       } catch (error) {
@@ -411,7 +422,7 @@ export default function ChatSingle() {
     };
 
     fetchAllMessages();
-  }, []);
+  }, [conversationId]);
 
   // Handle recall message when user long presses on their own message.
   const handleRecallMessage = (message) => {
@@ -423,7 +434,9 @@ export default function ChatSingle() {
         text: "OK",
         onPress: async () => {
           try {
-            await axios.delete(`/api/messages/${message._id}/conversation/${CONVERSATION_ID}`);
+            await axios.delete(
+              `/api/messages/${message._id}/conversation/${conversationId}`
+            );
             setMessages((prev) =>
               prev.map((m) =>
                 m._id === message._id
@@ -508,7 +521,7 @@ export default function ChatSingle() {
       }
     } catch (error) {
       console.error("File picking error:", error);
-      Alert.alert("Lỗi", "Không thể chọn file, vui lòng thử lại.");
+      Alert.alert("Error", "Cannot pick file. Please try again.");
     }
   };
 
@@ -520,22 +533,35 @@ export default function ChatSingle() {
       return;
     }
     try {
-      // Optionally, retrieve token if needed.
+      const newMessage = {
+        _id: String(Date.now()), // temporary id if backend doesn't return one immediately
+        memberId: { userId: userId },
+        type: "TEXT",
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+      // Update local state immediately (optimistic UI update)
+      setMessages((prev) => [...prev, newMessage]);
+  
       await axios.post("/api/messages/text", {
-        conversationId: CONVERSATION_ID,
+        conversationId: conversationId, // ensure you’re using the dynamic conversationId here
         content: message,
       });
-      // Emit the message over socket; the server should broadcast it back.
-      // (The socket listener will update the state upon receiving the new message.)
-      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, { conversationId: CONVERSATION_ID, content: message });
+  
+      // Emit the message over socket; your server should broadcast it back
+      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
+        conversationId: conversationId,
+        content: message,
+      });
     } catch (err) {
       Alert.alert("Cannot send message", err.response?.data?.message || err.message);
     }
   };
+  
 
   // Listen for incoming messages from the socket.
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !conversationId) return;
 
     const receiveHandler = (message) => {
       setMessages((prev) => {
@@ -546,15 +572,13 @@ export default function ChatSingle() {
     };
 
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, CONVERSATION_ID);
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
 
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, CONVERSATION_ID);
+      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
     };
-  }, []);
-
-
+  }, [conversationId]);
 
   return (
     <View style={chatScreenStyles.container}>
