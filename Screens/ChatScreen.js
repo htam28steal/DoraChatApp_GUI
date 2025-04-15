@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Linking,
   Dimensions,
   Platform,
+  Modal,
+  Linking,
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -24,8 +25,8 @@ import { SOCKET_EVENTS } from "../utils/constant";
 import * as Sharing from "expo-sharing";
 import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
-
 dayjs.extend(relativeTime);
+import { Video } from "expo-av";
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
@@ -42,18 +43,33 @@ const Return = require("../icons/back.png");
 const screenWidth = Dimensions.get("window").width;
 
 /**
- * Message Bubble Component with support for onLongPress to recall a message.
+ * Message Bubble Component with support for onLongPress to show message options.
  */
 function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) {
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
-
   const Container = onLongPress ? TouchableOpacity : View;
 
-  const getFileIcon = (fileName = "") => {
+  const getFileExtension = (url) => {
+    if (!url) return '';
 
-    const extension = fileName.split(".").pop().toLowerCase(); // lấy đuôi
+    const fileName = url.includes('/')
+      ? url.substring(url.lastIndexOf('/') + 1)
+      : url;
+
+    const lastDotIndex = fileName.lastIndexOf('.');
+
+    if (lastDotIndex !== -1) {
+      return fileName.substring(lastDotIndex + 1).toLowerCase();
+    }
+
+    return '';
+  };
+
+  const getFileIcon = (fileNameOrUrl = "") => {
+    const extension = getFileExtension(fileNameOrUrl);
+
     switch (extension) {
       case "pdf":
         return require("../icons/pdf.png");
@@ -73,20 +89,17 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
     }
   };
 
-  const openFile = async (uri, fileName = "") => {
+  const openVideo = async (uri) => {
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri);
-      } else if (Platform.OS === "android") {
-        const mimeType = "application/octet-stream";
+      const supported = await Linking.canOpenURL(uri);
+      if (supported) {
         await Linking.openURL(uri);
       } else {
-        Alert.alert("Cannot open file", "Device does not support opening this file.");
+        Alert.alert("Error", "Cannot open this video.");
       }
     } catch (error) {
-      console.error("Error opening file:", error);
-      Alert.alert("Cannot open file", "An error occurred when opening the file.");
+      console.error("Error opening video:", error);
+      Alert.alert("Error", "Failed to open video.");
     }
   };
 
@@ -107,12 +120,21 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
       <View style={messageItemStyles.contentContainer}>
         {msg.type === "IMAGE" ? (
           <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
+        ) : msg.type === "VIDEO" ? (
+          <Video
+            source={{ uri: content }}
+            style={messageItemStyles.videoContent}
+            useNativeControls
+            resizeMode="cover"
+            isLooping={false}
+          />
         ) : msg.type === "FILE" ? (
           <TouchableOpacity
             style={messageItemStyles.fileContainer}
-            onPress={() => openFile(msg.content, msg.fileName)}
+            onLongPress={onLongPress}
+            activeOpacity={0.7}
           >
-            <Image source={getFileIcon(msg.fileName)} style={messageItemStyles.fileIcon} />
+            <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
             <Text style={messageItemStyles.fileText}>
               {msg.fileName || "Open File"}
             </Text>
@@ -141,6 +163,7 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
     </Container>
   );
 }
+
 
 const messageItemStyles = StyleSheet.create({
   container: {
@@ -173,6 +196,11 @@ const messageItemStyles = StyleSheet.create({
     height: 48,
     marginBottom: 4,
   },
+  videoContent: {
+    width: 250,
+    height: 250,
+    borderRadius: 8,
+  },
   fileText: {
     color: "#086DC0",
     fontSize: 14,
@@ -187,6 +215,19 @@ const messageItemStyles = StyleSheet.create({
     borderRadius: 12,
     fontSize: 14,
     color: "#000",
+  },
+  videoContainer: {
+    width: 250,
+    height: 250,
+    borderRadius: 8,
+    backgroundColor: "#EFF8FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoIcon: {
+    width: 48,
+    height: 48,
+    marginBottom: 8,
   },
   myMessage: { backgroundColor: "#EFF8FF", alignSelf: "flex-end" },
   theirMessage: { backgroundColor: "#F5F5F5" },
@@ -245,7 +286,7 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmojiPress }) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress }) {
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -266,7 +307,7 @@ function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmoj
           onSubmitEditing={handleSend}
           returnKeyType="send"
         />
-        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickImage}>
+        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickMedia}>
           <Image source={PictureIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
         <TouchableOpacity style={messageInputStyles.iconButton} onPress={onEmojiPress}>
@@ -317,14 +358,9 @@ function HeaderSingleChat({ handleDetail }) {
   const navigation = useNavigation();
   return (
     <View style={headerStyles.container}>
-      <TouchableOpacity
-        onPress={() => {
-          navigation.navigate("ConversationScreen");
-        }}
-      >
-        <Image source={Return} style={headerStyles.avatar} />
+      <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
+        <Image source={Return} style={headerStyles.backBtn} />
       </TouchableOpacity>
-
       <Image source={AvatarImage} style={headerStyles.avatar} />
       <View style={headerStyles.infoContainer}>
         <Text style={headerStyles.name}>John Doe</Text>
@@ -359,6 +395,7 @@ const headerStyles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
+  backBtn: { width: 50, height: 35, marginRight: 20 },
   avatar: { width: 70, height: 70, borderRadius: 35 },
   infoContainer: { marginLeft: 12, flex: 1 },
   name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
@@ -376,18 +413,21 @@ const headerStyles = StyleSheet.create({
 
 /**
  * Main ChatScreen Component which now uses the conversation details passed in via route params.
+ * Also integrates a modal for long-press message options: "Thu hồi", "Xoá" and "Chuyển tiếp".
  */
 export default function ChatScreen({ route, navigation }) {
-  // Extract the conversation object from the route parameters.
+  // Extract the conversation object from route parameters.
   const { conversation } = route.params;
   const conversationId = conversation._id;
-  // Use the conversation _id received from HomeScreen.
-
 
   const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
+
+  // State for long press options modal.
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Retrieve userId from AsyncStorage.
   useEffect(() => {
@@ -406,7 +446,7 @@ export default function ChatScreen({ route, navigation }) {
     fetchUserId();
   }, []);
 
-  // Fetch all messages for the conversation using the dynamic conversationId.
+  // Fetch all messages for the conversation using conversationId.
   useEffect(() => {
     if (!conversationId) return;
     const fetchAllMessages = async () => {
@@ -422,26 +462,30 @@ export default function ChatScreen({ route, navigation }) {
         );
       }
     };
-
     fetchAllMessages();
   }, [conversationId]);
 
-  // Handle recall message when user long presses on their own message.
-  const handleRecallMessage = (message) => {
-    if (message.memberId?.userId !== userId) return;
+  // Unified long press handler to show the custom modal with options.
+  const handleMessageLongPress = (message) => {
+    setSelectedMessage(message);
+    setModalVisible(true);
+  };
 
-    Alert.alert("Recall Message", "Do you want to recall this message?", [
-      { text: "Cancel", style: "cancel" },
+  // Recall action (already implemented in your code).
+  const handleRecallAction = () => {
+    if (!selectedMessage) return;
+    Alert.alert("Thu hồi", "Bạn có muốn thu hồi tin nhắn này?", [
+      { text: "Hủy", style: "cancel" },
       {
         text: "OK",
         onPress: async () => {
           try {
             await axios.delete(
-              `/api/messages/${message._id}/conversation/${conversationId}`
+              `/api/messages/${selectedMessage._id}/conversation/${conversationId}`
             );
             setMessages((prev) =>
               prev.map((m) =>
-                m._id === message._id
+                m._id === selectedMessage._id
                   ? { ...m, content: "[Message recalled]", type: "RECALL" }
                   : m
               )
@@ -452,6 +496,39 @@ export default function ChatScreen({ route, navigation }) {
         },
       },
     ]);
+    setModalVisible(false);
+  };
+
+  const handleDeleteAction = async () => {
+    if (!selectedMessage) return;
+
+    try {
+      setMessages((prev) => prev.filter((m) => m._id !== selectedMessage._id));
+
+      console.log(selectedMessage._id);
+      await axios.delete(`/api/messages/${selectedMessage._id}/only`, {
+        data: {
+          conversationId: conversationId
+        }
+      });
+
+
+      // Thông báo xóa thành công (tùy chọn)
+      // Alert.alert("Thành công", "Tin nhắn đã được xóa");
+
+    } catch (error) {
+      console.error("Error deleting message:", error);
+
+      Alert.alert("Lỗi", "Không thể xóa tin nhắn. Vui lòng thử lại sau.");
+    } finally {
+      setModalVisible(false);
+    }
+  };
+
+  // Forward action: For now, just show an alert (placeholder).
+  const handleForwardAction = () => {
+    Alert.alert("Chuyển tiếp", "Forward action triggered.");
+    setModalVisible(false);
   };
 
   const pickImage = async () => {
@@ -462,14 +539,11 @@ export default function ChatScreen({ route, navigation }) {
       Alert.alert("Permission denied", "Gallery access needed.");
       return;
     }
-
-    // Mở thư viện hình ảnh
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
       allowsEditing: false, // Bạn có thể bật chế độ chỉnh sửa nếu cần
     });
-
     if (!result.canceled && result.assets.length > 0) {
       const selectedImage = result.assets[0];
       console.log(selectedImage); // Kiểm tra thông tin của hình ảnh được chọn
@@ -499,7 +573,6 @@ export default function ChatScreen({ route, navigation }) {
           timeout: 20000,
         });
 
-        // Nhận URL hình ảnh từ phản hồi và tạo thông điệp mới
         const imageUrl = response.data?.file?.url;
         const newMsg = {
           _id: String(Date.now()),
@@ -520,6 +593,121 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
+  const pickMedia = async () => {
+    const formData = new FormData();
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission denied", "Gallery access needed.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All, // Cho phép chọn cả Images và Videos
+      quality: 1,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const selectedMedia = result.assets[0];
+      const mediaUri = selectedMedia.uri;
+      const fileName = selectedMedia.uri.split('/').pop();
+      const mimeType = selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg');
+
+      const file = {
+        uri: mediaUri,
+        name: fileName,
+        type: mimeType,
+      };
+
+      formData.append('id', userId);
+      formData.append(selectedMedia.type === 'video' ? 'video' : 'image', file);
+      formData.append('conversationId', conversationId);
+
+      try {
+        const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
+        const response = await axios.post(endpoint, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: selectedMedia.type === 'video' ? 30000 : 20000,
+        });
+
+        const mediaUrl = response.data?.file?.url;
+        const newMsg = {
+          _id: String(Date.now()),
+          memberId: { userId: userId || "" },
+          type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
+          content: mediaUrl,
+          createdAt: new Date().toISOString(),
+        };
+
+        setMessages((prev) => [...prev, newMsg]);
+        console.log(`${selectedMedia.type} uploaded successfully:`, mediaUrl);
+      } catch (err) {
+        console.error(`Error uploading ${selectedMedia.type}:`, err);
+        Alert.alert('Error', `Failed to upload ${selectedMedia.type}`);
+      }
+    }
+  };
+
+  // const pickVideo = async () => {
+  //   const formData = new FormData();
+
+  //   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  //   if (!permission.granted) {
+  //     Alert.alert("Permission denied", "Gallery access needed.");
+  //     return;
+  //   }
+  //   const result = await ImagePicker.launchImageLibraryAsync({
+  //     mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+  //     quality: 1,
+  //     allowsEditing: false,
+  //   });
+  //   if (!result.canceled && result.assets.length > 0) {
+  //     const selectedVideo = result.assets[0];
+  //     console.log(selectedVideo);
+  //     const videoUri = selectedVideo.uri;
+  //     const fileName = selectedVideo.uri.split('/').pop();
+  //     const mimeType = selectedVideo.mimeType || 'video/mp4';
+
+  //     const file = {
+  //       uri: videoUri,
+  //       name: fileName,
+  //       type: mimeType,
+  //     };
+
+  //     formData.append('id', userId);
+  //     formData.append('video', file);
+  //     formData.append('conversationId', conversationId);
+
+  //     try {
+  //       // Gửi tệp lên server
+  //       const response = await axios.post('/api/messages/videos', formData, {
+  //         headers: {
+  //           'Content-Type': 'multipart/form-data',
+  //         },
+  //         timeout: 30000,
+  //       });
+
+  //       const videoUrl = response.data?.file?.url;
+  //       const newMsg = {
+  //         _id: String(Date.now()),
+  //         memberId: { userId: userId || "" },
+  //         type: "VIDEO",
+  //         content: videoUrl,
+  //         createdAt: new Date().toISOString(),
+  //       };
+
+  //       setMessages((prev) => [...prev, newMsg]);
+  //       console.log('Video uploaded successfully:', videoUrl);
+
+  //     } catch (err) {
+  //       console.log('Error uploading video:', err);
+  //       Alert.alert('Error', 'Failed to upload video');
+  //     }
+  //   }
+  // };
 
   const base64ToBlob = (base64Data, contentType = '', sliceSize = 512) => {
     const byteCharacters = atob(base64Data); // decode base64
@@ -543,56 +731,51 @@ export default function ChatScreen({ route, navigation }) {
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*", // cho tất cả định dạng
-        copyToCacheDirectory: true, // rất quan trọng trên iOS
+        type: "*/*",
+        copyToCacheDirectory: true,
         multiple: false,
       });
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        Alert.alert("No file selected", "You didn't select any file.");
-        return;
+      if ((result.canceled === false && result.assets && result.assets.length > 0) || result.type === "success") {
+        let file, fileName, fileUri, mimeType;
+
+        if (result.assets && result.assets.length > 0) {
+          file = result.assets[0];
+          fileUri = file.uri;
+          fileName = file.name;
+          mimeType = file.mimeType || 'application/octet-stream';
+        } else if (result.type === "success") {
+          fileUri = result.uri;
+          fileName = result.name;
+          mimeType = 'application/octet-stream';
+        } else {
+          throw new Error("Không thể đọc thông tin file");
+        }
+
+        const fileInfo = await FileSystem.getInfoAsync(fileUri);
+        if (!fileInfo.exists) {
+          Alert.alert("Error", "File not found.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('id', userId);
+        formData.append('conversationId', conversationId);
+        formData.append('file', {
+          uri: fileUri,
+          name: fileName,
+          type: mimeType,
+        });
+
+        // Chỉ upload file, không thêm tin nhắn vào state
+        // Tin nhắn sẽ được thêm tự động qua WebSocket
+        await axios.post('/api/messages/file', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
       }
-
-      const file = result.assets[0];
-      const fileUri = file.uri;
-      const fileName = file.name;
-      const mimeType = file.mimeType || 'application/octet-stream';
-
-      // Đọc file thành blob
-      const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      if (!fileInfo.exists) {
-        Alert.alert("Error", "File not found.");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('id', userId);
-      formData.append('conversationId', conversationId);
-      formData.append('file', {
-        uri: fileUri,
-        name: fileName,
-        type: mimeType,
-      });
-
-      const response = await axios.post('/api/messages/file', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const uploadedUrl = response.data?.file?.url;
-
-      const newFileMessage = {
-        _id: String(new Date().getTime()),
-        memberId: { userId },
-        type: "FILE",
-        fileName: fileName,
-        content: uploadedUrl,
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages(prev => [...prev, newFileMessage]);
-
     } catch (error) {
       console.error("Error uploading file:", error);
       Alert.alert("Upload error", "Không thể upload file.");
@@ -607,18 +790,20 @@ export default function ChatScreen({ route, navigation }) {
       return;
     }
     try {
+      // Create an optimistic message with a pending flag.
       const newMessage = {
-        _id: String(Date.now()), // temporary id if backend doesn't return one immediately
+        _id: String(Date.now()), // temporary id
         memberId: { userId: userId },
         type: "TEXT",
         content: message,
         createdAt: new Date().toISOString(),
+        pending: true,
       };
       // Update local state immediately (optimistic UI update)
       setMessages((prev) => [...prev, newMessage]);
 
       await axios.post("/api/messages/text", {
-        conversationId: conversationId, // ensure you’re using the dynamic conversationId here
+        conversationId: conversationId,
         content: message,
       });
 
@@ -635,10 +820,20 @@ export default function ChatScreen({ route, navigation }) {
   // Listen for incoming messages from the socket.
   useEffect(() => {
     if (!socket || !conversationId) return;
-
     const receiveHandler = (message) => {
-      console.log(message.content);
       setMessages((prev) => {
+        // If the message is from the current user, try to update the pending message.
+        if (message.memberId?.userId === userId) {
+          const index = prev.findIndex(
+            (m) => m.pending && m.content === message.content
+          );
+          if (index !== -1) {
+            const updatedMessages = [...prev];
+            updatedMessages[index] = message;
+            return updatedMessages;
+          }
+        }
+        // If the message already exists (by _id), don't add it again.
         const exists = prev.some((m) => m._id === message._id);
         if (exists) return prev;
         return [...prev, message];
@@ -646,15 +841,12 @@ export default function ChatScreen({ route, navigation }) {
     };
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-
     socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
-
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
       socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
     };
-  }, [socket, conversationId]);
-
+  }, [socket, conversationId, userId]);
 
   return (
     <View style={chatScreenStyles.container}>
@@ -663,14 +855,14 @@ export default function ChatScreen({ route, navigation }) {
         <ChatBox
           messages={messages}
           currentUserId={userId}
-          onMessageLongPress={handleRecallMessage}
+          onMessageLongPress={handleMessageLongPress}
         />
       </View>
       <MessageInput
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
-        onPickImage={pickImage}
+        onPickMedia={pickMedia}
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
       />
@@ -679,6 +871,32 @@ export default function ChatScreen({ route, navigation }) {
         open={emojiOpen}
         onClose={() => setEmojiOpen(false)}
       />
+
+      {/* Modal for message actions on long press */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
+              <Text style={styles.modalButtonText}>Thu hồi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
+              <Text style={styles.modalButtonText}>Xoá</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
+              <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -686,4 +904,31 @@ export default function ChatScreen({ route, navigation }) {
 const chatScreenStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#D8EDFF" },
   chatContainer: { flex: 1 },
+});
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalButton: {
+    paddingVertical: 10,
+    width: "100%",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+  },
+  modalButtonText: {
+    fontSize: 16,
+    color: "#086DC0",
+  },
 });
