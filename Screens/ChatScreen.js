@@ -560,27 +560,27 @@ export default function ChatScreen({ route, navigation }) {
   
   // Listen for incoming messages from the socket.
   useEffect(() => {
-
     if (!socket || !conversationId) return;
-
-
+  
     const receiveHandler = (message) => {
-      console.log(message.content)
+      console.log(message.content);
       setMessages((prev) => {
         const exists = prev.some((m) => m._id === message._id);
         if (exists) return prev;
         return [...prev, message];
       });
     };
-
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    
     socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
-
+  
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
       socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
     };
-  }, [conversationId]);
+  }, [socket, conversationId]);
+  
 
   return (
     <View style={chatScreenStyles.container}>
