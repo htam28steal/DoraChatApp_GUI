@@ -194,19 +194,35 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress }) {
+function ChatBox({ messages, currentUserId, onMessageLongPress, scrollToBottomOnMount }) {
   const scrollViewRef = useRef(null);
 
-  useEffect(() => {
-    if (scrollViewRef.current)
+  const scrollToEnd = () => {
+    if (scrollViewRef.current) {
       scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  };
+
+  // 🔁 Scroll when messages change
+  useEffect(() => {
+    const timeout = setTimeout(scrollToEnd, 100);
+    return () => clearTimeout(timeout);
   }, [messages]);
+
+  // 🚀 Scroll when the component first mounts
+  useEffect(() => {
+    if (scrollToBottomOnMount) {
+      const timeout = setTimeout(scrollToEnd, 200); // slightly longer delay on mount
+      return () => clearTimeout(timeout);
+    }
+  }, []);
 
   return (
     <ScrollView
       ref={scrollViewRef}
       style={chatBoxStyles.container}
       contentContainerStyle={chatBoxStyles.contentContainer}
+      showsVerticalScrollIndicator={false}
     >
       {messages.map((msg, index) => {
         const userId = msg.memberId?.userId || "";
@@ -234,6 +250,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
     </ScrollView>
   );
 }
+
 
 const chatBoxStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
@@ -470,7 +487,6 @@ export default function ChatScreen({ route, navigation }) {
         return;
       }
   
-      // Hiện danh sách bạn bè bằng Alert để chọn
       Alert.alert(
         "Chọn người nhận",
         "Hãy chọn người để chuyển tiếp:",
@@ -478,7 +494,6 @@ export default function ChatScreen({ route, navigation }) {
           text: friend.name || friend.username,
           onPress: async () => {
             try {
-              // Gọi API tạo cuộc trò chuyện nếu chưa có
               const convResponse = await axios.post(
                 `/api/conversations/individuals/${friend._id}`
               );
@@ -491,8 +506,16 @@ export default function ChatScreen({ route, navigation }) {
                 fileName: selectedMessage.fileName,
               };
   
-              // Gửi message chuyển tiếp
               await axios.post("/api/messages/text", messageToForward);
+  
+              // ✅ Send to socket too
+              socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
+                conversationId: newConv._id,
+                content: selectedMessage.content,
+                type: selectedMessage.type,
+                fileName: selectedMessage.fileName,
+              });
+  
               Alert.alert("Chuyển tiếp thành công!");
             } catch (err) {
               Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
@@ -505,6 +528,7 @@ export default function ChatScreen({ route, navigation }) {
     }
     setModalVisible(false);
   };
+  
   
 
   // Pick image for media message.
@@ -636,11 +660,12 @@ export default function ChatScreen({ route, navigation }) {
     <View style={chatScreenStyles.container}>
       <HeaderSingleChat />
       <View style={chatScreenStyles.chatContainer}>
-        <ChatBox
-          messages={messages}
-          currentUserId={userId}
-          onMessageLongPress={handleMessageLongPress}
-        />
+      <ChatBox
+  messages={messages}
+  currentUserId={userId}
+  onMessageLongPress={handleMessageLongPress}
+  scrollToBottomOnMount={true}
+/>
       </View>
       <MessageInput
         input={input}
