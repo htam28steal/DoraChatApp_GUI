@@ -127,6 +127,7 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     borderRadius: 8,
     paddingHorizontal: 10,
+
   },
   avatar: {
     width: 65,
