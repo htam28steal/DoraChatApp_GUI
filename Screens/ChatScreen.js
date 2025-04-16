@@ -8,10 +8,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Linking,
   Dimensions,
   Platform,
   Modal,
+  Linking,
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -24,8 +24,9 @@ import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import * as Sharing from "expo-sharing";
 import { useNavigation } from '@react-navigation/native';
-
+import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
+import { Video } from "expo-av";
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
@@ -50,8 +51,25 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
   const MAX_TEXT_LENGTH = 350;
   const Container = onLongPress ? TouchableOpacity : View;
 
-  const getFileIcon = (fileName = "") => {
-    const extension = fileName.split(".").pop().toLowerCase();
+  const getFileExtension = (url) => {
+    if (!url) return '';
+
+    const fileName = url.includes('/')
+      ? url.substring(url.lastIndexOf('/') + 1)
+      : url;
+
+    const lastDotIndex = fileName.lastIndexOf('.');
+
+    if (lastDotIndex !== -1) {
+      return fileName.substring(lastDotIndex + 1).toLowerCase();
+    }
+
+    return '';
+  };
+
+  const getFileIcon = (fileNameOrUrl = "") => {
+    const extension = getFileExtension(fileNameOrUrl);
+
     switch (extension) {
       case "pdf":
         return require("../icons/pdf.png");
@@ -71,20 +89,17 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
     }
   };
 
-  const openFile = async (uri, fileName = "") => {
+  const openVideo = async (uri) => {
     try {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri);
-      } else if (Platform.OS === "android") {
-        const mimeType = "application/octet-stream";
+      const supported = await Linking.canOpenURL(uri);
+      if (supported) {
         await Linking.openURL(uri);
       } else {
-        Alert.alert("Cannot open file", "Device does not support opening this file.");
+        Alert.alert("Error", "Cannot open this video.");
       }
     } catch (error) {
-      console.error("Error opening file:", error);
-      Alert.alert("Cannot open file", "An error occurred when opening the file.");
+      console.error("Error opening video:", error);
+      Alert.alert("Error", "Failed to open video.");
     }
   };
 
@@ -105,12 +120,21 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
       <View style={messageItemStyles.contentContainer}>
         {msg.type === "IMAGE" ? (
           <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
+        ) : msg.type === "VIDEO" ? (
+          <Video
+            source={{ uri: content }}
+            style={messageItemStyles.videoContent}
+            useNativeControls
+            resizeMode="cover"
+            isLooping={false}
+          />
         ) : msg.type === "FILE" ? (
           <TouchableOpacity
             style={messageItemStyles.fileContainer}
-            onPress={() => openFile(msg.content, msg.fileName)}
+            onLongPress={onLongPress}
+            activeOpacity={0.7}
           >
-            <Image source={getFileIcon(msg.fileName)} style={messageItemStyles.fileIcon} />
+            <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
             <Text style={messageItemStyles.fileText}>
               {msg.fileName || "Open File"}
             </Text>
@@ -126,8 +150,8 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
             {msg.type === "RECALL"
               ? "Message has been recalled"
               : content.length > MAX_TEXT_LENGTH
-              ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-              : content}
+                ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+                : content}
           </Text>
         )}
         {showTime && (
@@ -139,6 +163,7 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
     </Container>
   );
 }
+
 
 const messageItemStyles = StyleSheet.create({
   container: {
@@ -171,6 +196,11 @@ const messageItemStyles = StyleSheet.create({
     height: 48,
     marginBottom: 4,
   },
+  videoContent: {
+    width: 250,
+    height: 250,
+    borderRadius: 8,
+  },
   fileText: {
     color: "#086DC0",
     fontSize: 14,
@@ -185,6 +215,19 @@ const messageItemStyles = StyleSheet.create({
     borderRadius: 12,
     fontSize: 14,
     color: "#000",
+  },
+  videoContainer: {
+    width: 250,
+    height: 250,
+    borderRadius: 8,
+    backgroundColor: "#EFF8FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoIcon: {
+    width: 48,
+    height: 48,
+    marginBottom: 8,
   },
   myMessage: { backgroundColor: "#EFF8FF", alignSelf: "flex-end" },
   theirMessage: { backgroundColor: "#F5F5F5" },
@@ -243,7 +286,7 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmojiPress }) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress }) {
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -264,7 +307,7 @@ function MessageInput({ input, setInput, onSend, onPickImage, onPickFile, onEmoj
           onSubmitEditing={handleSend}
           returnKeyType="send"
         />
-        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickImage}>
+        <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickMedia}>
           <Image source={PictureIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
         <TouchableOpacity style={messageInputStyles.iconButton} onPress={onEmojiPress}>
@@ -352,7 +395,7 @@ const headerStyles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-  backBtn:{width:50, height:35, marginRight:20},
+  backBtn: { width: 50, height: 35, marginRight: 20 },
   avatar: { width: 70, height: 70, borderRadius: 35 },
   infoContainer: { marginLeft: 12, flex: 1 },
   name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
@@ -378,7 +421,7 @@ export default function ChatScreen({ route, navigation }) {
   const conversationId = conversation._id;
 
   const [friends, setFriends] = useState([]);
-const [forwardModalVisible, setForwardModalVisible] = useState(false);
+  const [forwardModalVisible, setForwardModalVisible] = useState(false);
 
 
   const [userId, setUserId] = useState(null);
@@ -463,10 +506,30 @@ const [forwardModalVisible, setForwardModalVisible] = useState(false);
   
 
   // Delete action: Remove the message from local state.
-  const handleDeleteAction = () => {
+  const handleDeleteAction = async () => {
     if (!selectedMessage) return;
-    setMessages((prev) => prev.filter((m) => m._id !== selectedMessage._id));
-    setModalVisible(false);
+
+    try {
+      setMessages((prev) => prev.filter((m) => m._id !== selectedMessage._id));
+
+      console.log(selectedMessage._id);
+      await axios.delete(`/api/messages/${selectedMessage._id}/only`, {
+        data: {
+          conversationId: conversationId
+        }
+      });
+
+
+      // Thông báo xóa thành công (tùy chọn)
+      // Alert.alert("Thành công", "Tin nhắn đã được xóa");
+
+    } catch (error) {
+      console.error("Error deleting message:", error);
+
+      Alert.alert("Lỗi", "Không thể xóa tin nhắn. Vui lòng thử lại sau.");
+    } finally {
+      setModalVisible(false);
+    }
   };
 
   // Forward action: For now, just show an alert (placeholder).
@@ -512,8 +575,9 @@ const [forwardModalVisible, setForwardModalVisible] = useState(false);
   };
   
   
-  // Pick image for media message.
   const pickImage = async () => {
+    const formData = new FormData();
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert("Permission denied", "Gallery access needed.");
@@ -522,63 +586,246 @@ const [forwardModalVisible, setForwardModalVisible] = useState(false);
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
+      allowsEditing: false, // Bạn có thể bật chế độ chỉnh sửa nếu cần
     });
     if (!result.canceled && result.assets.length > 0) {
       const selectedImage = result.assets[0];
-      const newMsg = {
-        _id: String(Date.now()),
-        memberId: { userId: userId || "" },
-        type: "IMAGE",
-        content: selectedImage.uri,
-        createdAt: new Date().toISOString(),
+      console.log(selectedImage); // Kiểm tra thông tin của hình ảnh được chọn
+
+      // Lấy URI hình ảnh
+      const imageUri = selectedImage.uri;
+      const fileName = selectedImage.uri.split('/').pop(); // Lấy tên file từ URI
+      const mimeType = selectedImage.mimeType;
+
+      // Tạo một đối tượng `File` cho FormData
+      const file = {
+        uri: imageUri,
+        name: fileName,
+        type: mimeType,
       };
-      setMessages((prev) => [...prev, newMsg]);
-      // Optionally, you could also upload the image to the server here.
+
+      formData.append('id', userId);
+      formData.append('image', file);
+      formData.append('conversationId', conversationId);
+
+      try {
+        // Gửi tệp lên server
+        const response = await axios.post('/api/messages/images', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 20000,
+        });
+
+        const imageUrl = response.data?.file?.url;
+        const newMsg = {
+          _id: String(Date.now()),
+          memberId: { userId: userId || "" },
+          type: "IMAGE",
+          content: imageUrl,
+          createdAt: new Date().toISOString(),
+        };
+
+        // Cập nhật danh sách tin nhắn với ảnh mới
+        setMessages((prev) => [...prev, newMsg]);
+        console.log('Image uploaded successfully:', imageUrl);
+
+      } catch (err) {
+        console.log('Error uploading image:', err);
+        Alert.alert('Error', 'Failed to upload image');
+      }
     }
   };
 
-  // Pick document for file message.
+  const pickMedia = async () => {
+    const formData = new FormData();
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission denied", "Gallery access needed.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All, // Cho phép chọn cả Images và Videos
+      quality: 1,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const selectedMedia = result.assets[0];
+      const mediaUri = selectedMedia.uri;
+      const fileName = selectedMedia.uri.split('/').pop();
+      const mimeType = selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg');
+
+      const file = {
+        uri: mediaUri,
+        name: fileName,
+        type: mimeType,
+      };
+
+      formData.append('id', userId);
+      formData.append(selectedMedia.type === 'video' ? 'video' : 'image', file);
+      formData.append('conversationId', conversationId);
+
+      try {
+        const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
+        const response = await axios.post(endpoint, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: selectedMedia.type === 'video' ? 30000 : 20000,
+        });
+
+        const mediaUrl = response.data?.file?.url;
+        const newMsg = {
+          _id: String(Date.now()),
+          memberId: { userId: userId || "" },
+          type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
+          content: mediaUrl,
+          createdAt: new Date().toISOString(),
+        };
+
+        setMessages((prev) => [...prev, newMsg]);
+        console.log(`${selectedMedia.type} uploaded successfully:`, mediaUrl);
+      } catch (err) {
+        console.error(`Error uploading ${selectedMedia.type}:`, err);
+        Alert.alert('Error', `Failed to upload ${selectedMedia.type}`);
+      }
+    }
+  };
+
+  // const pickVideo = async () => {
+  //   const formData = new FormData();
+
+  //   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  //   if (!permission.granted) {
+  //     Alert.alert("Permission denied", "Gallery access needed.");
+  //     return;
+  //   }
+  //   const result = await ImagePicker.launchImageLibraryAsync({
+  //     mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+  //     quality: 1,
+  //     allowsEditing: false,
+  //   });
+  //   if (!result.canceled && result.assets.length > 0) {
+  //     const selectedVideo = result.assets[0];
+  //     console.log(selectedVideo);
+  //     const videoUri = selectedVideo.uri;
+  //     const fileName = selectedVideo.uri.split('/').pop();
+  //     const mimeType = selectedVideo.mimeType || 'video/mp4';
+
+  //     const file = {
+  //       uri: videoUri,
+  //       name: fileName,
+  //       type: mimeType,
+  //     };
+
+  //     formData.append('id', userId);
+  //     formData.append('video', file);
+  //     formData.append('conversationId', conversationId);
+
+  //     try {
+  //       // Gửi tệp lên server
+  //       const response = await axios.post('/api/messages/videos', formData, {
+  //         headers: {
+  //           'Content-Type': 'multipart/form-data',
+  //         },
+  //         timeout: 30000,
+  //       });
+
+  //       const videoUrl = response.data?.file?.url;
+  //       const newMsg = {
+  //         _id: String(Date.now()),
+  //         memberId: { userId: userId || "" },
+  //         type: "VIDEO",
+  //         content: videoUrl,
+  //         createdAt: new Date().toISOString(),
+  //       };
+
+  //       setMessages((prev) => [...prev, newMsg]);
+  //       console.log('Video uploaded successfully:', videoUrl);
+
+  //     } catch (err) {
+  //       console.log('Error uploading video:', err);
+  //       Alert.alert('Error', 'Failed to upload video');
+  //     }
+  //   }
+  // };
+
+  const base64ToBlob = (base64Data, contentType = '', sliceSize = 512) => {
+    const byteCharacters = atob(base64Data); // decode base64
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+
+    return new Blob(byteArrays, { type: contentType });
+  };
+
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "text/plain",
-          "application/vnd.ms-project",
-        ],
+        type: "*/*",
         copyToCacheDirectory: true,
         multiple: false,
       });
-      if (result.canceled === false && result.assets && result.assets.length > 0) {
-        const file = result.assets[0];
-        const newFileMessage = {
-          _id: String(new Date().getTime()),
-          memberId: { userId: userId },
-          type: "FILE",
-          fileName: file.name,
-          content: file.uri,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, newFileMessage]);
-      } else if (result.type === "success") {
-        const { name, uri } = result;
-        const newFileMessage = {
-          _id: String(new Date().getTime()),
-          memberId: { userId: userId },
-          type: "FILE",
-          fileName: name,
-          content: uri,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, newFileMessage]);
+      console.log(result);
+
+
+      if ((result.canceled === false && result.assets && result.assets.length > 0) || result.type === "success") {
+        let file, fileName, fileUri, mimeType;
+
+        if (result.assets && result.assets.length > 0) {
+          file = result.assets[0];
+          fileUri = file.uri;
+          fileName = file.name;
+          mimeType = file.mimeType || 'application/octet-stream';
+        } else if (result.type === "success") {
+          fileUri = result.uri;
+          fileName = result.name;
+          mimeType = 'application/octet-stream';
+        } else {
+          throw new Error("Không thể đọc thông tin file");
+        }
+
+        const fileInfo = await FileSystem.getInfoAsync(fileUri);
+        if (!fileInfo.exists) {
+          Alert.alert("Error", "File not found.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('id', userId);
+        formData.append('conversationId', conversationId);
+        formData.append('file', {
+          uri: fileUri,
+          name: fileName,
+          type: mimeType,
+        });
+
+        // Chỉ upload file, không thêm tin nhắn vào state
+        // Tin nhắn sẽ được thêm tự động qua WebSocket
+        console.log(formData)
+        await axios.post('/api/messages/file', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
       }
     } catch (error) {
-      console.error("File picking error:", error);
-      Alert.alert("Error", "Cannot pick file. Please try again.");
+      console.error("Error uploading file:", error.message);
+      Alert.alert("Upload error", "Không thể upload file.");
     }
   };
 
@@ -667,7 +914,7 @@ const [forwardModalVisible, setForwardModalVisible] = useState(false);
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
-        onPickImage={pickImage}
+        onPickMedia={pickMedia}
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
       />
