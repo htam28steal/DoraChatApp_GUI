@@ -194,35 +194,19 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress, scrollToBottomOnMount }) {
+function ChatBox({ messages, currentUserId, onMessageLongPress }) {
   const scrollViewRef = useRef(null);
 
-  const scrollToEnd = () => {
-    if (scrollViewRef.current) {
+  useEffect(() => {
+    if (scrollViewRef.current)
       scrollViewRef.current.scrollToEnd({ animated: true });
-    }
-  };
-
-  // 🔁 Scroll when messages change
-  useEffect(() => {
-    const timeout = setTimeout(scrollToEnd, 100);
-    return () => clearTimeout(timeout);
   }, [messages]);
-
-  // 🚀 Scroll when the component first mounts
-  useEffect(() => {
-    if (scrollToBottomOnMount) {
-      const timeout = setTimeout(scrollToEnd, 200); // slightly longer delay on mount
-      return () => clearTimeout(timeout);
-    }
-  }, []);
 
   return (
     <ScrollView
       ref={scrollViewRef}
       style={chatBoxStyles.container}
       contentContainerStyle={chatBoxStyles.contentContainer}
-      showsVerticalScrollIndicator={false}
     >
       {messages.map((msg, index) => {
         const userId = msg.memberId?.userId || "";
@@ -250,7 +234,6 @@ function ChatBox({ messages, currentUserId, onMessageLongPress, scrollToBottomOn
     </ScrollView>
   );
 }
-
 
 const chatBoxStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
@@ -390,32 +373,39 @@ const headerStyles = StyleSheet.create({
  * Also integrates a modal for long-press message options: "Thu hồi", "Xoá" and "Chuyển tiếp".
  */
 export default function ChatScreen({ route, navigation }) {
-  // ✅ Extract both conversation and userId from route.params
-  const { conversation, userId: passedUserId } = route.params;
+  // Extract the conversation object from route parameters.
+  const { conversation } = route.params;
   const conversationId = conversation._id;
 
-  
+  const [friends, setFriends] = useState([]);
+const [forwardModalVisible, setForwardModalVisible] = useState(false);
 
-  // ✅ Directly use the passed userId
-  const [userId, setUserId] = useState(passedUserId);
+
+  const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
 
+  // State for long press options modal.
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Retrieve userId from AsyncStorage.
   useEffect(() => {
-    if (!userId) {
-      (async () => {
+    const fetchUserId = async () => {
+      try {
         const storedUserId = await AsyncStorage.getItem("userId");
         if (storedUserId) {
           setUserId(storedUserId);
+        } else {
+          Alert.alert("Error", "User id not found.");
         }
-      })();
-    }
-  }, [userId]);
-  
+      } catch (error) {
+        Alert.alert("Error fetching user id", error.message);
+      }
+    };
+    fetchUserId();
+  }, []);
 
   // Fetch all messages for the conversation using conversationId.
   useEffect(() => {
@@ -470,6 +460,8 @@ export default function ChatScreen({ route, navigation }) {
     setModalVisible(false);
   };
 
+  
+
   // Delete action: Remove the message from local state.
   const handleDeleteAction = () => {
     if (!selectedMessage) return;
@@ -477,60 +469,49 @@ export default function ChatScreen({ route, navigation }) {
     setModalVisible(false);
   };
 
+  // Forward action: For now, just show an alert (placeholder).
   const handleForwardAction = async () => {
+    
     try {
       const response = await axios.get("/api/friends");
-      const friends = response.data;
-  
-      if (!friends || friends.length === 0) {
-        Alert.alert("Không có bạn bè nào để chuyển tiếp.");
-        return;
-      }
-  
-      Alert.alert(
-        "Chọn người nhận",
-        "Hãy chọn người để chuyển tiếp:",
-        friends.map((friend) => ({
-          text: friend.name || friend.username,
-          onPress: async () => {
-            try {
-              const convResponse = await axios.post(
-                `/api/conversations/individuals/${friend._id}`
-              );
-  
-              const newConv = convResponse.data;
-              const messageToForward = {
-                conversationId: newConv._id,
-                content: selectedMessage.content,
-                type: selectedMessage.type,
-                fileName: selectedMessage.fileName,
-              };
-  
-              await axios.post("/api/messages/text", messageToForward);
-  
-              // ✅ Send to socket too
-              socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
-                conversationId: newConv._id,
-                content: selectedMessage.content,
-                type: selectedMessage.type,
-                fileName: selectedMessage.fileName,
-              });
-  
-              Alert.alert("Chuyển tiếp thành công!");
-            } catch (err) {
-              Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
-            }
-          },
-        }))
-      );
+      setFriends(response.data); // set to show in modal
+      setForwardModalVisible(true); // show modal
     } catch (error) {
       Alert.alert("Lỗi lấy danh sách bạn bè", error.response?.data?.message || error.message);
+    } finally {
+      setModalVisible(false); // close long-press menu
     }
-    setModalVisible(false);
+  };
+
+
+  const handleSelectFriendToForward = async (friend) => {
+    try {
+      const convRes = await axios.post(`/api/conversations/individuals/${friend._id}`);
+      const conversation = convRes.data;
+  
+      await axios.post("/api/messages/text", {
+        conversationId: conversation._id,
+        content: selectedMessage.content,
+        type: selectedMessage.type,
+        fileName: selectedMessage.fileName,
+      });
+  
+      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
+        conversationId: conversation._id,
+        content: selectedMessage.content,
+        type: selectedMessage.type,
+        fileName: selectedMessage.fileName,
+      });
+  
+      Alert.alert("Đã chuyển tiếp đến " + (friend.name || friend.username));
+    } catch (error) {
+      Alert.alert("Lỗi", "Không thể chuyển tiếp tin nhắn.");
+    } finally {
+      setForwardModalVisible(false);
+    }
   };
   
   
-
   // Pick image for media message.
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -636,36 +617,51 @@ export default function ChatScreen({ route, navigation }) {
     }
   };
 
+  // Listen for incoming messages from the socket.
   useEffect(() => {
-    if (!socket || !conversationId || !userId) return;
-    
+    if (!socket || !conversationId) return;
     const receiveHandler = (message) => {
-      // handle message logic (updating state, etc.)
+      setMessages((prev) => {
+        // If the message is from the current user, try to update the pending message.
+        if (message.memberId?.userId === userId) {
+          const index = prev.findIndex(
+            (m) => m.pending && m.content === message.content
+          );
+          if (index !== -1) {
+            const updatedMessages = [...prev];
+            updatedMessages[index] = message;
+            return updatedMessages;
+          }
+        }
+        // If the message already exists (by _id), don't add it again.
+        const exists = prev.some((m) => m._id === message._id);
+        if (exists) return prev;
+        return [...prev, message];
+      });
     };
-  
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-  
-    // Emit join event with userId (it should now be defined)
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId, userId });
-  
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId, userId });
+      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
     };
   }, [socket, conversationId, userId]);
+
+
   
-  
+
+
+
   return (
     <View style={chatScreenStyles.container}>
       <HeaderSingleChat />
       <View style={chatScreenStyles.chatContainer}>
-      <ChatBox
-  messages={messages}
-  currentUserId={userId}
-  onMessageLongPress={handleMessageLongPress}
-  scrollToBottomOnMount={true}
-/>
+        <ChatBox
+          messages={messages}
+          currentUserId={userId}
+          onMessageLongPress={handleMessageLongPress}
+        />
       </View>
       <MessageInput
         input={input}
@@ -706,6 +702,35 @@ export default function ChatScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <Modal
+  visible={forwardModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setForwardModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.forwardContainer}>
+      <Text style={styles.forwardTitle}>Chọn người để chuyển tiếp</Text>
+      {friends.map((friend) => (
+        <TouchableOpacity
+          key={friend._id}
+          style={styles.friendItem}
+          onPress={() => handleSelectFriendToForward(friend)}
+        >
+          <Text style={styles.friendName}>{friend.name || friend.username}</Text>
+        </TouchableOpacity>
+      ))}
+      <TouchableOpacity onPress={() => setForwardModalVisible(false)}>
+        <Text style={{ color: "red", marginTop: 10 }}>Đóng</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+
+
+      
     </View>
   );
 }
@@ -740,4 +765,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#086DC0",
   },
+  forwardContainer: {
+    backgroundColor: "#fff",
+    padding: 20,
+    marginHorizontal: 30,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  forwardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  friendItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    width: "100%",
+  },
+  friendName: {
+    fontSize: 16,
+    textAlign: "center",
+  }
+  
 });
