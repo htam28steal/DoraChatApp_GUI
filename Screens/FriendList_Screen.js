@@ -96,14 +96,14 @@ export default function ListFirendScreen({ navigation }) {
                         <Text style={styles.txtfriendlist}>Friend list</Text>
                     </View>
 
-                    <View style={styles.fRequest}>
+                    <TouchableOpacity style={styles.fRequest} onPress={() => navigation.navigate("FriendList_Screen")}>
                         <Image
                             source={require('../icons/friendrequest.png')}
                             style={styles.icons}
                         />
                         <Text style={styles.txtRequest}>Friend request</Text>
                         <Text style={styles.txtRequest}>(1)</Text>
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={styles.fContact}>
                         <Image
@@ -164,7 +164,7 @@ export default function ListFirendScreen({ navigation }) {
                     </View>
                 </TouchableOpacity>
             </View>
-        </View>
+        </View >
     );
 }
 
