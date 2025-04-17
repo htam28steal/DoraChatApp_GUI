@@ -487,13 +487,20 @@ export default function ChatScreen({ route, navigation }) {
             await axios.delete(
               `/api/messages/${selectedMessage._id}/conversation/${conversationId}`
             );
-            setMessages((prev) =>
-              prev.map((m) =>
+            // 1) update local UI
+            setMessages(prev =>
+              prev.map(m =>
                 m._id === selectedMessage._id
                   ? { ...m, content: "[Message recalled]", type: "RECALL" }
                   : m
               )
             );
+
+            socket.emit(SOCKET_EVENTS.MESSAGE_RECALLED, {
+              conversationId,
+              messageId: selectedMessage._id,
+            });
+            
           } catch (err) {
             Alert.alert("Error", err.response?.data?.message || err.message);
           }
@@ -502,7 +509,7 @@ export default function ChatScreen({ route, navigation }) {
     ]);
     setModalVisible(false);
   };
-
+  
   
 
   // Delete action: Remove the message from local state.
@@ -886,11 +893,30 @@ export default function ChatScreen({ route, navigation }) {
         return [...prev, message];
       });
     };
-    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
+    const recallHandler = (data) => {
+      // pick the ID either from data.messageId or data._id
+      const messageId = data.messageId ?? data._id;
+      // pick the updated content (your server set it to "Tin nhắn đã được thu hồi")
+      const newContent = data.content ?? "[Message recalled]";
+    
+      setMessages(prev =>
+        prev.map(m =>
+          m._id === messageId
+            ? { ...m, content: newContent, type: "RECALL" }
+            : m
+        )
+      );
+    };
+    
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
     socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+  
     return () => {
       socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+      socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
       socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
     };
   }, [socket, conversationId, userId]);
