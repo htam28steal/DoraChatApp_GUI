@@ -422,7 +422,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const [friends, setFriends] = useState([]);
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
-
+  const [selectedForwardId, setSelectedForwardId] = useState(null);
 
   const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -985,21 +985,58 @@ export default function ChatScreen({ route, navigation }) {
   <View style={styles.modalOverlay}>
     <View style={styles.forwardContainer}>
       <Text style={styles.forwardTitle}>Chọn người để chuyển tiếp</Text>
-      {friends.map((friend) => (
-        <TouchableOpacity
-          key={friend._id}
-          style={styles.friendItem}
-          onPress={() => handleSelectFriendToForward(friend)}
-        >
-          <Text style={styles.friendName}>{friend.name || friend.username}</Text>
-        </TouchableOpacity>
-      ))}
+      {friends.map((friend) => {
+        const isSelected = friend._id === selectedForwardId;
+        return (
+          <TouchableOpacity
+            key={friend._id}
+            style={[
+              styles.friendItem,
+              isSelected && styles.friendItemSelected
+            ]}
+            onPress={() => setSelectedForwardId(friend._id)}
+          >
+            {/* Avatar */}
+            <Image
+              source={
+                friend.avatar
+                  ? { uri: friend.avatar }
+                  : {AvatarImage}
+              }
+              style={styles.friendAvatar}
+            />
+            {/* Name */}
+            <Text style={styles.friendName}>{friend.name || friend.username}</Text>
+            {/* Radio Button */}
+            <View style={styles.radioWrapper}>
+              {isSelected
+                ? <View style={styles.radioOuter}><View style={styles.radioInner} /></View>
+                : <View style={styles.radioOuter} />}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+      {/* Confirm Button */}
+      <TouchableOpacity
+        style={styles.confirmButton}
+        onPress={() => {
+          if (selectedForwardId) {
+            const friend = friends.find(f => f._id === selectedForwardId);
+            handleSelectFriendToForward(friend);
+          } else {
+            Alert.alert("Vui lòng chọn bạn để chuyển tiếp");
+          }
+        }}
+      >
+        <Text style={styles.confirmText}>Xác nhận</Text>
+      </TouchableOpacity>
       <TouchableOpacity onPress={() => setForwardModalVisible(false)}>
-        <Text style={{ color: "red", marginTop: 10 }}>Đóng</Text>
+        <Text style={styles.cancelText}>Đóng</Text>
       </TouchableOpacity>
     </View>
   </View>
 </Modal>
+
 
 
 
@@ -1043,7 +1080,6 @@ const styles = StyleSheet.create({
     padding: 20,
     marginHorizontal: 30,
     borderRadius: 10,
-    alignItems: "center",
   },
   forwardTitle: {
     fontSize: 18,
@@ -1059,6 +1095,69 @@ const styles = StyleSheet.create({
   friendName: {
     fontSize: 16,
     textAlign: "center",
-  }
+  },
+  friendItem: {
+    flexDirection: "row",
+    
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  friendItemSelected: {
+    backgroundColor: "#E3F2FD",
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  friendName: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  radioWrapper: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  radioOuter: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#086DC0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#086DC0",
+  },
+  confirmButton: {
+    backgroundColor: "#086DC0",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    marginTop: 16,
+  },
+  confirmText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  cancelText: {
+    color: "#f44336",
+    fontSize: 16,
+    textAlign: "center",
+    marginTop: 12,
+  },
+
   
 });

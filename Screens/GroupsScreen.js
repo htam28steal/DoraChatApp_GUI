@@ -80,7 +80,11 @@ export default function GroupsScreen({ navigation }) {
   };
 
   const renderConversation = useCallback(({ item: group }) => (
-    <TouchableOpacity onPress={() => navigation.navigate('ChatScreen', { conversationId: group._id })}>
+    <TouchableOpacity // in GroupsScreen renderConversation:
+    onPress={() => navigation.navigate("GroupDetailScreen", {
+      conversationId: group._id
+    })}
+    >
       <View style={styles.fMessage}>
         <View style={styles.favatarGroup}>
           {group.members && group.members.length > 0 ? (
@@ -334,7 +338,7 @@ const styles = StyleSheet.create({
       justifyContent: 'space-around',
       alignItems: 'center',
     },
-    favatarG: { width: 25, height: 25, borderRadius: 12.5 },
+    favatarG: { width: 25, height: 25, borderRadius: 12.5 },    
     imgAG: { width: '100%', height: '100%', borderRadius: 100 },
   
     fInfor: { flex: 1, justifyContent: 'center', paddingLeft: 10 },
