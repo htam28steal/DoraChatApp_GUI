@@ -13,17 +13,33 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import FriendService from "../api/friendService";
 
-export default function ListFirendScreen({ navigation }) {
+export default function ListRequestFirendScreen({ navigation }) {
     const [userId, setUserId] = useState(null);
     const [friends, setFriends] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedFriend, setSelectedFriend] = useState(null);
-    const [showOptions, setShowOptions] = useState(false);
+    const [tokens, setToken] = useState(true);
+    console.log(userId)
+    console.log(friends)
+
+    const handleAccept = async (friendId) => {
+        console.log(friendId);
+        try {
+
+            await FriendService.acceptFriend(friendId);
+            Alert.alert("Success", "Friend request accepted!");
+            const updatedList = friends.filter(friend => friend._id !== friendId);
+            setFriends(updatedList);
+        } catch (error) {
+            Alert.alert("Error", "Failed to accept friend request");
+        }
+    };
+
 
     useEffect(() => {
         const fetchUserId = async () => {
             try {
                 const storedUserId = await AsyncStorage.getItem("userId");
+                const token = await AsyncStorage.getItem("userToken");
+                setToken(token);
                 if (storedUserId) {
                     setUserId(storedUserId);
                 } else {
@@ -37,48 +53,34 @@ export default function ListFirendScreen({ navigation }) {
     }, []);
 
     useEffect(() => {
-        const fetchFriends = async () => {
-            try {
-                const friendsData = await FriendService.getListFriends();
-                setFriends(friendsData);
-            } catch (err) {
-                console.log(err);
-            }
-        };
-        if (userId) {
-            fetchFriends();
+        if (userId && tokens) {
+            const fetchFriendsRequest = async () => {
+                try {
+                    const friendsRequestData = await FriendService.getListRequestFriends(userId, tokens);
+                    setFriends(friendsRequestData);
+                } catch (err) {
+                    console.log(err);
+                }
+            };
+            fetchFriendsRequest();
         }
-    }, [userId]);
+    }, [userId, tokens]);
 
-    const handleDetailPress = (friend) => {
-        if (selectedFriend && selectedFriend._id === friend._id) {
-            setShowOptions(false);
-            setSelectedFriend(null);
-        } else {
-            setSelectedFriend(friend);
-            setShowOptions(true);
-        }
-    };
 
-    const handleDeleteFriend = async (friendId) => {
-        try {
-            await FriendService.deleteFriend(friendId);
-            Alert.alert("Success", "Friend deleted!");
-            const updatedList = friends.filter(friend => friend._id !== friendId);
-            setFriends(updatedList);
-        } catch (error) {
-            Alert.alert("Error", "Failed to delete friend");
-        }
-    };
+
+
 
     const renderFriend = ({ item }) => (
+
+
         <TouchableOpacity style={styles.fMessage}>
             <Image
                 source={item.avatar ? { uri: item.avatar } : null}
                 style={styles.avatar}
             />
+
             {!item.avatar && item.avatarColor ? (
-                <View style={[styles.avatar, { backgroundColor: item.avatarColor }, { justifyContent: 'center', alignItems: 'center' }]}>
+                <View style={[styles.avatarCl, { backgroundColor: item.avatarColor }, { backgroundColor: item.avatarColor, justifyContent: 'center', alignItems: 'center' }]}>
                     <Text style={styles.avatarText}>{item.name?.charAt(0)}</Text>
                 </View>
             ) : null}
@@ -87,26 +89,20 @@ export default function ListFirendScreen({ navigation }) {
                 <Text style={styles.email}>{item.username}</Text>
 
                 <View style={styles.fbtn}>
-                    <TouchableOpacity style={styles.btnDetail} onPress={() => handleDetailPress(item)}>
-                        <Image
-                            source={require('../icons/detail.png')}
-                            style={styles.iconDetail}
-                        />
+                    <TouchableOpacity style={styles.btnAccept} onPress={() => {
+                        console.log("Accept button pressed for ID:", item._id);
+                        handleAccept(item._id);
+                    }}
+                    >
+                        <Text style={styles.txtAccecpt}>Chấp nhận</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.btnTC}>
+                        <Text style={styles.txtTC}>Từ chối</Text>
                     </TouchableOpacity>
                 </View>
             </View>
-            {showOptions && selectedFriend && selectedFriend._id === item._id && (
-                <View style={styles.popupContainer}>
-                    <TouchableOpacity style={styles.popupItem} onPress={() => handleDeleteFriend(item._id)}>
-                        <Text style={styles.popupText}>❌ Xóa kết bạn</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.popupItem} onPress={() => setShowOptions(false)}>
-                        <Text style={styles.popupText}>Đóng</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
         </TouchableOpacity>
+
     );
 
     return (
@@ -120,15 +116,15 @@ export default function ListFirendScreen({ navigation }) {
 
             <View style={styles.fcontent}>
                 <View style={styles.fcontrol}>
-                    <View style={styles.fFriendList}>
+                    <TouchableOpacity style={styles.fFriendList} onPress={() => navigation.navigate("FriendList_Screen")}>
                         <Image
                             source={require('../icons/friend.png')}
                             style={styles.icons}
                         />
                         <Text style={styles.txtfriendlist}>Friend list</Text>
-                    </View>
+                    </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.fRequest} onPress={() => navigation.navigate("ListRequestFriend")}>
+                    <TouchableOpacity style={styles.fRequest} >
                         <Image
                             source={require('../icons/friendrequest.png')}
                             style={styles.icons}
@@ -145,7 +141,7 @@ export default function ListFirendScreen({ navigation }) {
                         <Text style={styles.txtRequest}>Contact</Text>
                     </View>
                 </View>
-                <TouchableOpacity style={styles.btnAdd} onPress={() => navigation.navigate('FindUserScreen')}>
+                <TouchableOpacity style={styles.btnAdd}>
                     <View>
                         <Image
                             source={require('../icons/addFriend.png')}
@@ -154,16 +150,14 @@ export default function ListFirendScreen({ navigation }) {
                     </View>
                 </TouchableOpacity>
             </View>
-
             <View style={styles.fListFriend}>
                 <FlatList
                     data={friends}
                     renderItem={renderFriend}
                     keyExtractor={(item) => item._id}
-                    ListEmptyComponent={<Text>No friends found.</Text>}
+                    ListEmptyComponent={<Text>No friends found.</Text>} // Hiển thị khi mảng rỗng
                 />
             </View>
-
             <View style={styles.fFooter}>
                 <TouchableOpacity style={styles.btnTags}>
                     <Image
@@ -294,59 +288,79 @@ const styles = StyleSheet.create({
         padding: 5,
     },
     fMessage: {
+        width: '100%',
+        height: 60,
         flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        marginTop: 5,
 
     },
     avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        marginRight: 15,
-        backgroundColor: '#ccc',
-        justifyContent: 'center',
-        alignItems: 'center',
+        width: 65,
+        height: 60,
+        borderRadius: 100,
+        marginRight: 0,
     },
-    avatarPlaceholder: {
-        justifyContent: 'center',
-        alignItems: 'center',
+    avatarCl: {
+        position: 'absolute',
+        width: 65,
+        height: 60,
+        borderRadius: 100,
+        marginRight: 0,
+        left: 0
     },
-
-    avatarText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: 'white',
-    },
-
     fInfor: {
-        flex: 1,
+        width: '80%',
+        height: '100%',
         justifyContent: 'center',
+        borderWidth: 1
     },
     name: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
     },
     email: {
         fontSize: 13,
-        color: '#666',
+        fontWeight: 400,
     },
     fbtn: {
+        display: 'flex',
         position: 'absolute',
-        width: 13,
+        width: 150,
         height: 30,
-        justifyContent: 'center',
-        right: 0,
-        top: 5,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        right: 5,
     },
-    btnDetail: {
-        width: 8,
-        height: 30,
-        padding: 8,
+    btnAccept: {
+        display: 'flex',
+        width: 70,
+        height: '100%',
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#4CBB17',
+    },
+    txtAccecpt: {
+        fontSize: 11,
+        fontWeight: 500,
+        color: 'white'
+    },
+    btnTC: {
+        display: 'flex',
+        width: 70,
+        height: '100%',
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'red'
+
+    },
+    txtTC: {
+        fontSize: 11,
+        fontWeight: 500,
+        color: 'white'
     },
     fFooter: {
         position: 'absolute',
@@ -403,31 +417,5 @@ const styles = StyleSheet.create({
         fontSize: 25,
         fontWeight: 'bold',
         color: 'white',
-    },
-
-    iconDetail: {
-        width: 8,
-        height: 30,
-        tintColor: '#086DC0',
-    },
-    popupContainer: {
-        position: 'absolute',
-        right: 20,
-        backgroundColor: 'white',
-        padding: 10,
-        borderRadius: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
-        zIndex: 999,
-    },
-    popupItem: {
-        paddingVertical: 10,
-    },
-    popupText: {
-        fontSize: 16,
-        color: '#086DC0',
     },
 });

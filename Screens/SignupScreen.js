@@ -97,6 +97,8 @@ const SignupScreen = () => {
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
         bio: formData.bio || '',
+      }, {
+        timeout: 10000, // timeout sau 10 giây
       });
 
       if (registrationResponse.data.message === 'Đã lưu thông tin người dùng') {
@@ -313,9 +315,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  input:{
-    paddingTop:5,
-    marginBottom:-5
+  input: {
+    paddingTop: 5,
+    marginBottom: -5
   }
 });
 

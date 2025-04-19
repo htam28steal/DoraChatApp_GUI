@@ -24,7 +24,8 @@ import ResetPasswordStep1 from './Screens/ResetPasswordStep1';
 import ResetPasswordStep2 from './Screens/ResetPasswordStep2';
 import useSocketListeners from './hooks/useSocketListeners';
 import Conversations from './Screens/ConversationScreen'
-
+import ListRequestFriend from './Screens/ListRequestFriendSCreen';
+import FindUser from './Screens/FindUserScreen'
 const Stack = createStackNavigator();
 
 // Component con để sử dụng các hook Redux (ví dụ useDispatch)
@@ -44,6 +45,9 @@ function AppContainer() {
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AddFriendScreen" component={AddFriendScreen} options={{ headerShown: false }} />
         <Stack.Screen name="YourFriendScreen" component={YourFriendScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ListRequestFriend" component={ListRequestFriend} options={{ headerShown: false }} />
+        <Stack.Screen name="FindUserScreen" component={FindUser} options={{ headerShown: false }} />
+
         <Stack.Screen
           name="LoginScreen"
           component={Login}
