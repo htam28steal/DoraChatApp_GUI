@@ -156,30 +156,6 @@ export default function GroupDetail({ route, navigation }) {
         keyExtractor={(item) => item.id}
       />
        <View style={{marginTop:30}}>
-        <View style={styles.options}>
-        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
-          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
-          borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../icons/Notification.png')} style={{alignSelf:'center'}} /></View>
-          <Text style={{color:'#086DC0', fontSize:15}}>Mute messages</Text>
-        </View>
-        <TouchableOpacity 
-          style={{width:40, backgroundColor:'#D8EDFF', height:20, borderRadius:10, position:'relative'}}>
-          <View 
-            style={{
-              width: 16,
-              height: 16,
-              backgroundColor: '#086DC0',
-              borderRadius: 10,
-              position: 'absolute',
-              right: 1,
-              top: '50%',
-              transform: [{ translateY: -8 }]  // Dịch lên trên 8 đơn vị để căn giữa
-            }
-          }>
-          </View>
-        </TouchableOpacity>
-        </View>
 
         <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
@@ -221,6 +197,14 @@ export default function GroupDetail({ route, navigation }) {
                   <Image source={require('../icons/Branches.png')} />
               </View>
               <Text style={styles.authorityText}>Uỷ quyền </Text>
+            </TouchableOpacity>
+        </View>
+        <View style={styles.authority}>
+            <TouchableOpacity style={styles.authorityOptions}>
+              <View style={styles.authorityIcon}>
+                  <Image source={require('../icons/remove-user.png')} style={{width:12, height:12}}/>
+                </View>
+              <Text style={styles.authorityText}>Mời khỏi nhóm </Text>
             </TouchableOpacity>
         </View>
               <View style={styles.authority}>
