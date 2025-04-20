@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
-  FlatList, Modal, ActivityIndicator, Alert , Platform, StatusBar} from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert,Platform, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import axios from '../api/apiConfig';
@@ -156,6 +156,30 @@ export default function GroupDetail({ route, navigation }) {
         keyExtractor={(item) => item.id}
       />
        <View style={{marginTop:30}}>
+        <View style={styles.options}>
+        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
+          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
+          borderRadius:15, justifyContent:'center', marginRight:10
+          }}><Image source={require('../icons/Notification.png')} style={{alignSelf:'center'}} /></View>
+          <Text style={{color:'#086DC0', fontSize:15}}>Mute messages</Text>
+        </View>
+        <TouchableOpacity 
+          style={{width:40, backgroundColor:'#D8EDFF', height:20, borderRadius:10, position:'relative'}}>
+          <View 
+            style={{
+              width: 16,
+              height: 16,
+              backgroundColor: '#086DC0',
+              borderRadius: 10,
+              position: 'absolute',
+              right: 1,
+              top: '50%',
+              transform: [{ translateY: -8 }]  // Dịch lên trên 8 đơn vị để căn giữa
+            }
+          }>
+          </View>
+        </TouchableOpacity>
+        </View>
 
         <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
@@ -169,7 +193,9 @@ export default function GroupDetail({ route, navigation }) {
           <Image source={require('../icons/arrow.png')} />
         </TouchableOpacity>
         </View>
-        <View style={styles.options}>
+
+    </View>
+    <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
@@ -202,12 +228,13 @@ export default function GroupDetail({ route, navigation }) {
         <View style={styles.authority}>
             <TouchableOpacity style={styles.authorityOptions}>
               <View style={styles.authorityIcon}>
-                  <Image source={require('../icons/remove-user.png')} style={{width:12, height:12}}/>
+                  <Image source={require('../icons/remove-user.png')} style={{width:12, height:12}} />
                 </View>
-              <Text style={styles.authorityText}>Mời khỏi nhóm </Text>
+              <Text style={styles.authorityText}>Mời khỏi nhóm</Text>
             </TouchableOpacity>
         </View>
-              <View style={styles.authority}>
+
+            <View style={styles.authority}>
             <TouchableOpacity style={styles.authorityOptions}>
               <View style={styles.authorityIcon}>
                 <View style={styles.authorityBorderIcon}>
@@ -219,7 +246,6 @@ export default function GroupDetail({ route, navigation }) {
         </View>
 
 
-    </View>
       <FlatList
         data={dataPic}
         horizontal={false}
@@ -227,7 +253,7 @@ export default function GroupDetail({ route, navigation }) {
         renderItem={renderPicture}
         keyExtractor={(item) => item.id}
       />
-      
+ 
 
       <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
       <TouchableOpacity>
@@ -307,17 +333,13 @@ export default function GroupDetail({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
   header: {
-    flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
-    // on Android use the StatusBar height; on iOS it's handled by SafeAreaView
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, 
-    height: (Platform.OS === 'android' ? StatusBar.currentHeight : 0) + 56, 
+    flexDirection: 'row',
+    paddingBottom: 10,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginTop:35
   },
-  avatar: { height: 120, width: 120, marginTop: 20 },
+  avatar: { height: 120, width: 120, marginTop: 20, marginBottom: 10 },
   addButton: {
     backgroundColor: '#D8EDFF',
     width: 30,
@@ -333,11 +355,11 @@ const styles = StyleSheet.create({
     justifyContent:'space-between',
     alignItems:'center',
     paddingLeft:20,
-    marginBottom:15,
+    marginBottom:15
   },
   authority:{
     marginLeft:50,
-    marginBottom:5,
+    marginBottom:5
   },
   authorityOptions:{
     flexDirection:'row'
