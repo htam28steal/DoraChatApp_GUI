@@ -28,7 +28,26 @@ export default function GroupDetail({ route, navigation }) {
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [selectedFriendIds, setSelectedFriendIds] = useState([]);
   const [members, setMembers] = useState([]);
+  const [removeModalVisible, setRemoveModalVisible] = useState(false);
+  const [groupMembers, setGroupMembers] = useState([]);
 
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
+
+  const fetchGroupMembers = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      const res = await axios.get(`/api/conversations/${conversationId}/members`);
+      const allMembers = res.data || [];
+  
+      // 🔍 Filter out the current user
+      const otherMembers = allMembers.filter(member => member.userId !== userId);
+  
+      setGroupMembers(otherMembers);
+    } catch (err) {
+      console.error('Failed to fetch members', err);
+    }
+  };
+  
   const fetchModalData = async () => {
     try {
       setLoadingFriends(true);
@@ -252,7 +271,12 @@ export default function GroupDetail({ route, navigation }) {
             </TouchableOpacity>
         </View>
         <View style={styles.authority}>
-            <TouchableOpacity style={styles.authorityOptions}>
+            <TouchableOpacity style={styles.authorityOptions}
+              onPress={async () => {
+                setRemoveModalVisible(true);
+                await fetchGroupMembers();
+              }}
+            >
               <View style={styles.authorityIcon}>
                   <Image source={require('../icons/remove-user.png')} style={{width:12, height:12}} />
                 </View>
@@ -352,6 +376,78 @@ export default function GroupDetail({ route, navigation }) {
           </View>
         </View>
       </Modal>
+      <Modal
+  visible={removeModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setRemoveModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Remove Member</Text>
+      {groupMembers.length === 0 ? (
+        <Text style={{ textAlign: 'center', color: '#555' }}>
+          No members in this group.
+        </Text>
+      ) : (
+        <FlatList
+          data={groupMembers}
+          keyExtractor={item => item.memberId}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.friendItem,
+                selectedMemberId === item.memberId && { backgroundColor: '#E6F0FF' },
+              ]}
+              onPress={() => setSelectedMemberId(item.memberId)}
+            >
+              <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+              <Text style={styles.friendName}>{item.name}</Text>
+              <View style={styles.radioCircle}>
+                {selectedMemberId === item.memberId && <View style={styles.radioDot} />}
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+      <View style={styles.modalActions}>
+        <TouchableOpacity
+          style={styles.modalCloseButton}
+          onPress={() => {
+            setSelectedMemberId(null);
+            setRemoveModalVisible(false);
+          }}
+        >
+          <Text style={styles.modalCloseText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.modalCreateButton,
+            !selectedMemberId && { backgroundColor: '#ccc' },
+          ]}
+          disabled={!selectedMemberId}
+          onPress={async () => {
+            try {
+              await axios.post(`/api/conversations/${conversationId}/remove`, {
+                memberId: selectedMemberId,
+              });
+              await fetchGroupMembers();
+              fetchModalData();
+              setSelectedMemberId(null);
+              setRemoveModalVisible(false);
+            } catch (err) {
+              console.error('Error removing member:', err);
+              Alert.alert('Error', 'Could not remove member.');
+            }
+          }}
+        >
+          <Text style={styles.modalCreateText}>Remove</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
     </SafeAreaView>
   );
 }
