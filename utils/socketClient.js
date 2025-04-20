@@ -4,7 +4,7 @@ export let socket;
 
 export function init() {
   console.log("Initializing socket connection...");
-  socket = io("http://192.168.2.72:3001",{
+  socket = io("http://192.168.1.7:3001",{
     transports: ["websocket"],
   });
 }

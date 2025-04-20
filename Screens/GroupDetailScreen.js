@@ -27,24 +27,50 @@ export default function GroupDetail({ route, navigation }) {
   const [friends, setFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [selectedFriendIds, setSelectedFriendIds] = useState([]);
+  const [members, setMembers] = useState([]);
 
-  useEffect(() => {
-    if (modalVisible) {
-      fetchFriends();
-    }
-  }, [modalVisible]);
-
-  const fetchFriends = async () => {
+  const fetchModalData = async () => {
     try {
       setLoadingFriends(true);
-      const res = await axios.get('/api/friends');
-      setFriends(res.data || []);
+  
+      const [membersRes, friendsRes] = await Promise.all([
+        axios.get(`/api/conversations/${conversationId}/members`),
+        axios.get('/api/friends'),
+      ]);
+  
+      const fetchedMembers = membersRes.data || [];
+      const allFriends = friendsRes.data || [];
+  
+      // ✅ Extract userId from members
+      const memberUserIds = fetchedMembers.map(member => member.userId);
+  
+      // ✅ Only keep friends who are NOT already in the group
+      const nonMembers = allFriends.filter(friend => !memberUserIds.includes(friend._id));
+  
+      // Debug logs (optional)
+      console.log('Member User IDs:', memberUserIds);
+      console.log('Filtered friends to add:', nonMembers.map(f => f._id));
+  
+      setMembers(fetchedMembers);
+      setFriends(nonMembers);
     } catch (err) {
-      console.error('Failed to fetch friends', err);
+      console.error('Error fetching modal data', err);
     } finally {
       setLoadingFriends(false);
     }
   };
+  
+  
+  
+
+  useEffect(() => {
+    if (modalVisible) {
+      fetchModalData();
+    }
+  }, [modalVisible]);
+  
+  
+
 
   const toggleFriendSelection = useCallback((friendId) => {
     setSelectedFriendIds(prev =>
