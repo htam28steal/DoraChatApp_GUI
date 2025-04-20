@@ -428,9 +428,9 @@ export default function GroupDetail({ route, navigation }) {
           disabled={!selectedMemberId}
           onPress={async () => {
             try {
-              await axios.post(`/api/conversations/${conversationId}/remove`, {
-                memberId: selectedMemberId,
-              });
+              const userId = await AsyncStorage.getItem('userId');
+              await axios.delete(
+                `/api/conversations/${conversationId}/members/${selectedMemberId}`,{ data: { userId } });
               await fetchGroupMembers();
               fetchModalData();
               setSelectedMemberId(null);
