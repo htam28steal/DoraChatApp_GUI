@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
-  FlatList, Modal, ActivityIndicator, Alert } from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert , Platform, StatusBar} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import axios from '../api/apiConfig';
@@ -193,16 +193,7 @@ export default function GroupDetail({ route, navigation }) {
           <Image source={require('../icons/arrow.png')} />
         </TouchableOpacity>
         </View>
-
-    </View>
-      <FlatList
-        data={dataPic}
-        horizontal={false}
-        numColumns={3}
-        renderItem={renderPicture}
-        keyExtractor={(item) => item.id}
-      />
-              <View style={styles.options}>
+        <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
@@ -243,6 +234,16 @@ export default function GroupDetail({ route, navigation }) {
             </TouchableOpacity>
         </View>
 
+
+    </View>
+      <FlatList
+        data={dataPic}
+        horizontal={false}
+        numColumns={3}
+        renderItem={renderPicture}
+        keyExtractor={(item) => item.id}
+      />
+      
 
       <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
       <TouchableOpacity>
@@ -321,8 +322,18 @@ export default function GroupDetail({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  header: { justifyContent: 'center', flexDirection: 'row', paddingTop: 20 },
-  avatar: { height: 120, width: 120, marginTop: 20, marginBottom: 10 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    // on Android use the StatusBar height; on iOS it's handled by SafeAreaView
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, 
+    height: (Platform.OS === 'android' ? StatusBar.currentHeight : 0) + 56, 
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  avatar: { height: 120, width: 120, marginTop: 20 },
   addButton: {
     backgroundColor: '#D8EDFF',
     width: 30,
@@ -338,11 +349,11 @@ const styles = StyleSheet.create({
     justifyContent:'space-between',
     alignItems:'center',
     paddingLeft:20,
-    marginBottom:15
+    marginBottom:15,
   },
   authority:{
     marginLeft:50,
-    marginBottom:5
+    marginBottom:5,
   },
   authorityOptions:{
     flexDirection:'row'
