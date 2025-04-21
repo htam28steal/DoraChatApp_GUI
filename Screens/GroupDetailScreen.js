@@ -295,16 +295,36 @@ export default function GroupDetail({ route, navigation }) {
             </TouchableOpacity>
         </View>
 
-            <View style={styles.authority}>
-            <TouchableOpacity style={styles.authorityOptions}>
-              <View style={styles.authorityIcon}>
-                <View style={styles.authorityBorderIcon}>
-                  <Image source={require('../icons/Disband.png')} />
-                </View>
-              </View>
-              <Text style={styles.authorityText}>Giải tán nhóm </Text>
-            </TouchableOpacity>
-        </View>
+        <View style={styles.authority}>
+  <TouchableOpacity
+    style={styles.authorityOptions}
+    onPress={async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        await axios.delete(
+          `/api/conversations/disband/${conversationId}`,
+          { data: { userId } }
+        );
+        Alert.alert('Thành công', 'Nhóm đã được giải tán.');
+        navigation.goBack(); // hoặc navigation.navigate('Home') tuỳ UX
+      } catch (err) {
+        console.error('Error disbanding group:', err);
+        Alert.alert(
+          'Lỗi',
+          err.response?.data?.message || 'Không thể giải tán nhóm.'
+        );
+      }
+    }}
+  >
+    <View style={styles.authorityIcon}>
+      <View style={styles.authorityBorderIcon}>
+        <Image source={require('../icons/Disband.png')} />
+      </View>
+    </View>
+    <Text style={styles.authorityText}>Giải tán nhóm</Text>
+  </TouchableOpacity>
+</View>
+
 
 
       <FlatList
