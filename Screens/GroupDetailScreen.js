@@ -31,6 +31,7 @@ export default function GroupDetail({ route, navigation }) {
   const [removeModalVisible, setRemoveModalVisible] = useState(false);
 
   const [authorityModalVisible, setAuthorityModalVisible] = useState(false);
+  const [selectedDeputyId, setSelectedDeputyId] = useState(null);
   const [groupMembers, setGroupMembers] = useState([]);
 
   const [selectedMemberId, setSelectedMemberId] = useState(null);
@@ -265,13 +266,20 @@ export default function GroupDetail({ route, navigation }) {
             </TouchableOpacity>
         </View>
                 <View style={styles.authority}>
-            <TouchableOpacity style={styles.authorityOptions}
-             onPress={() => setAuthorityModalVisible(true)}>
-              <View style={styles.authorityIcon}>
+                <TouchableOpacity
+                  style={styles.authorityOptions}
+                  onPress={async () => {
+                    await fetchGroupMembers();       // ensure groupMembers is fresh
+                    setSelectedDeputyId(null);       // clear any old selection
+                    setAuthorityModalVisible(true);  // show the modal
+                  }}
+                >
+                <View style={styles.authorityIcon}>
                   <Image source={require('../icons/Branches.png')} />
-              </View>
-              <Text style={styles.authorityText}>Uỷ quyền </Text>
-            </TouchableOpacity>
+                </View>
+                <Text style={styles.authorityText}>Uỷ quyền</Text>
+              </TouchableOpacity>
+
         </View>
         <View style={styles.authority}>
             <TouchableOpacity style={styles.authorityOptions}
@@ -449,45 +457,85 @@ export default function GroupDetail({ route, navigation }) {
       </View>
     </View>
   </View>
-</Modal>
+</Modal>  
 <Modal
-   visible={authorityModalVisible}
-   transparent
-   animationType="slide"
-   onRequestClose={() => setAuthorityModalVisible(false)}
- >
-   <View style={styles.modalContainer}>
-     <View style={styles.modalContent}>
+  visible={authorityModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setAuthorityModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
       <Text style={styles.modalTitle}>Uỷ quyền</Text>
+
+      {/* List current members to select one */}
+      <FlatList
+        data={groupMembers}
+        keyExtractor={item => item.memberId}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.friendItem,
+              selectedDeputyId === item.memberId && { backgroundColor: '#E6F0FF' }
+            ]}
+            onPress={() => setSelectedDeputyId(item.memberId)}
+          >
+            <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+            <Text style={styles.friendName}>{item.name}</Text>
+            <View style={styles.radioCircle}>
+              {selectedDeputyId === item.memberId && <View style={styles.radioDot} />}
+            </View>
+          </TouchableOpacity>
+        )}
+      />
+
+      {/* “Thêm phó nhóm” */}
       <TouchableOpacity
-        style={styles.modalCreateButton}
-                 onPress={() => {
-           // TODO: implement add deputy logic
-           setAuthorityModalVisible(false);
-           Alert.alert('Thông báo', 'Chức năng Thêm phó nhóm');
-         }}
-       >
-         <Text style={styles.modalCreateText}>Thêm phó nhóm</Text>
-       </TouchableOpacity>
-       <TouchableOpacity
-         style={[styles.modalCreateButton, { marginTop: 10 }]}
-         onPress={() => {
-           // TODO: implement remove deputy logic
-           setAuthorityModalVisible(false);
-          Alert.alert('Thông báo', 'Chức năng Xoá phó nhóm');
-         }}
-       >
-         <Text style={styles.modalCreateText}>Xoá phó nhóm</Text>
-       </TouchableOpacity>
+        style={[styles.modalCreateButton, !selectedDeputyId && { backgroundColor: '#ccc' }]}
+        disabled={!selectedDeputyId}
+        onPress={async () => {
+          try {
+            const userId = await AsyncStorage.getItem('userId');
+            await axios.post(
+              `/api/conversations/${conversationId}/managers`,
+              {
+                userid: userId,
+                memberIds: [selectedDeputyId]
+              }
+            );
+            Alert.alert('Thành công', 'Đã thêm phó nhóm.');
+            setAuthorityModalVisible(false);
+          } catch (err) {
+            console.error('Add deputy error:', err);
+            Alert.alert('Lỗi', err.response?.data?.message || 'Không thể thêm phó nhóm.');
+          }
+        }}
+      >
+        <Text style={styles.modalCreateText}>Thêm phó nhóm</Text>
+      </TouchableOpacity>
+
+      {/* “Xoá phó nhóm” (hook up your delete endpoint here) */}
       <TouchableOpacity
-         style={[styles.modalCloseButton, { marginTop: 20 }]}
-         onPress={() => setAuthorityModalVisible(false)}
-       >
-         <Text style={styles.modalCloseText}>Cancel</Text>
-       </TouchableOpacity>
-     </View>
-   </View>
- </Modal>
+        style={[styles.modalCreateButton, { marginTop: 10 }, !selectedDeputyId && { backgroundColor: '#ccc' }]}
+        disabled={!selectedDeputyId}
+        onPress={async () => {
+          // TODO: call your remove‐manager endpoint
+          Alert.alert('TBD', 'Xoá phó nhóm chưa được hiện thực.');
+        }}
+      >
+        <Text style={styles.modalCreateText}>Xoá phó nhóm</Text>
+      </TouchableOpacity>
+
+      {/* Cancel */}
+      <TouchableOpacity
+        style={[styles.modalCloseButton, { marginTop: 20 }]}
+        onPress={() => setAuthorityModalVisible(false)}
+      >
+        <Text style={styles.modalCloseText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
 
     </SafeAreaView>
   );
