@@ -29,6 +29,8 @@ export default function GroupDetail({ route, navigation }) {
   const [selectedFriendIds, setSelectedFriendIds] = useState([]);
   const [members, setMembers] = useState([]);
   const [removeModalVisible, setRemoveModalVisible] = useState(false);
+
+  const [authorityModalVisible, setAuthorityModalVisible] = useState(false);
   const [groupMembers, setGroupMembers] = useState([]);
 
   const [selectedMemberId, setSelectedMemberId] = useState(null);
@@ -263,7 +265,8 @@ export default function GroupDetail({ route, navigation }) {
             </TouchableOpacity>
         </View>
                 <View style={styles.authority}>
-            <TouchableOpacity style={styles.authorityOptions}>
+            <TouchableOpacity style={styles.authorityOptions}
+             onPress={() => setAuthorityModalVisible(true)}>
               <View style={styles.authorityIcon}>
                   <Image source={require('../icons/Branches.png')} />
               </View>
@@ -324,7 +327,7 @@ export default function GroupDetail({ route, navigation }) {
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
-            <Image source={require('../assets/Leave.png')} style={{alignSelf:'center'}} />
+            <Image source={require('../icons/Leave.png')} style={{alignSelf:'center'}} />
           </View>
           <Text style={{color:'#086DC0', fontSize:15}}>Leave group</Text>
         </View>
@@ -447,6 +450,44 @@ export default function GroupDetail({ route, navigation }) {
     </View>
   </View>
 </Modal>
+<Modal
+   visible={authorityModalVisible}
+   transparent
+   animationType="slide"
+   onRequestClose={() => setAuthorityModalVisible(false)}
+ >
+   <View style={styles.modalContainer}>
+     <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Uỷ quyền</Text>
+      <TouchableOpacity
+        style={styles.modalCreateButton}
+                 onPress={() => {
+           // TODO: implement add deputy logic
+           setAuthorityModalVisible(false);
+           Alert.alert('Thông báo', 'Chức năng Thêm phó nhóm');
+         }}
+       >
+         <Text style={styles.modalCreateText}>Thêm phó nhóm</Text>
+       </TouchableOpacity>
+       <TouchableOpacity
+         style={[styles.modalCreateButton, { marginTop: 10 }]}
+         onPress={() => {
+           // TODO: implement remove deputy logic
+           setAuthorityModalVisible(false);
+          Alert.alert('Thông báo', 'Chức năng Xoá phó nhóm');
+         }}
+       >
+         <Text style={styles.modalCreateText}>Xoá phó nhóm</Text>
+       </TouchableOpacity>
+      <TouchableOpacity
+         style={[styles.modalCloseButton, { marginTop: 20 }]}
+         onPress={() => setAuthorityModalVisible(false)}
+       >
+         <Text style={styles.modalCloseText}>Cancel</Text>
+       </TouchableOpacity>
+     </View>
+   </View>
+ </Modal>
 
     </SafeAreaView>
   );
