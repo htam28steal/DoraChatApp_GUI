@@ -516,15 +516,32 @@ export default function GroupDetail({ route, navigation }) {
 
       {/* “Xoá phó nhóm” (hook up your delete endpoint here) */}
       <TouchableOpacity
-        style={[styles.modalCreateButton, { marginTop: 10 }, !selectedDeputyId && { backgroundColor: '#ccc' }]}
-        disabled={!selectedDeputyId}
-        onPress={async () => {
-          // TODO: call your remove‐manager endpoint
-          Alert.alert('TBD', 'Xoá phó nhóm chưa được hiện thực.');
-        }}
-      >
-        <Text style={styles.modalCreateText}>Xoá phó nhóm</Text>
-      </TouchableOpacity>
+  style={[styles.modalCreateButton, { marginTop: 10 }, !selectedDeputyId && { backgroundColor: '#ccc' }]}
+  disabled={!selectedDeputyId}
+  onPress={async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      await axios.delete(
+        `/api/conversations/${conversationId}/managers`,
+        {
+          data: {
+            userId: userId,
+            managerId: selectedDeputyId
+          }
+        }
+      );
+      Alert.alert('Thành công', 'Đã xóa phó nhóm.');
+      setAuthorityModalVisible(false);
+      // nếu cần: làm mới danh sách groupMembers / managers ở đây
+      await fetchGroupMembers();
+    } catch (err) {
+      console.error('Remove deputy error:', err);
+      Alert.alert('Lỗi', err.response?.data?.message || 'Không thể xóa phó nhóm.');
+    }
+  }}
+>
+  <Text style={styles.modalCreateText}>Xoá phó nhóm</Text>
+</TouchableOpacity>
 
       {/* Cancel */}
       <TouchableOpacity
