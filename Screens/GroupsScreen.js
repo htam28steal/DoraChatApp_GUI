@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback,useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import axios from '../api/apiConfig';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
 
 const Add = require('../icons/plus.png');
 
@@ -24,16 +26,43 @@ export default function GroupsScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
   const [groupName, setGroupName] = useState('');
 
+
+  function normalizeId(id) {
+    if (typeof id === 'object' && id !== null && '$oid' in id) {
+      return id.$oid;
+    }
+    return String(id);
+  }
+  
+
+
+  const friendsById = useMemo(() => {
+    const map = {};
+    friends.forEach(user => (map[user._id] = user));
+    return map;
+  }, [friends]);
+  
   useEffect(() => {
     const fetchConversations = async () => {
       try {
         const res = await axios.get('/api/conversations');
+        console.log(res.data);
         setConversations(res.data);
       } catch (err) {
         console.error(err);
       }
     };
     fetchConversations();
+
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+    const handleNewGroup = (newConv) => {
+      setConversations(prev => [newConv, ...prev]);
+    };
+    socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
+    return () => {
+      socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
+    };
+
   }, []);
 
   useEffect(() => {
@@ -69,6 +98,9 @@ export default function GroupsScreen({ navigation }) {
         members: selectedFriendIds,
       });
       setConversations((prev) => [res.data, ...prev]);
+
+      socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, res.data);
+
       setSelectedFriendIds([]);
       setGroupName('');
       setModalVisible(false);
@@ -79,47 +111,80 @@ export default function GroupsScreen({ navigation }) {
     }
   };
 
-  const renderConversation = useCallback(({ item: group }) => (
-    <TouchableOpacity // in GroupsScreen renderConversation:
-    onPress={() => navigation.navigate("GroupDetailScreen", {
-      conversationId: group._id
-    })}
-    >
-      <View style={styles.fMessage}>
-        <View style={styles.favatarGroup}>
-          {group.members && group.members.length > 0 ? (
-            <>
-              <View style={styles.fRowOne}>
-                {(group.members.slice(0, 2) || []).map((member, idx) => (
-                  <View style={styles.favatarG} key={member._id || idx}>
-                    <Image source={{ uri: member.avatar }} style={styles.imgAG} />
+  const renderConversation = useCallback(
+    ({ item: group }) => {
+      // Ensure members is always an array
+      const members = Array.isArray(group.members) ? group.members : [];
+  
+      return (
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('GroupDetailScreen', { conversationId: group._id })
+          }
+        >
+          <View style={styles.fMessage}>
+            {/* AVATAR GROUP */}
+            <View style={styles.favatarGroup}>
+              {members.length > 0 ? (
+                <>
+                  <View style={styles.fRowOne}>
+                    {members.slice(0, 2).map((memberId, idx) => {
+                      const member = friendsById[memberId];
+                      return (
+                        <View
+                          style={styles.favatarG}
+                          key={`${group._id}-avatar-${memberId}-${idx}`}
+                        >
+                          {member?.avatar ? (
+                            <Image source={{ uri: member.avatar }} style={styles.imgAG} />
+                          ) : (
+                            <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
-                ))}
-              </View>
-              <View style={styles.fRowTwo}>
-                {group.members[2] && (
-                  <View style={styles.favatarG} key={group.members[2]._id}>
-                    <Image source={{ uri: group.members[2].avatar }} style={styles.imgAG} />
+                  <View style={styles.fRowTwo}>
+                    {members[2] && (
+                      <View
+                        style={styles.favatarG}
+                        key={`${group._id}-avatar-${members[2]}`}
+                      >
+                        {friendsById[members[2]]?.avatar ? (
+                          <Image
+                            source={{ uri: friendsById[members[2]].avatar }}
+                            style={styles.imgAG}
+                          />
+                        ) : (
+                          <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
+                        )}
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
-            </>
-          ) : (
-            <View style={[styles.favatarG]} />
-          )}
-        </View>
-
-        <View style={styles.fInfor}>
-          <Text style={styles.name}>{group.name || 'New Group'}</Text>
-          <Text style={styles.email}>
-            {(group.members || []).map((m) => m.name).join(', ')}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  ), [navigation]);
-
-  const keyExtractor = useCallback((item) => item._id, []);
+                </>
+              ) : (
+                <View style={styles.favatarG} />
+              )}
+            </View>
+  
+            {/* GROUP NAME & MEMBERS */}
+            <View style={styles.fInfor}>
+              <Text style={styles.name}>{group.name || 'New Group'}</Text>
+              <Text style={styles.email}>
+                {members.map(id => friendsById[id]?.name || 'Unknown').join(', ')}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [navigation, friendsById]
+  );
+  
+  
+  const keyExtractor = useCallback((item, index) =>
+    normalizeId(item._id) || index.toString()
+  , []);
 
   return (
     <View style={styles.container}>
@@ -167,7 +232,9 @@ export default function GroupsScreen({ navigation }) {
           style={styles.fListFriend}
           contentContainerStyle={{ paddingVertical: 5 }}
           data={conversations}
-          keyExtractor={keyExtractor}
+          keyExtractor={(item, index) =>
+            normalizeId(item._id) || index.toString()
+          }
           renderItem={renderConversation}
         />
       )}
@@ -215,7 +282,7 @@ export default function GroupsScreen({ navigation }) {
             ) : (
               <FlatList
                 data={friends}
-                keyExtractor={(item) => item._id}
+                keyExtractor={(item, idx) =>normalizeId(item._id) || idx.toString()}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={[
