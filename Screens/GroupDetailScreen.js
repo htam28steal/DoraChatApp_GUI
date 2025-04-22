@@ -371,7 +371,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
     }
   }}
 >
-  <View style={{ flexDirection:'row', justifyContent:'center', alignItems:'center' }}>\
+  <View style={{ flexDirection:'row', justifyContent:'center', alignItems:'center' }}>
     <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
