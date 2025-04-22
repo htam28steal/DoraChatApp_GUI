@@ -27,6 +27,29 @@ export default function GroupsScreen({ navigation }) {
   const [groupName, setGroupName] = useState('');
 
 
+
+  useEffect(() => {
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+  
+    const handleNewGroup = (newConv) => {
+      setConversations(prev => {
+        // if it’s already there, replace it
+        const exists = prev.find(c => c._id === newConv._id);
+        if (exists) {
+          return prev.map(c => c._id === newConv._id ? newConv : c);
+        }
+        // otherwise prepend
+        return [newConv, ...prev];
+      });
+    };
+  
+    socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
+    return () => {
+      socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
+    };
+  }, []);
+  
+
   function normalizeId(id) {
     if (typeof id === 'object' && id !== null && '$oid' in id) {
       return id.$oid;
@@ -53,15 +76,6 @@ export default function GroupsScreen({ navigation }) {
       }
     };
     fetchConversations();
-
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-    const handleNewGroup = (newConv) => {
-      setConversations(prev => [newConv, ...prev]);
-    };
-    socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
-    return () => {
-      socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
-    };
 
   }, []);
 
@@ -91,25 +105,42 @@ export default function GroupsScreen({ navigation }) {
 
   const createGroup = async () => {
     if (!selectedFriendIds.length || !groupName) return;
+  
     try {
       setCreatingGroup(true);
+  
+      // hit your API
       const res = await axios.post('/api/conversations/groups', {
-        name: groupName,
+        name:    groupName,
         members: selectedFriendIds,
       });
-      setConversations((prev) => [res.data, ...prev]);
-
-      socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, res.data);
-
+  
+      // build a new convo object that definitely has a name
+      const newConv = {
+        _id:     res.data._id,
+        name:    res.data.name    || groupName,
+        members: res.data.members || selectedFriendIds,
+        // …spread in any other fields your UI needs…
+      };
+  
+      // prepend it
+      setConversations(prev => [newConv, ...prev]);
+  
+      // notify everyone else (and yourself on other devices)
+      socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
+  
+      // reset
       setSelectedFriendIds([]);
       setGroupName('');
       setModalVisible(false);
     } catch (err) {
       console.error('Failed to create group:', err);
+      Alert.alert('Error', 'Could not create group');
     } finally {
       setCreatingGroup(false);
     }
   };
+  
 
   const renderConversation = useCallback(
     ({ item: group }) => {
