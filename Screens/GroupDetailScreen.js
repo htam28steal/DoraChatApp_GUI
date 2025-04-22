@@ -321,7 +321,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         console.log("📤 Emitted socket event: disbanded-conversation", { conversationId });
     
         Alert.alert('Thành công', 'Nhóm đã được giải tán.');
-        navigation.goBack();
+        navigation.navigate('GroupsScreen')
       } catch (err) {
         console.error('❌ Error disbanding group:', err);
         Alert.alert(
@@ -378,7 +378,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
       console.log("📤 Emitted leave‑conversation:", { conversationId, userId });
 
       Alert.alert('Thành công', 'Bạn đã rời nhóm.');
-      navigation.goBack();
+      navigation.navigate('GroupsScreen')
     } catch (err) {
       console.error('Error leaving group:', err);
       Alert.alert(

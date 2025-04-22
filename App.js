@@ -24,7 +24,13 @@ import ResetPasswordStep1 from './Screens/ResetPasswordStep1';
 import ResetPasswordStep2 from './Screens/ResetPasswordStep2';
 import useSocketListeners from './hooks/useSocketListeners';
 import Conversations from './Screens/ConversationScreen'
+
+import ListRequestFriend from './Screens/ListRequestFriendSCreen';
+import FindUser from './Screens/FindUserScreen';
+import Contact from './Screens/ContactScreen';
+
 import Groups from './Screens/GroupsScreen'
+
 import ChatGroup from './Screens/ChatGroupScreen'
 
 const Stack = createStackNavigator();
@@ -40,12 +46,17 @@ function AppContainer() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="LoginScreen">
-        <Stack.Screen name="FriendList_Screen" component={FriendList_Screen} options={{ headerShown: false }} />
+        {/* <Stack.Screen name="FriendList_Screen" component={FriendList_Screen} options={{ headerShown: false }} /> */}
         <Stack.Screen name="AllFriendAndGroup" component={AllFriendAndGroup} options={{ headerShown: false }} />
         <Stack.Screen name="Screen_03" component={Screen_03} options={{ headerShown: false }} />
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AddFriendScreen" component={AddFriendScreen} options={{ headerShown: false }} />
         <Stack.Screen name="YourFriendScreen" component={YourFriendScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ListRequestFriend" component={ListRequestFriend} options={{ headerShown: false }} />
+        <Stack.Screen name="FindUserScreen" component={FindUser} options={{ headerShown: false }} />
+        <Stack.Screen name="ContactScreen" component={Contact} options={{ headerShown: false }} />
+        <Stack.Screen name="ChatGroup" component={ChatGroup} options={{ headerShown: false }} />
+
         <Stack.Screen
           name="LoginScreen"
           component={Login}
@@ -102,13 +113,13 @@ function AppContainer() {
           options={{ headerShown: false }}
 
         />
-         <Stack.Screen
+        <Stack.Screen
           name="GroupsScreen"
           component={Groups}
           options={{ headerShown: false }}
 
         />
-             <Stack.Screen
+        <Stack.Screen
           name="ChatGroupScreen"
           component={ChatGroup}
           options={{ headerShown: false }}

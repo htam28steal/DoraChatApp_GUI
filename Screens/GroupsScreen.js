@@ -386,7 +386,7 @@ export default function GroupsScreen({ navigation }) {
         <TouchableOpacity style={styles.btnTags}>
           <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnTag}>
+        <TouchableOpacity style={styles.btnTag} onPress={navigation.navigate('FriendList_Screen')}>
           <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
         </TouchableOpacity>
       </View>
