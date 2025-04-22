@@ -253,7 +253,7 @@ export default function GroupsScreen({ navigation }) {
       return (
         <TouchableOpacity
           onPress={() =>
-            navigation.navigate('GroupDetailScreen', { conversationId: group._id })
+            navigation.navigate('ChatGroupScreen', { conversationId: group._id })
           }
         >
           <View style={styles.fMessage}>
@@ -388,9 +388,6 @@ export default function GroupsScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnTag}>
           <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.avatarFooter}>
-          <Image source={require('../Images/nike.png')} style={styles.imgAva} />
         </TouchableOpacity>
       </View>
 
