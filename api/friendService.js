@@ -78,6 +78,17 @@ const FriendService = {
         } catch (err) {
             throw (err)
         }
+    },
+    deleteInviteWasSend: async (userId) => {
+        try {
+            const response = await api.delete(`/api/friends/invites/me/${userId}`);
+            return response.data;
+        } catch (err) {
+            throw (err)
+        }
+    },
+    deleteFriendInvite: (userId) => {
+        return api.delete(`/api/friends/invites/${userId}`);
     }
 
 };

@@ -65,7 +65,18 @@ export default function ListRequestFirendScreen({ navigation }) {
             fetchFriendsRequest();
         }
     }, [userId, tokens]);
+    const handleRejectInvite = async (friendId) => {
+        try {
+            await FriendService.deleteFriendInvite(friendId);
+            const updatedList = friends.filter(friend => friend._id !== friendId);
+            setFriends(updatedList);
 
+
+        } catch (error) {
+            console.error("Lỗi khi từ chối lời mời:", error);
+            Alert.alert("Lỗi", "Không thể từ chối lời mời. Vui lòng thử lại.");
+        }
+    };
 
 
 
@@ -96,7 +107,7 @@ export default function ListRequestFirendScreen({ navigation }) {
                     >
                         <Text style={styles.txtAccecpt}>Chấp nhận</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.btnTC}>
+                    <TouchableOpacity style={styles.btnTC} onPress={() => { handleRejectInvite(item._id) }}>
                         <Text style={styles.txtTC}>Từ chối</Text>
                     </TouchableOpacity>
                 </View>
@@ -133,21 +144,21 @@ export default function ListRequestFirendScreen({ navigation }) {
                         <Text style={styles.txtRequest}>(1)</Text>
                     </TouchableOpacity>
 
-                    <View style={styles.fContact}>
+                    <TouchableOpacity style={styles.fContact} onPress={() => { navigation.navigate("ContactScreen") }}>
                         <Image
                             source={require('../icons/contact.png')}
                             style={styles.icons}
                         />
                         <Text style={styles.txtRequest}>Contact</Text>
-                    </View>
+                    </TouchableOpacity>
                 </View>
                 <TouchableOpacity style={styles.btnAdd}>
-                    <View>
+                    <TouchableOpacity style={styles.btnAdd} onPress={() => navigation.navigate('FindUserScreen')}>
                         <Image
                             source={require('../icons/addFriend.png')}
                             style={styles.iconAdd}
                         />
-                    </View>
+                    </TouchableOpacity>
                 </TouchableOpacity>
             </View>
             <View style={styles.fListFriend}>
@@ -289,11 +300,12 @@ const styles = StyleSheet.create({
     },
     fMessage: {
         width: '100%',
-        height: 60,
+        height: 65,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        borderWidth: 1,
         marginTop: 5,
+        borderBottomWidth: 1,
+        borderColor: 'white'
 
     },
     avatar: {
@@ -311,10 +323,9 @@ const styles = StyleSheet.create({
         left: 0
     },
     fInfor: {
-        width: '80%',
+        width: '90%',
         height: '100%',
         justifyContent: 'center',
-        borderWidth: 1
     },
     name: {
         fontSize: 16,

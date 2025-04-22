@@ -14,7 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export default function HomeScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
 
   // Fetch all conversations from the backend.
   useEffect(() => {
@@ -26,6 +26,7 @@ export default function HomeScreen({ navigation }) {
           params: { userId: userId },
         });
 
+        console.log(response)
         // Ensure we get an array; otherwise, fallback to empty array.
         setConversations(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
@@ -43,23 +44,33 @@ export default function HomeScreen({ navigation }) {
 
   // Render each conversation item.
   const renderConversationItem = ({ item }) => {
-    // Adjust fields based on your API response.
-    // For example, here we use: _id, name, avatar, and lastMessage.
+    const isGroupChat = item.type === true; // đúng theo yêu cầu của bạn
+    const handlePress = () => {
+      if (isGroupChat) {
+        navigation.navigate('ChatGroup', { conversation: item });
+      } else {
+        navigation.navigate('ChatScreen', { conversation: item });
+      }
+    };
+
     return (
       <TouchableOpacity
         style={styles.conversationItem}
-        onPress={() => navigation.navigate('ChatScreen', { conversation: item })}
+        onPress={handlePress}
       >
         <Image
           source={
             item.avatar
               ? { uri: item.avatar }
-              : require('../Images/avt.png')  // Make sure you have this image file
+              : require('../Images/avt.png')
           }
           style={styles.avatar}
         />
         <View style={styles.conversationInfo}>
-          <Text style={styles.name}>{item.name || "Unnamed Conversation"}</Text>
+          <Text style={styles.name}>
+            {item.name || (isGroupChat ? "Group Chat" : "Private Chat")}
+          </Text>
+
           {item.lastMessage ? (
             <Text style={styles.lastMessage} numberOfLines={1}>
               {item.lastMessage}
@@ -69,10 +80,13 @@ export default function HomeScreen({ navigation }) {
               No messages yet.
             </Text>
           )}
+
+
         </View>
       </TouchableOpacity>
     );
   };
+
 
   // If still loading, you can optionally render a loading message.
   if (loading) {

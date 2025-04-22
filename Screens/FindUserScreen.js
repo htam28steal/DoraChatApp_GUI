@@ -71,7 +71,16 @@ export default function ListRequestFirendScreen({ navigation }) {
             Alert.alert("Lỗi xảy ra khi tìm kiếm");
         }
     };
-
+    const handleThuHoi = async (userId) => {
+        try {
+            await FriendService.deleteInviteWasSend(userId);
+            setSentInvites(false);
+            setStateFriend(false);
+        } catch (error) {
+            console.error('Lỗi khi thu hồi lời mời:', error);
+            Alert.alert('Lỗi', 'Không thể thu hồi lời mời. Vui lòng thử lại.');
+        }
+    };
 
 
 
@@ -130,7 +139,7 @@ export default function ListRequestFirendScreen({ navigation }) {
                 )}
                 {sentInvites === "pending" && (
                     <View style={styles.fbtn}>
-                        <TouchableOpacity style={[styles.btnAccept, { backgroundColor: '#FFA500' }]}>
+                        <TouchableOpacity style={[styles.btnAccept, { backgroundColor: '#FFA500' }]} onPress={() => handleThuHoi(item._id)}>
                             <Text style={styles.txtAccecpt}>Đã gửi lời mời</Text>
                         </TouchableOpacity>
                     </View>
