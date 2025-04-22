@@ -38,7 +38,6 @@ export default function GroupDetail({ route, navigation }) {
 
   const [showAuthorityChoice, setShowAuthorityChoice] = useState(false);
 const [showTransferModal, setShowTransferModal] = useState(false);
-
 const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
 
@@ -355,16 +354,37 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
       <Text style={{marginLeft:10, fontSize:15, color:'#BDE1FE',marginRight:10}}>|</Text>
       
-      <TouchableOpacity>
-        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
-          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
+<TouchableOpacity
+  onPress={async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      await axios.delete(
+        `/api/conversations/members/leave/${conversationId}`,
+        { data: { userId } }
+      );
+      Alert.alert('Thành công', 'Bạn đã rời nhóm.');
+      navigation.goBack();
+    } catch (err) {
+      console.error('Error leaving group:', err);
+      Alert.alert(
+        'Lỗi',
+        err.response?.data?.message || 'Không thể rời nhóm.'
+      );
+    }
+  }}
+>
+  <View style={{ flexDirection:'row', justifyContent:'center', alignItems:'center' }}>\
+    <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
-            <Image source={require('../icons/Leave.png')} style={{alignSelf:'center'}} />
-          </View>
-          <Text style={{color:'#086DC0', fontSize:15}}>Leave group</Text>
-        </View>
-      </TouchableOpacity>
+    <Image source={require('../icons/Leave.png')} style={{alignSelf:'center'}} />
+    </View>
+
+    <Text style={{ color:'#086DC0', fontSize:15}}>Leave group</Text>
+  </View>
+
+</TouchableOpacity>
+
 
     </View>
 
@@ -694,6 +714,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
     </View>
   </View>
 </Modal>
+
 
     </SafeAreaView>
   );
