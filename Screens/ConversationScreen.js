@@ -14,16 +14,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export default function HomeScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState(null);
 
+  
 
-  // Fetch all conversations from the backend.
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId');
-
+        const storedUserId = await AsyncStorage.getItem('userId');
+        setUserId(storedUserId);
+  
         const response = await axios.get('/api/conversations', {
-          params: { userId: userId },
+          params: { userId: storedUserId },
         });
 
         console.log(response)
@@ -41,6 +43,7 @@ export default function HomeScreen({ navigation }) {
     };
     fetchConversations();
   }, []);
+  
 
   // Render each conversation item.
   const renderConversationItem = ({ item }) => {
@@ -137,6 +140,7 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     borderRadius: 8,
     paddingHorizontal: 10,
+
   },
   avatar: {
     width: 65,

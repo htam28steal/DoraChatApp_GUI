@@ -346,22 +346,18 @@ const messageInputStyles = StyleSheet.create({
  * Also integrates a modal for long-press message options: "Thu hồi", "Xoá" and "Chuyển tiếp".
  */
 export default function ChatScreen({ route, navigation }) {
-    const { conversation } = route.params;
-    console.log(conversation);
-    const conversationId = conversation._id;
-    console.log(conversationId)
-
-
+    const { conversationId } = route.params;  // Lấy conversationId từ route.params
+    const [conversation, setConversation] = useState(null);
     const [userId, setUserId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [emojiOpen, setEmojiOpen] = useState(false);
-
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [currentChannelId, setCurrentChannelId] = useState(null);
     const [channels, setChannels] = useState([]);
 
+    // Lấy userId từ AsyncStorage
     useEffect(() => {
         const fetchUserId = async () => {
             try {
@@ -378,6 +374,24 @@ export default function ChatScreen({ route, navigation }) {
         fetchUserId();
     }, []);
 
+    // Fetch thông tin cuộc trò chuyện
+    useEffect(() => {
+        const fetchConversation = async () => {
+            try {
+                const response = await axios.get(`/api/conversations/${conversationId}`);
+                console.log('Conversation Data:', response.data);
+                setConversation(response.data);
+            } catch (error) {
+                Alert.alert("Error", "Unable to fetch conversation: " + (error.response?.data?.message || error.message));
+            }
+        };
+
+        if (conversationId) {
+            fetchConversation();
+        }
+    }, [conversationId]);
+
+    // Fetch danh sách channel nếu là nhóm (conversation.type === true)
     useEffect(() => {
         const fetchChannels = async () => {
             try {
@@ -393,16 +407,18 @@ export default function ChatScreen({ route, navigation }) {
             }
         };
 
-        if (conversation?.type === true) {  // Chỉ fetch channel nếu là nhóm
+        if (conversation?.type) {  // Kiểm tra nếu là nhóm
             fetchChannels();
         }
-    }, [conversationId]);
+    }, [conversation, conversationId]);
 
+    // Fetch tất cả tin nhắn của cuộc trò chuyện
     useEffect(() => {
         if (!conversationId) return;
+
         const fetchAllMessages = async () => {
             try {
-                const response = await axios.get("/api/messages/" + conversationId);
+                const response = await axios.get(`/api/messages/${conversationId}`);
                 setMessages(response.data);
             } catch (error) {
                 console.error("Error fetching messages:", error);
@@ -415,10 +431,9 @@ export default function ChatScreen({ route, navigation }) {
         fetchAllMessages();
     }, [conversationId]);
 
+    // Lấy ID của channel đầu tiên
     const firstChannelId = channels.length > 0 ? channels[0]._id : null;
     console.log("First Channel ID:", firstChannelId);
-
-
 
     const handleMessageLongPress = (message) => {
         setSelectedMessage(message);
@@ -427,16 +442,14 @@ export default function ChatScreen({ route, navigation }) {
 
     const handleRecallAction = () => {
         if (!selectedMessage) return;
+
         Alert.alert("Thu hồi", "Bạn có muốn thu hồi tin nhắn này?", [
             { text: "Hủy", style: "cancel" },
             {
                 text: "OK",
                 onPress: async () => {
                     try {
-                        await axios.delete(
-                            `/api/messages/${selectedMessage._id}/conversation/${conversationId}`
-                        );
-                        console.log('selectedMessage', selectedMessage._id);
+                        await axios.delete(`/api/messages/${selectedMessage._id}/conversation/${conversationId}`);
                         setMessages((prev) =>
                             prev.map((m) =>
                                 m._id === selectedMessage._id
