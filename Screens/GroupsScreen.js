@@ -28,6 +28,21 @@ export default function GroupsScreen({ navigation }) {
   const [groupName, setGroupName] = useState('');
   const [userId, setUserId] = useState(null);
 
+
+  useEffect(() => {
+    const handleDisbandedConversation = ({ conversationId: disbandedId }) => {
+      console.log("🗑️ Conversation disbanded:", disbandedId);
+      setConversations(prev => prev.filter(conv => conv._id !== disbandedId));
+    };
+  
+    socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisbandedConversation);
+  
+    return () => {
+      socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisbandedConversation);
+    };
+  }, []);
+  
+
   const receiveConversation = useCallback((payload) => {
     const newConv = payload.conversation || payload;
   
@@ -149,44 +164,38 @@ export default function GroupsScreen({ navigation }) {
     );
   };
 
- const createGroup = async () => {
-  if (!selectedFriendIds.length || !groupName) return;
-
-  try {
-    setCreatingGroup(true);
-
-    // hit your API
-    const res = await axios.post('/api/conversations/groups', {
-      name:    groupName,
-      members: selectedFriendIds,
-    });
-
-    // build a new convo object that definitely has a name
-    const newConv = {
-      _id:     res.data._id,
-      name:    res.data.name    || groupName,
-      members: res.data.members || selectedFriendIds,
-      // …spread in any other fields your UI needs…
-    };
-
-    // prepend it
-    setConversations(prev => [newConv, ...prev]);
-
-    // notify everyone else (and yourself on other devices)
-    socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
-
-    // reset
-    setSelectedFriendIds([]);
-    setGroupName('');
-    setModalVisible(false);
-  } catch (err) {
-    console.error('Failed to create group:', err);
-    Alert.alert('Error', 'Could not create group');
-  } finally {
-    setCreatingGroup(false);
-  }
-};
-
+  const createGroup = async () => {
+    if (!selectedFriendIds.length || !groupName) return;
+  
+    try {
+      setCreatingGroup(true);
+  
+      const res = await axios.post('/api/conversations/groups', {
+        name: groupName,
+        members: selectedFriendIds,
+      });
+  
+      const newConv = {
+        _id: res.data._id,
+        name: res.data.name || groupName,
+        members: res.data.members || selectedFriendIds,
+      };
+  
+      // ✅ Just emit to others (and yourself)
+      socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
+  
+      // ✅ Reset modal state
+      setSelectedFriendIds([]);
+      setGroupName('');
+      setModalVisible(false);
+    } catch (err) {
+      console.error('Failed to create group:', err);
+      Alert.alert('Error', 'Could not create group');
+    } finally {
+      setCreatingGroup(false);
+    }
+  };
+  
 
   const renderConversation = useCallback(
     ({ item: group }) => {
@@ -205,22 +214,22 @@ export default function GroupsScreen({ navigation }) {
               {members.length > 0 ? (
                 <>
                   <View style={styles.fRowOne}>
-                    {members.slice(0, 2).map((memberId, idx) => {
-                      const member = friendsById[memberId];
-                      return (
-                        <View
-                          style={styles.favatarG}
-                          key={`${group._id}-avatar-${memberId || 'unknown'}-${idx}`}
-
-                        >
-                          {member?.avatar ? (
-                            <Image source={{ uri: member.avatar }} style={styles.imgAG} />
-                          ) : (
-                            <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
-                          )}
-                        </View>
-                      );
-                    })}
+                  {members.slice(0, 2).map((memberId, idx) => {
+  if (!memberId) return null;
+  const member = friendsById[memberId];
+  return (
+    <View
+      style={styles.favatarG}
+      key={`${group._id}-avatar-${memberId}-${idx}`}
+    >
+      {member?.avatar ? (
+        <Image source={{ uri: member.avatar }} style={styles.imgAG} />
+      ) : (
+        <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
+      )}
+    </View>
+  );
+})}
                   </View>
                   <View style={styles.fRowTwo}>
                     {members[2] && (
