@@ -210,7 +210,8 @@ export default function GroupsScreen({ navigation }) {
                       return (
                         <View
                           style={styles.favatarG}
-                          key={`${group._id}-avatar-${memberId}-${idx}`}
+                          key={`${group._id}-avatar-${memberId || 'unknown'}-${idx}`}
+
                         >
                           {member?.avatar ? (
                             <Image source={{ uri: member.avatar }} style={styles.imgAG} />
@@ -225,7 +226,8 @@ export default function GroupsScreen({ navigation }) {
                     {members[2] && (
                       <View
                         style={styles.favatarG}
-                        key={`${group._id}-avatar-${members[2]}`}
+                        key={`${group._id}-avatar-${members[2] || 'unknown'}`}
+
                       >
                         {friendsById[members[2]]?.avatar ? (
                           <Image
