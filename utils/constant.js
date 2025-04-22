@@ -12,6 +12,8 @@ export const SOCKET_EVENTS = {
   //Chat
   SEND_MESSAGE: "send-message",
   RECEIVE_MESSAGE: "receive-message",
+  MESSAGE_RECALLED: "message-recalled",
+  MESSAGE_DELETED_FOR_ME: "message_deleted_for_me",
   // Friend system
   ACCEPT_FRIEND: "accept-friend",
   SEND_FRIEND_INVITE: "send-friend-invite",
@@ -28,6 +30,7 @@ export const SOCKET_EVENTS = {
   JOIN_CONVERSATIONS: "join-conversations",
   JOIN_CONVERSATION: "join-conversation",
   LEAVE_CONVERSATION: "leave-conversation",
+  NEW_GROUP_CONVERSATION: "new-group-conversation",
 
   // Typing indicators
   TYPING: "typing",
@@ -36,9 +39,19 @@ export const SOCKET_EVENTS = {
   // Online status
   GET_USER_ONLINE: "get-user-online",
 
-  // Video call
+  // Call - for simple-peer
   SUBSCRIBE_CALL_VIDEO: "subscribe-call-video",
+  SUBSCRIBE_CALL_AUDIO: "subscribe-call-audio",
   NEW_USER_CALL: "new-user-call",
+  REJECT_CALL: "reject-call",
+  CALL_REJECTED: "call-rejected",
+  END_CALL: "end-call",
+  CALL_ENDED: "call-ended",
+  CALL_USER: "call-user",
+  ANSWER_CALL: "answer-call",
+  RECEIVE_SIGNAL: "receive-signal",
+  LEAVE_CALL: "leave-call",
+
 
   // Last view tracking
   CONVERSATION_LAST_VIEW: "conversation-last-view",

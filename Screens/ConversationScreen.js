@@ -14,19 +14,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export default function HomeScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState(null);
+
   
 
-  // Fetch all conversations from the backend.
   useEffect(() => {
     const fetchConversations = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId');
-
+        const storedUserId = await AsyncStorage.getItem('userId');
+        setUserId(storedUserId);
+  
         const response = await axios.get('/api/conversations', {
-          params: { userId: userId },
+          params: { userId: storedUserId },
         });
-
-        // Ensure we get an array; otherwise, fallback to empty array.
+  
         setConversations(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Error fetching conversations:", error);
@@ -40,40 +41,43 @@ export default function HomeScreen({ navigation }) {
     };
     fetchConversations();
   }, []);
+  
 
   // Render each conversation item.
   const renderConversationItem = ({ item }) => {
-    // Adjust fields based on your API response.
-    // For example, here we use: _id, name, avatar, and lastMessage.
+    // Find the other member (not the current user)
+    const [otherMember] = item.members.filter(member => member.userId !== userId);
+  
     return (
       <TouchableOpacity
-        style={styles.conversationItem}
-        onPress={() => navigation.navigate('ChatScreen', { conversation: item })}
-      >
+      style={styles.conversationItem}
+      onPress={() =>
+        navigation.navigate('ChatScreen', {
+          conversation: item,
+          userId: userId, // Make sure userId is defined here.
+        })
+      }
+    >
         <Image
           source={
-            item.avatar
-              ? { uri: item.avatar }
-              : require('../Images/avt.png')  // Make sure you have this image file
+            otherMember?.avatar
+              ? { uri: otherMember.avatar }
+              : require('../Images/avt.png')
           }
           style={styles.avatar}
         />
         <View style={styles.conversationInfo}>
-          <Text style={styles.name}>{item.name || "Unnamed Conversation"}</Text>
-          {item.lastMessage ? (
-            <Text style={styles.lastMessage} numberOfLines={1}>
-              {item.lastMessage}
-            </Text>
-          ) : (
-            <Text style={styles.lastMessage} numberOfLines={1}>
-              No messages yet.
-            </Text>
-          )}
+          <Text style={styles.name}>
+            {otherMember?.name || "Unnamed Conversation"}
+          </Text>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.lastMessageId?.content || "No messages yet."}
+          </Text>
         </View>
       </TouchableOpacity>
     );
   };
-
+  
   // If still loading, you can optionally render a loading message.
   if (loading) {
     return (
@@ -123,6 +127,7 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     borderRadius: 8,
     paddingHorizontal: 10,
+
   },
   avatar: {
     width: 65,

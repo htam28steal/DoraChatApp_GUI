@@ -24,6 +24,8 @@ import ResetPasswordStep1 from './Screens/ResetPasswordStep1';
 import ResetPasswordStep2 from './Screens/ResetPasswordStep2';
 import useSocketListeners from './hooks/useSocketListeners';
 import Conversations from './Screens/ConversationScreen'
+import Groups from './Screens/GroupsScreen'
+import ChatGroup from './Screens/ChatGroupScreen'
 
 const Stack = createStackNavigator();
 
@@ -97,6 +99,18 @@ function AppContainer() {
         <Stack.Screen
           name="ResetPasswordStep2Screen"
           component={ResetPasswordStep2}
+          options={{ headerShown: false }}
+
+        />
+         <Stack.Screen
+          name="GroupsScreen"
+          component={Groups}
+          options={{ headerShown: false }}
+
+        />
+           <Stack.Screen
+          name="ChatGroupScreen"
+          component={ChatGroup}
           options={{ headerShown: false }}
 
         />
