@@ -330,7 +330,6 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 </View>
 
 
-
       <FlatList
         data={dataPic}
         horizontal={false}
@@ -338,7 +337,6 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         renderItem={renderPicture}
         keyExtractor={(item) => item.id}
       />
- 
 
       <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
       <TouchableOpacity>
@@ -528,25 +526,15 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
       {/* Trưởng nhóm */}
       <TouchableOpacity
         style={[styles.modalCreateButton, { marginTop: 10 }]}
-        onPress={async () => {
+        onPress={() => {
           setShowAuthorityChoice(false);
-          const userId = await AsyncStorage.getItem('userId');
-          try {
-            const { data } = await axios.get(`/api/conversations/${conversationId}`);
-            if (data.leaderId === userId) {
-              setSelectedNewAdminId(null);
-              setShowTransferModal(true);
-            } else {
-              Alert.alert('Không đủ quyền', 'Chỉ trưởng nhóm mới có thể chuyển quyền.');
-            }
-          } catch (err) {
-            console.error(err);
-            Alert.alert('Lỗi', 'Không thể kiểm tra quyền.');
-          }
+          setSelectedNewAdminId(null);
+          setShowTransferModal(true);
         }}
-      >
-        <Text style={styles.modalCreateText}>Trưởng nhóm</Text>
-      </TouchableOpacity>
+>
+  <Text style={styles.modalCreateText}>Trưởng nhóm</Text>
+</TouchableOpacity>
+
 
       {/* Cancel */}
       <TouchableOpacity
@@ -695,7 +683,6 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
             );
             Alert.alert('Thành công', 'Đã chuyển quyền quản trị.');
             setShowTransferModal(false);
-            navigation.goBack();  // hoặc tuỳ UX
           } catch (err) {
             console.error('Transfer admin error:', err);
             Alert.alert('Lỗi', err.response?.data?.message || 'Không thể chuyển quyền.');
