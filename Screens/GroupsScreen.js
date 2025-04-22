@@ -28,19 +28,42 @@ export default function GroupsScreen({ navigation }) {
   const [groupName, setGroupName] = useState('');
   const [userId, setUserId] = useState(null);
 
-
-  useEffect(() => {
-    const handleDisbandedConversation = ({ conversationId: disbandedId }) => {
-      console.log("🗑️ Conversation disbanded:", disbandedId);
-      setConversations(prev => prev.filter(conv => conv._id !== disbandedId));
-    };
   
-    socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisbandedConversation);
+  useEffect(() => {
+    // 1️⃣ Debug: log connection state
+    console.log("🧪 socket.connected:", socket.connected);
+    socket.on("connect", () => console.log("✅ socket connected"));
+    socket.on("disconnect", () => console.log("❌ socket disconnected"));
+  
+    // 2️⃣ Debug: catch every event
+    socket.onAny((event, payload) => {
+      console.log("📡 socket.onAny:", event, payload);
+    });
+  
+    // 3️⃣ Handle disbanded-conversation
+    const handleDisband = ({ conversationId }) => {
+      console.log("📥 Received disbanded-conversation:", conversationId);
+      setConversations(prev => {
+        const updated = prev.filter(c => c._id !== conversationId);
+        console.log("🧹 After filter:", updated.map(c => c._id));
+        console.log(updated);
+        return updated;
+      });
+    };
+    console.log("🔌 Subscribing to DISBANDED_CONVERSATION");
+    socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
+  
+    // 4️⃣ Join the global feed
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
   
     return () => {
-      socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisbandedConversation);
+      console.log("🛑 Unsubscribing from DISBANDED_CONVERSATION");
+      socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
+      socket.offAny();
     };
   }, []);
+  
+  
   
 
   const receiveConversation = useCallback((payload) => {

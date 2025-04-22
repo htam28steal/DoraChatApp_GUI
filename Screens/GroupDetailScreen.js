@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
   FlatList, Modal, ActivityIndicator, Alert,Platform, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
 
 import axios from '../api/apiConfig';
 const AddMember = require('../icons/addFriend.png');
@@ -41,6 +43,8 @@ const [showTransferModal, setShowTransferModal] = useState(false);
 const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
 
+
+
   const fetchGroupMembers = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -73,10 +77,8 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
   
       // ✅ Only keep friends who are NOT already in the group
       const nonMembers = allFriends.filter(friend => !memberUserIds.includes(friend._id));
-  
-      // Debug logs (optional)
-      console.log('Member User IDs:', memberUserIds);
-      console.log('Filtered friends to add:', nonMembers.map(f => f._id));
+
+
   
       setMembers(fetchedMembers);
       setFriends(nonMembers);
@@ -305,14 +307,23 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
     onPress={async () => {
       try {
         const userId = await AsyncStorage.getItem('userId');
-        await axios.delete(
+        console.log("🚨 Attempting to disband group:", conversationId, "by user:", userId);
+    
+        const response = await axios.delete(
           `/api/conversations/disband/${conversationId}`,
           { data: { userId } }
         );
+    
+        console.log("✅ Group disbanded on server:", response.data);
+    
+        // Emit socket event
+        socket.emit("disbanded-conversation", { conversationId });
+        console.log("📤 Emitted socket event: disbanded-conversation", { conversationId });
+    
         Alert.alert('Thành công', 'Nhóm đã được giải tán.');
-        navigation.goBack(); // hoặc navigation.navigate('Home') tuỳ UX
+        navigation.goBack();
       } catch (err) {
-        console.error('Error disbanding group:', err);
+        console.error('❌ Error disbanding group:', err);
         Alert.alert(
           'Lỗi',
           err.response?.data?.message || 'Không thể giải tán nhóm.'
