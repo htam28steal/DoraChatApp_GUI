@@ -36,6 +36,12 @@ export default function GroupDetail({ route, navigation }) {
 
   const [selectedMemberId, setSelectedMemberId] = useState(null);
 
+  const [showAuthorityChoice, setShowAuthorityChoice] = useState(false);
+const [showTransferModal, setShowTransferModal] = useState(false);
+
+const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
+
+
   const fetchGroupMembers = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
@@ -267,18 +273,17 @@ export default function GroupDetail({ route, navigation }) {
         </View>
                 <View style={styles.authority}>
                 <TouchableOpacity
-                  style={styles.authorityOptions}
-                  onPress={async () => {
-                    await fetchGroupMembers();       // ensure groupMembers is fresh
-                    setSelectedDeputyId(null);       // clear any old selection
-                    setAuthorityModalVisible(true);  // show the modal
-                  }}
-                >
-                <View style={styles.authorityIcon}>
-                  <Image source={require('../icons/Branches.png')} />
-                </View>
-                <Text style={styles.authorityText}>Uỷ quyền</Text>
-              </TouchableOpacity>
+  style={styles.authorityOptions}
+  onPress={async () => {
+    await fetchGroupMembers();       // load groupMembers
+    setShowAuthorityChoice(true);
+  }}
+>
+  <View style={styles.authorityIcon}>
+    <Image source={require('../icons/Branches.png')} />
+  </View>
+  <Text style={styles.authorityText}>Uỷ quyền</Text>
+</TouchableOpacity>
 
         </View>
         <View style={styles.authority}>
@@ -479,6 +484,62 @@ export default function GroupDetail({ route, navigation }) {
   </View>
 </Modal>  
 <Modal
+  visible={showAuthorityChoice}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setShowAuthorityChoice(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Uỷ quyền</Text>
+
+      {/* Phó nhóm */}
+      <TouchableOpacity
+        style={styles.modalCreateButton}
+        onPress={() => {
+          setShowAuthorityChoice(false);
+          setSelectedDeputyId(null);
+          setAuthorityModalVisible(true);
+        }}
+      >
+        <Text style={styles.modalCreateText}>Phó nhóm</Text>
+      </TouchableOpacity>
+
+      {/* Trưởng nhóm */}
+      <TouchableOpacity
+        style={[styles.modalCreateButton, { marginTop: 10 }]}
+        onPress={async () => {
+          setShowAuthorityChoice(false);
+          const userId = await AsyncStorage.getItem('userId');
+          try {
+            const { data } = await axios.get(`/api/conversations/${conversationId}`);
+            if (data.leaderId === userId) {
+              setSelectedNewAdminId(null);
+              setShowTransferModal(true);
+            } else {
+              Alert.alert('Không đủ quyền', 'Chỉ trưởng nhóm mới có thể chuyển quyền.');
+            }
+          } catch (err) {
+            console.error(err);
+            Alert.alert('Lỗi', 'Không thể kiểm tra quyền.');
+          }
+        }}
+      >
+        <Text style={styles.modalCreateText}>Trưởng nhóm</Text>
+      </TouchableOpacity>
+
+      {/* Cancel */}
+      <TouchableOpacity
+        style={[styles.modalCloseButton, { marginTop: 20 }]}
+        onPress={() => setShowAuthorityChoice(false)}
+      >
+        <Text style={styles.modalCloseText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+<Modal
   visible={authorityModalVisible}
   transparent
   animationType="slide"
@@ -567,6 +628,66 @@ export default function GroupDetail({ route, navigation }) {
       <TouchableOpacity
         style={[styles.modalCloseButton, { marginTop: 20 }]}
         onPress={() => setAuthorityModalVisible(false)}
+      >
+        <Text style={styles.modalCloseText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+<Modal
+  visible={showTransferModal}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setShowTransferModal(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Chuyển quyền quản trị</Text>
+
+      <FlatList
+        data={groupMembers}
+        keyExtractor={item => item.memberId}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.friendItem,
+              selectedNewAdminId === item.memberId && { backgroundColor: '#E6F0FF' }
+            ]}
+            onPress={() => setSelectedNewAdminId(item.memberId)}
+          >
+            <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+            <Text style={styles.friendName}>{item.name}</Text>
+            <View style={styles.radioCircle}>
+              {selectedNewAdminId === item.memberId && <View style={styles.radioDot} />}
+            </View>
+          </TouchableOpacity>
+        )}
+      />
+
+      <TouchableOpacity
+        style={[styles.modalCreateButton, !selectedNewAdminId && { backgroundColor: '#ccc' }]}
+        disabled={!selectedNewAdminId}
+        onPress={async () => {
+          try {
+            await axios.patch(
+              `/api/conversations/transfer-admin/${conversationId}`,
+              { newAdminId: selectedNewAdminId }
+            );
+            Alert.alert('Thành công', 'Đã chuyển quyền quản trị.');
+            setShowTransferModal(false);
+            navigation.goBack();  // hoặc tuỳ UX
+          } catch (err) {
+            console.error('Transfer admin error:', err);
+            Alert.alert('Lỗi', err.response?.data?.message || 'Không thể chuyển quyền.');
+          }
+        }}
+      >
+        <Text style={styles.modalCreateText}>Chuyển quyền</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.modalCloseButton, { marginTop: 20 }]}
+        onPress={() => setShowTransferModal(false)}
       >
         <Text style={styles.modalCloseText}>Cancel</Text>
       </TouchableOpacity>
