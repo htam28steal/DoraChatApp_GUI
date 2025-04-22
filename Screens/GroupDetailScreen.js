@@ -371,6 +371,12 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         `/api/conversations/members/leave/${conversationId}`,
         { data: { userId } }
       );
+      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
+        conversationId,
+        userId
+      });
+      console.log("📤 Emitted leave‑conversation:", { conversationId, userId });
+
       Alert.alert('Thành công', 'Bạn đã rời nhóm.');
       navigation.goBack();
     } catch (err) {

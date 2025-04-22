@@ -28,6 +28,31 @@ export default function GroupsScreen({ navigation }) {
   const [groupName, setGroupName] = useState('');
   const [userId, setUserId] = useState(null);
 
+
+  useEffect(() => {
+    // … your existing debug / connect logging …
+  
+    // Handle leave-conversation
+    const handleLeave = ({ conversationId: leftId }) => {
+      console.log("📥 Received leave‑conversation:", leftId);
+      setConversations(prev =>
+        prev.filter(conv => conv._id !== leftId)
+      );
+    };
+  
+    console.log("🔌 Subscribing to LEAVE_CONVERSATION");
+    socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, handleLeave);
+  
+    // make sure we're in the global feed
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+  
+    return () => {
+      console.log("🛑 Unsubscribing from LEAVE_CONVERSATION");
+      socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, handleLeave);
+      // … maybe socket.offAny() if you used it …
+    };
+  }, []);
+  
   
   useEffect(() => {
     // 1️⃣ Debug: log connection state
