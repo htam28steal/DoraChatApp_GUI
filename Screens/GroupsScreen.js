@@ -13,6 +13,7 @@ import {
 import axios from '../api/apiConfig';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Add = require('../icons/plus.png');
 
@@ -25,28 +26,73 @@ export default function GroupsScreen({ navigation }) {
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [groupName, setGroupName] = useState('');
+  const [userId, setUserId] = useState(null);
 
-
-
-  useEffect(() => {
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+  const receiveConversation = useCallback((payload) => {
+    const newConv = payload.conversation || payload;
   
-    const handleNewGroup = (newConv) => {
-      setConversations(prev => {
-        // if it’s already there, replace it
-        const exists = prev.find(c => c._id === newConv._id);
-        if (exists) {
-          return prev.map(c => c._id === newConv._id ? newConv : c);
+    console.log("📥 Processed NEW_GROUP_CONVERSATION:", newConv);
+  
+    if (!newConv._id) return;
+  
+    setConversations(prev => {
+      const exists = prev.find(c => c._id === newConv._id);
+      if (exists) {
+        return prev.map(c => c._id === newConv._id ? newConv : c);
+      }
+      return [newConv, ...prev];
+    });
+  }, []);
+  
+
+    // 2) Load userId once on mount
+    useEffect(() => {
+      (async () => {
+        try {
+          const id = await AsyncStorage.getItem('userId');
+          if (id) {
+            console.log("✅ Loaded userId from AsyncStorage:", id);
+            setUserId(id);
+          } else {
+            console.log("⚠️ No userId found in AsyncStorage");
+          }
+        } catch (e) {
+          console.error('❌ Failed to load userId from storage', e);
         }
-        // otherwise prepend
-        return [newConv, ...prev];
-      });
-    };
-  
-    socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
-    return () => {
-      socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, handleNewGroup);
-    };
+      })();
+    }, []);
+    
+    
+    useEffect(() => {
+      if (!userId) return;
+    
+      console.log("✅ Emitting JOIN_USER and JOIN_CONVERSATIONS", userId);
+    
+      socket.emit(SOCKET_EVENTS.JOIN_USER, userId);
+      socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+    
+      const onNewGroup = (newConv) => {
+        console.log("📥 Received NEW_GROUP_CONVERSATION via socket:", newConv);
+        receiveConversation(newConv);
+      };
+    
+      socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNewGroup);
+    
+      return () => {
+        socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNewGroup);
+      };
+    }, [userId, receiveConversation]);
+    
+    // 4) initial fetch of existing conversations
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await axios.get('/api/conversations');
+        setConversations(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
   }, []);
   
 
@@ -103,44 +149,44 @@ export default function GroupsScreen({ navigation }) {
     );
   };
 
-  const createGroup = async () => {
-    if (!selectedFriendIds.length || !groupName) return;
-  
-    try {
-      setCreatingGroup(true);
-  
-      // hit your API
-      const res = await axios.post('/api/conversations/groups', {
-        name:    groupName,
-        members: selectedFriendIds,
-      });
-  
-      // build a new convo object that definitely has a name
-      const newConv = {
-        _id:     res.data._id,
-        name:    res.data.name    || groupName,
-        members: res.data.members || selectedFriendIds,
-        // …spread in any other fields your UI needs…
-      };
-  
-      // prepend it
-      setConversations(prev => [newConv, ...prev]);
-  
-      // notify everyone else (and yourself on other devices)
-      socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
-  
-      // reset
-      setSelectedFriendIds([]);
-      setGroupName('');
-      setModalVisible(false);
-    } catch (err) {
-      console.error('Failed to create group:', err);
-      Alert.alert('Error', 'Could not create group');
-    } finally {
-      setCreatingGroup(false);
-    }
-  };
-  
+ const createGroup = async () => {
+  if (!selectedFriendIds.length || !groupName) return;
+
+  try {
+    setCreatingGroup(true);
+
+    // hit your API
+    const res = await axios.post('/api/conversations/groups', {
+      name:    groupName,
+      members: selectedFriendIds,
+    });
+
+    // build a new convo object that definitely has a name
+    const newConv = {
+      _id:     res.data._id,
+      name:    res.data.name    || groupName,
+      members: res.data.members || selectedFriendIds,
+      // …spread in any other fields your UI needs…
+    };
+
+    // prepend it
+    setConversations(prev => [newConv, ...prev]);
+
+    // notify everyone else (and yourself on other devices)
+    socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
+
+    // reset
+    setSelectedFriendIds([]);
+    setGroupName('');
+    setModalVisible(false);
+  } catch (err) {
+    console.error('Failed to create group:', err);
+    Alert.alert('Error', 'Could not create group');
+  } finally {
+    setCreatingGroup(false);
+  }
+};
+
 
   const renderConversation = useCallback(
     ({ item: group }) => {
