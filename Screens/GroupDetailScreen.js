@@ -804,20 +804,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 15,
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '80%',
-    maxHeight: '70%',
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-  },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+
   friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   friendAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
   friendName: { fontSize: 16 },
@@ -832,23 +819,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#086DC0' },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',           // increased width
+    maxHeight: '80%',       // more space for content
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 25,            // more padding
+  },
+  modalTitle: {
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    marginBottom: 15, 
+    textAlign: 'center' 
+  },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   modalCloseButton: {
-    flex: 1,
     marginRight: 5,
-    padding: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     backgroundColor: '#aaa',
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
   },
   modalCreateButton: {
-    flex: 1,
     marginLeft: 5,
-    padding: 10,
+    paddingVertical: 16,    // taller buttons
+    paddingHorizontal: 20,
     backgroundColor: '#086DC0',
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  modalCloseText: { color: 'white', fontWeight: 'bold' },
-  modalCreateText: { color: 'white', fontWeight: 'bold' },
+  modalCloseText: { color: 'white', fontSize:12, fontWeight:'bold' },
+  modalCreateText: { color: 'white', fontSize:12, fontWeight:'bold'},
 });

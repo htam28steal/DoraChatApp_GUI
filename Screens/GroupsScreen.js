@@ -14,6 +14,7 @@ import axios from '../api/apiConfig';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 
 const Add = require('../icons/plus.png');
 
@@ -53,39 +54,20 @@ export default function GroupsScreen({ navigation }) {
     })();
   }, []);
   // 3️⃣ on mount: fetch & wire up socket
-  useEffect(() => {
+   // Run once on mount
+   useEffect(() => {
     console.log('🌐 Setting up socket listeners…');
-
-    // join the global feed
     socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-    console.log('📡 Emitted:', SOCKET_EVENTS.JOIN_CONVERSATIONS);
 
-    // new group created/updated
-    const onNew = payload => {
-      console.log('📥 SOCKET new-group-conversation:', payload);
-      fetchAllConversations();
-    };
+    const onNew        = () => { console.log('📥 SOCKET NEW_GROUP_CONVERSATION'); fetchAllConversations(); };
+    const onDisband    = () => { console.log('📥 SOCKET DISBANDED_CONVERSATION');   fetchAllConversations(); };
+    const onLeave      = () => { console.log('📥 SOCKET LEAVE_CONVERSATION');       fetchAllConversations(); };
+
     socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
-
-    // someone disbanded a group
-    const onDisband = ({ conversationId }) => {
-      console.log('📥 SOCKET disbanded-conversation:', conversationId);
-      fetchAllConversations();
-    };
     socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
-
-    // someone left a group
-    const onLeave = ({ conversationId }) => {
-      console.log('📥 SOCKET leave-conversation:', conversationId);
-      fetchAllConversations();
-    };
     socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
 
-    // initial load
-    fetchAllConversations();
-
     return () => {
-      console.log('🛑 Cleaning up socket listeners…');
       socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
       socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
       socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
@@ -127,6 +109,14 @@ export default function GroupsScreen({ navigation }) {
       socket.offAny();
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('⚡️ Screen focused – re-fetching conversations');
+      fetchAllConversations();
+    }, [fetchAllConversations])
+  );
+
   
   
   
