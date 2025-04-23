@@ -29,29 +29,69 @@ export default function GroupsScreen({ navigation }) {
   const [userId, setUserId] = useState(null);
 
 
-  useEffect(() => {
-    // … your existing debug / connect logging …
-  
-    // Handle leave-conversation
-    const handleLeave = ({ conversationId: leftId }) => {
-      console.log("📥 Received leave‑conversation:", leftId);
-      setConversations(prev =>
-        prev.filter(conv => conv._id !== leftId)
-      );
-    };
-  
-    console.log("🔌 Subscribing to LEAVE_CONVERSATION");
-    socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, handleLeave);
-  
-    // make sure we're in the global feed
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-  
-    return () => {
-      console.log("🛑 Unsubscribing from LEAVE_CONVERSATION");
-      socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, handleLeave);
-      // … maybe socket.offAny() if you used it …
-    };
+  const fetchAllConversations = useCallback(async () => {
+    console.log('🔄 fetchAllConversations() start');
+    try {
+      const { data } = await axios.get('/api/conversations');
+      console.log('✅ fetchAllConversations() got:', data.map(c => c._id));
+      setConversations(data);
+    } catch (err) {
+      console.error('❌ fetchAllConversations() error:', err);
+    }
   }, []);
+  
+  useEffect(() => {
+    fetchAllConversations();
+  }, [fetchAllConversations]);
+  
+
+  useEffect(() => {
+    (async () => {
+      const id = await AsyncStorage.getItem('userId');
+      console.log('ℹ️ Loaded userId:', id);
+      setUserId(id);
+    })();
+  }, []);
+  // 3️⃣ on mount: fetch & wire up socket
+  useEffect(() => {
+    console.log('🌐 Setting up socket listeners…');
+
+    // join the global feed
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+    console.log('📡 Emitted:', SOCKET_EVENTS.JOIN_CONVERSATIONS);
+
+    // new group created/updated
+    const onNew = payload => {
+      console.log('📥 SOCKET new-group-conversation:', payload);
+      fetchAllConversations();
+    };
+    socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
+
+    // someone disbanded a group
+    const onDisband = ({ conversationId }) => {
+      console.log('📥 SOCKET disbanded-conversation:', conversationId);
+      fetchAllConversations();
+    };
+    socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
+
+    // someone left a group
+    const onLeave = ({ conversationId }) => {
+      console.log('📥 SOCKET leave-conversation:', conversationId);
+      fetchAllConversations();
+    };
+    socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
+
+    // initial load
+    fetchAllConversations();
+
+    return () => {
+      console.log('🛑 Cleaning up socket listeners…');
+      socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
+      socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
+      socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
+    };
+  }, [fetchAllConversations]);
+  
   
   
   useEffect(() => {
@@ -386,7 +426,7 @@ export default function GroupsScreen({ navigation }) {
         <TouchableOpacity style={styles.btnTags}>
           <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnTag} onPress={navigation.navigate('FriendList_Screen')}>
+        <TouchableOpacity style={styles.btnTag}>
           <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
         </TouchableOpacity>
       </View>

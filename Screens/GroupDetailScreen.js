@@ -302,42 +302,58 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         </View>
 
         <View style={styles.authority}>
-  <TouchableOpacity
-    style={styles.authorityOptions}
-    onPress={async () => {
-      try {
-        const userId = await AsyncStorage.getItem('userId');
-        console.log("🚨 Attempting to disband group:", conversationId, "by user:", userId);
-    
-        const response = await axios.delete(
-          `/api/conversations/disband/${conversationId}`,
-          { data: { userId } }
-        );
-    
-        console.log("✅ Group disbanded on server:", response.data);
-    
-        // Emit socket event
-        socket.emit("disbanded-conversation", { conversationId });
-        console.log("📤 Emitted socket event: disbanded-conversation", { conversationId });
-    
-        Alert.alert('Thành công', 'Nhóm đã được giải tán.');
-        navigation.navigate('GroupsScreen')
-      } catch (err) {
-        console.error('❌ Error disbanding group:', err);
-        Alert.alert(
-          'Lỗi',
-          err.response?.data?.message || 'Không thể giải tán nhóm.'
-        );
-      }
-    }}
-  >
-    <View style={styles.authorityIcon}>
-      <View style={styles.authorityBorderIcon}>
-        <Image source={require('../icons/Disband.png')} />
-      </View>
+        <TouchableOpacity
+  style={styles.authorityOptions}
+  onPress={async () => {
+    const userId = await AsyncStorage.getItem('userId');
+    // Show confirmation dialog
+    Alert.alert(
+      'Xác nhận',
+      'Bạn có chắc chắn muốn giải tán nhóm này?',
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Giải tán',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log("🚨 Attempting to disband group:", conversationId, "by user:", userId);
+      
+              const response = await axios.delete(
+                `/api/conversations/disband/${conversationId}`,
+                { data: { userId } }
+              );
+      
+              console.log("✅ Group disbanded on server:", response.data);
+      
+              // Emit socket event
+              socket.emit(SOCKET_EVENTS.DISBANDED_CONVERSATION, { conversationId });
+              console.log("📤 Emitted socket event: disbanded-conversation", { conversationId });
+      
+              Alert.alert('Thành công', 'Nhóm đã được giải tán.');
+              navigation.navigate('GroupsScreen');
+            } catch (err) {
+              console.error('❌ Error disbanding group:', err);
+              Alert.alert(
+                'Lỗi',
+                err.response?.data?.message || 'Không thể giải tán nhóm.'
+              );
+            }
+          }
+        }
+      ],
+      { cancelable: true }
+    );
+  }}
+>
+  <View style={styles.authorityIcon}>
+    <View style={styles.authorityBorderIcon}>
+      <Image source={require('../icons/Disband.png')} />
     </View>
-    <Text style={styles.authorityText}>Giải tán nhóm</Text>
-  </TouchableOpacity>
+  </View>
+  <Text style={styles.authorityText}>Giải tán nhóm</Text>
+</TouchableOpacity>
+
 </View>
 
 
