@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
-  FlatList, Modal, ActivityIndicator, Alert,Platform, StatusBar } from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert,TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
@@ -24,6 +24,11 @@ const dataPic = [
 ];
 
 export default function GroupDetail({ route, navigation }) {
+
+  const [groupName, setGroupName] = useState('');
+  const [tempName, setTempName] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+
   const { conversationId } = route.params;
   const [modalVisible, setModalVisible] = useState(false);
   const [friends, setFriends] = useState([]);
@@ -46,6 +51,19 @@ export default function GroupDetail({ route, navigation }) {
 const [showTransferModal, setShowTransferModal] = useState(false);
 const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
+const handleSaveName = async () => {
+  try {
+    await axios.patch(
+      `/api/conversations/${conversationId}/name`,
+      { name: tempName }
+    );
+    setGroupName(tempName);
+    setIsEditingName(false);
+  } catch (err) {
+    console.error('Could not rename group:', err);
+    Alert.alert('Error', 'Failed to rename group.');
+  }
+};
 
 
 
@@ -77,6 +95,8 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
   
         // support either res.data.conversation or just res.data
         const convo = convRes.data.conversation || convRes.data;
+        setGroupName(convo.name);
+
         const members = memRes.data || [];
   
         // 2) Unwrap Mongo’s {$oid: "..."} if present
@@ -262,13 +282,59 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
       </View>
 
       {/* Existing group profile and pictures... */}
-      <FlatList
-        data={dataGroupProfile}
-        horizontal={false}
-        numColumns={2}
-        renderItem={renderGroupProfile}
-        keyExtractor={(item) => item.id}
+      <View style={{ alignItems: 'center', marginVertical: 20 }}>
+  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    {isEditingName ? (
+      <TextInput
+        value={tempName}
+        onChangeText={setTempName}
+        style={{
+          borderBottomWidth: 1,
+          borderColor: '#086DC0',
+          fontSize: 18,
+          fontWeight: 'bold',
+          color: '#086DC0',
+          marginRight: 8,
+          minWidth: 120,
+        }}
+        autoFocus
       />
+    ) : (
+      <Text
+        style={{
+          fontSize: 18,
+          fontWeight: 'bold',
+          color: '#086DC0',
+          marginRight: 8,
+        }}
+      >
+        {groupName}
+      </Text>
+    )}
+
+    <TouchableOpacity
+      onPress={() => {
+        if (isEditingName) {
+          handleSaveName();
+        } else {
+          setTempName(groupName);
+          setIsEditingName(true);
+        }
+      }}
+    >
+      <Image
+        source={
+          isEditingName
+            ? require('../icons/check.png')
+            : require('../assets/Edit.png')
+        }
+        style={{ width: 20, height: 20 }}
+      />
+    </TouchableOpacity>
+  </View>
+</View>
+
+
        <View style={{marginTop:30}}>
         <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
