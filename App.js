@@ -33,6 +33,8 @@ import Groups from './Screens/GroupsScreen'
 
 import ChatGroup from './Screens/ChatGroupScreen'
 
+import Media from './Screens/MediaScreen'
+
 const Stack = createStackNavigator();
 
 // Component con để sử dụng các hook Redux (ví dụ useDispatch)
@@ -122,6 +124,12 @@ function AppContainer() {
         <Stack.Screen
           name="ChatGroupScreen"
           component={ChatGroup}
+          options={{ headerShown: false }}
+
+        />
+         <Stack.Screen
+          name="MediaScreen"
+          component={Media}
           options={{ headerShown: false }}
 
         />
