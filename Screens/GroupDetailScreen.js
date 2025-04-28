@@ -283,35 +283,37 @@ const handleSaveName = async () => {
 
       {/* Existing group profile and pictures... */}
       <View style={{ alignItems: 'center', marginVertical: 20 }}>
-  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-    {isEditingName ? (
-      <TextInput
-        value={tempName}
-        onChangeText={setTempName}
-        style={{
-          borderBottomWidth: 1,
-          borderColor: '#086DC0',
-          fontSize: 18,
-          fontWeight: 'bold',
-          color: '#086DC0',
-          marginRight: 8,
-          minWidth: 120,
-        }}
-        autoFocus
-      />
-    ) : (
-      <Text
-        style={{
-          fontSize: 18,
-          fontWeight: 'bold',
-          color: '#086DC0',
-          marginRight: 8,
-        }}
-      >
-        {groupName}
-      </Text>
-    )}
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+  {isEditingName ? (
+    <TextInput
+      value={tempName}
+      onChangeText={setTempName}
+      style={{
+        borderBottomWidth: 1,
+        borderColor: '#086DC0',
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#086DC0',
+        marginRight: 8,
+        minWidth: 120,
+      }}
+      autoFocus
+    />
+  ) : (
+    <Text
+      style={{
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#086DC0',
+        marginRight: 8,
+      }}
+    >
+      {groupName}
+    </Text>
+  )}
 
+  {/* only show edit/check if leader or manager */}
+  {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
     <TouchableOpacity
       onPress={() => {
         if (isEditingName) {
@@ -331,7 +333,9 @@ const handleSaveName = async () => {
         style={{ width: 20, height: 20 }}
       />
     </TouchableOpacity>
-  </View>
+  )}
+</View>
+
 </View>
 
 
