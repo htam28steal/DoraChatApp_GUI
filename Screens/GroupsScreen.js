@@ -243,19 +243,24 @@ export default function GroupsScreen({ navigation }) {
   };
 
   const createGroup = async () => {
-    if (!selectedFriendIds.length || !groupName) return;
+    const trimmedName = groupName.trim();
+    if (!trimmedName) {
+      Alert.alert('Error', 'Group name cannot be blank.');
+      return;
+    }
+    if (!groupName) return;
   
     try {
       setCreatingGroup(true);
   
       const res = await axios.post('/api/conversations/groups', {
-        name: groupName,
+        name: trimmedName,
         members: selectedFriendIds,
       });
   
       const newConv = {
         _id: res.data._id,
-        name: res.data.name || groupName,
+        name: res.data.name || trimmedName,
         members: res.data.members || selectedFriendIds,
       };
   
@@ -471,16 +476,20 @@ export default function GroupsScreen({ navigation }) {
                 <Text style={styles.modalCloseText}>Close</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalCreateButton, (!groupName || creatingGroup) && { backgroundColor: '#ccc' }]}
-                onPress={createGroup}
-                disabled={!groupName || creatingGroup}
-              >
-                {creatingGroup ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.modalCreateText}>Create Group</Text>
-                )}
-              </TouchableOpacity>
+  style={[
+    styles.modalCreateButton,
+    (creatingGroup || !groupName.trim()) && { backgroundColor: '#ccc' }
+  ]}
+  onPress={createGroup}
+  disabled={creatingGroup || !groupName.trim()}
+>
+  {creatingGroup
+    ? <ActivityIndicator size="small" color="white" />
+    : <Text style={styles.modalCreateText}>Create Group</Text>
+  }
+</TouchableOpacity>
+
+
             </View>
           </View>
         </View>

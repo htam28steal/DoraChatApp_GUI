@@ -26,8 +26,9 @@ const dataPic = [
 export default function GroupDetail({ route, navigation }) {
 
   const [groupName, setGroupName] = useState('');
-  const [tempName, setTempName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+
 
   const { conversationId } = route.params;
   const [modalVisible, setModalVisible] = useState(false);
@@ -52,17 +53,17 @@ const [showTransferModal, setShowTransferModal] = useState(false);
 const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
 const handleSaveName = async () => {
-  try {
-    await axios.patch(
-      `/api/conversations/${conversationId}/name`,
-      { name: tempName }
-    );
-    setGroupName(tempName);
-    setIsEditingName(false);
-  } catch (err) {
-    console.error('Could not rename group:', err);
-    Alert.alert('Error', 'Failed to rename group.');
+  const trimmed = tempName.trim();
+  if (!trimmed) {
+    Alert.alert('Error', 'Name cannot be blank.');
+    return;
   }
+  await axios.patch(
+    `/api/conversations/${conversationId}/name`,
+    { name: trimmed }
+  );
+  setGroupName(trimmed);
+  setIsEditingName(false);
 };
 
 
@@ -283,60 +284,63 @@ const handleSaveName = async () => {
 
       {/* Existing group profile and pictures... */}
       <View style={{ alignItems: 'center', marginVertical: 20 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-  {isEditingName ? (
-    <TextInput
-      value={tempName}
-      onChangeText={setTempName}
-      style={{
-        borderBottomWidth: 1,
-        borderColor: '#086DC0',
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#086DC0',
-        marginRight: 8,
-        minWidth: 120,
-      }}
-      autoFocus
-    />
-  ) : (
-    <Text
-      style={{
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#086DC0',
-        marginRight: 8,
-      }}
-    >
-      {groupName}
-    </Text>
-  )}
+  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    {isEditingName
+      ? (
+        <TextInput
+          value={tempName}
+          onChangeText={setTempName}
+          style={{
+            borderBottomWidth: 1,
+            borderColor: '#086DC0',
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#086DC0',
+            marginRight: 8,
+            minWidth: 120,
+          }}
+          autoFocus
+        />
+      )
+      : (
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#086DC0',
+            marginRight: 8,
+          }}
+        >
+          {groupName}
+        </Text>
+      )
+    }
 
-  {/* only show edit/check if leader or manager */}
-  {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
-    <TouchableOpacity
-      onPress={() => {
-        if (isEditingName) {
-          handleSaveName();
-        } else {
-          setTempName(groupName);
-          setIsEditingName(true);
-        }
-      }}
-    >
-      <Image
-        source={
-          isEditingName
-            ? require('../icons/check.png')
-            : require('../assets/Edit.png')
-        }
-        style={{ width: 20, height: 20 }}
-      />
-    </TouchableOpacity>
-  )}
+    {/* only leaders & managers get the button */}
+    {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
+      <TouchableOpacity
+        onPress={() => {
+          if (isEditingName) {
+            handleSaveName();
+          } else {
+            setTempName(groupName);
+            setIsEditingName(true);
+          }
+        }}
+      >
+        <Image
+          source={
+            isEditingName
+              ? require('../icons/check.png')
+              : require('../assets/Edit.png')
+          }
+          style={{ width: 20, height: 20 }}
+        />
+      </TouchableOpacity>
+    )}
+  </View>
 </View>
 
-</View>
 
 
        <View style={{marginTop:30}}>
