@@ -37,6 +37,8 @@ export default function GroupDetail({ route, navigation }) {
   const [groupMembers, setGroupMembers] = useState([]);
   const [showAdministrationOptions, setShowAdministrationOptions] = useState(false);
 
+  const [currentUserRole, setCurrentUserRole] = useState(null);
+
 
   const [selectedMemberId, setSelectedMemberId] = useState(null);
 
@@ -61,6 +63,61 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
       console.error('Failed to fetch members', err);
     }
   };
+  useEffect(() => {
+    const loadMyRole = async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (!userId) return;
+  
+        // 1) Fetch both the conversation *and* its members
+        const [convRes, memRes] = await Promise.all([
+          axios.get(`/api/conversations/${conversationId}`),
+          axios.get(`/api/conversations/${conversationId}/members`)
+        ]);
+  
+        // support either res.data.conversation or just res.data
+        const convo = convRes.data.conversation || convRes.data;
+        const members = memRes.data || [];
+  
+        // 2) Unwrap Mongo’s {$oid: "..."} if present
+        let leaderId = convo.leaderId;
+        if (leaderId && typeof leaderId === 'object' && leaderId.$oid) {
+          leaderId = leaderId.$oid;
+        }
+  
+        const managerIds = Array.isArray(convo.managerIds)
+          ? convo.managerIds.map(m => (m && m.$oid) ? m.$oid : m)
+          : [];
+  
+        // 3) Find *your* membership record and grab its memberId
+        const myRecord = members.find(m => m.userId === userId);
+        const myMemberId = myRecord
+          ? (myRecord.memberId || myRecord._id || myRecord.id)
+          : null;
+  
+        console.log('→ meMemberId:', myMemberId,
+                    ' leaderId:', leaderId,
+                    ' managers:', managerIds);
+  
+        // 4) Compare *membership* IDs
+        if (myMemberId && myMemberId === leaderId) {
+          setCurrentUserRole('leader');
+        }
+        else if (myMemberId && managerIds.includes(myMemberId)) {
+          setCurrentUserRole('manager');
+        }
+        else {
+          setCurrentUserRole('member');
+        }
+      } catch (err) {
+        console.error('Could not load conversation or role', err);
+      }
+    };
+  
+    loadMyRole();
+  }, [conversationId]);
+  
+  
   
   const fetchModalData = async () => {
     try {
@@ -252,35 +309,32 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         </View>
 
     </View>
-    <TouchableOpacity 
-  style={styles.options}
-  onPress={() => setShowAdministrationOptions(prev => !prev)}
->
-  <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}}>
-    <View style={{
-      width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
-      borderRadius:15, justifyContent:'center', marginRight:10
-    }}>
-      <Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} />
+    {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
+  <TouchableOpacity
+    style={styles.options}
+    onPress={() => setShowAdministrationOptions(v => !v)}
+  >
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{
+        width: 30, height: 30, backgroundColor: '#D8EDFF',
+        borderRadius: 15, justifyContent: 'center', marginRight: 10
+      }}>
+        <Image source={require('../icons/Photos.png')} style={{ alignSelf: 'center' }} />
+      </View>
+      <Text style={{ color: '#086DC0', fontSize: 15 }}>Administration</Text>
     </View>
-    <Text style={{color:'#086DC0', fontSize:15}}>Administration</Text>
-  </View>
-
-  <View style={{
-    width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10,
-    justifyContent:'center', alignItems:'center'
-  }}>
-    <Image 
+    <Image
       source={
         showAdministrationOptions
-          ? require('../icons/down-arrow.png')     // you need to prepare a "up arrow" icon
+          ? require('../icons/down-arrow.png')
           : require('../icons/arrow.png')
-      } 
-      style={{alignSelf:'center', width:12, height:12}}
+      }
+      style={{ width: 12, height: 12, resizeMode: 'contain' }}
     />
-  </View>
-</TouchableOpacity>
-{showAdministrationOptions && (
+  </TouchableOpacity>
+)}
+
+{ (currentUserRole === 'leader' || currentUserRole === 'manager') && showAdministrationOptions && (
   <>
         <View style={styles.authority}>
             <TouchableOpacity style={styles.authorityOptions}>
