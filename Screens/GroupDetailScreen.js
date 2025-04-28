@@ -35,6 +35,8 @@ export default function GroupDetail({ route, navigation }) {
   const [authorityModalVisible, setAuthorityModalVisible] = useState(false);
   const [selectedDeputyId, setSelectedDeputyId] = useState(null);
   const [groupMembers, setGroupMembers] = useState([]);
+  const [showAdministrationOptions, setShowAdministrationOptions] = useState(false);
+
 
   const [selectedMemberId, setSelectedMemberId] = useState(null);
 
@@ -245,23 +247,41 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         </View>
         <TouchableOpacity 
           style={{width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10, justifyContent:'center',alignItems:'center'}}>
-          <Image source={require('../icons/arrow.png')} />
+          <Image source={require('../icons/arrow.png')} style ={{width:12, height:12}} />
         </TouchableOpacity>
         </View>
 
     </View>
-    <View style={styles.options}>
-        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
-          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
-          borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
-          <Text style={{color:'#086DC0', fontSize:15}}>Quyền quản trị</Text>
-        </View>
-        <TouchableOpacity 
-          style={{width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10, justifyContent:'center',alignItems:'center'}}>
-          <Image source={require('../icons/arrow.png')} />
-        </TouchableOpacity>
-        </View>
+    <TouchableOpacity 
+  style={styles.options}
+  onPress={() => setShowAdministrationOptions(prev => !prev)}
+>
+  <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}}>
+    <View style={{
+      width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
+      borderRadius:15, justifyContent:'center', marginRight:10
+    }}>
+      <Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} />
+    </View>
+    <Text style={{color:'#086DC0', fontSize:15}}>Administration</Text>
+  </View>
+
+  <View style={{
+    width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10,
+    justifyContent:'center', alignItems:'center'
+  }}>
+    <Image 
+      source={
+        showAdministrationOptions
+          ? require('../icons/down-arrow.png')     // you need to prepare a "up arrow" icon
+          : require('../icons/arrow.png')
+      } 
+      style={{alignSelf:'center', width:12, height:12}}
+    />
+  </View>
+</TouchableOpacity>
+{showAdministrationOptions && (
+  <>
         <View style={styles.authority}>
             <TouchableOpacity style={styles.authorityOptions}>
               <View style={styles.authorityIcon}>
@@ -269,7 +289,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
                   <Image source={require('../icons/Verify.png')} />
                 </View>
               </View>
-              <Text style={styles.authorityText}>Phê duyệt thành viên </Text>
+              <Text style={styles.authorityText}>Join requests</Text>
             </TouchableOpacity>
         </View>
                 <View style={styles.authority}>
@@ -283,7 +303,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
   <View style={styles.authorityIcon}>
     <Image source={require('../icons/Branches.png')} />
   </View>
-  <Text style={styles.authorityText}>Uỷ quyền</Text>
+  <Text style={styles.authorityText}>Authority</Text>
 </TouchableOpacity>
 
         </View>
@@ -351,10 +371,12 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
       <Image source={require('../icons/Disband.png')} />
     </View>
   </View>
-  <Text style={styles.authorityText}>Giải tán nhóm</Text>
+  <Text style={styles.authorityText}>Disband group</Text>
 </TouchableOpacity>
 
 </View>
+</>
+)}
 
 
       <FlatList
