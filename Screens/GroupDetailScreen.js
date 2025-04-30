@@ -24,7 +24,8 @@ const dataPic = [
 ];
 
 export default function GroupDetail({ route, navigation }) {
-
+  const [isMuted, setIsMuted] = useState(false);
+  const [isJoinApproval, setIsJoinApproval] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
@@ -51,6 +52,32 @@ export default function GroupDetail({ route, navigation }) {
   const [showAuthorityChoice, setShowAuthorityChoice] = useState(false);
 const [showTransferModal, setShowTransferModal] = useState(false);
 const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
+
+useEffect(() => {
+  ;(async () => {
+    try {
+      const res = await axios.get(`/api/conversations/${conversationId}`);
+      // assuming your convo object has a boolean `acceptGroupRequest` field
+      setIsJoinApproval(!!res.data.isJoinFromLink);
+    } catch (err) {
+      console.error("Couldn't load joinApproval:", err);
+    }
+  })();
+}, [conversationId]);
+
+
+const toggleJoinApproval = async () => {
+  const newValue = !isJoinApproval;
+  try {
+    await axios.patch(
+      `/api/conversations/${conversationId}/acceptGroupRequest/${newValue}`
+    );
+    setIsJoinApproval(newValue);
+  } catch (err) {
+    console.error('❌ Error toggling joinApproval:', err);
+    Alert.alert('Error', 'Could not update join approval setting.');
+  }
+};
 
 const handleSaveName = async () => {
   const trimmed = tempName.trim();
@@ -344,30 +371,60 @@ const handleSaveName = async () => {
 
 
        <View style={{marginTop:30}}>
-        <View style={styles.options}>
-        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
-          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
-          borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../icons/Notification.png')} style={{alignSelf:'center'}} /></View>
-          <Text style={{color:'#086DC0', fontSize:15}}>Mute messages</Text>
-        </View>
-        <TouchableOpacity 
-          style={{width:40, backgroundColor:'#D8EDFF', height:20, borderRadius:10, position:'relative'}}>
-          <View 
-            style={{
-              width: 16,
-              height: 16,
-              backgroundColor: '#086DC0',
-              borderRadius: 10,
-              position: 'absolute',
-              right: 1,
-              top: '50%',
-              transform: [{ translateY: -8 }]  // Dịch lên trên 8 đơn vị để căn giữa
-            }
-          }>
+       <View style={styles.options}>
+        <View style={styles.optionsLeft}>
+          <View style={styles.iconCircle}>
+            <Image
+              source={require('../icons/Notification.png')}
+              style={styles.icon}
+            />
           </View>
-        </TouchableOpacity>
+          <Text style={styles.optionsText}>Mute messages</Text>
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.toggleTrack,
+            isMuted && styles.toggleTrackActive
+          ]}
+          onPress={() => setIsMuted(m => !m)}
+        >
+          <View
+            style={[
+              styles.toggleThumb,
+              isMuted ? styles.thumbRight : styles.thumbLeft
+            ]}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.options}>
+        <View style={styles.optionsLeft}>
+          <View style={styles.iconCircle}>
+            <Image
+              source={require('../icons/Notification.png')}
+              style={styles.icon}
+            />
+          </View>
+          <Text style={styles.optionsText}>Join approval</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.toggleTrack,
+            isJoinApproval && styles.toggleTrackActive
+          ]}
+          onPress={toggleJoinApproval}
+        >
+          <View
+            style={[
+              styles.toggleThumb,
+              isJoinApproval ? styles.thumbRight : styles.thumbLeft
+            ]}
+          />
+        </TouchableOpacity>
+      </View>
+ 
 
         <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
@@ -410,6 +467,17 @@ const handleSaveName = async () => {
       </View>
       <Text style={{ color: '#086DC0', fontSize: 15 }}>Administration</Text>
     </View>
+    <View         
+  style={{
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}>
+
+
     <Image
       source={
         showAdministrationOptions
@@ -418,6 +486,7 @@ const handleSaveName = async () => {
       }
       style={{ width: 12, height: 12, resizeMode: 'contain' }}
     />
+        </View>
   </TouchableOpacity>
 )}
 
@@ -1020,4 +1089,52 @@ const styles = StyleSheet.create({
   },
   modalCloseText: { color: 'white', fontSize:12, fontWeight:'bold' },
   modalCreateText: { color: 'white', fontSize:12, fontWeight:'bold'},
+  options: {
+    width: '90%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingLeft: 20,
+    marginBottom: 15
+  },
+  optionsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  iconCircle: {
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10
+  },
+  icon: { width: 16, height: 16 },
+  optionsText: { color: '#086DC0', fontSize: 15 },
+
+  // Toggle “track”
+  toggleTrack: {
+    width: 40,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#D8EDFF',
+    justifyContent: 'center',
+    position: 'relative'
+  },
+  toggleTrackActive: {
+    backgroundColor: '#086DC0'
+  },
+
+  // The little “thumb”
+  toggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    position: 'absolute',
+    top: 2
+  },
+  thumbLeft: { left: 2 },
+  thumbRight: { right: 2 },
 });
