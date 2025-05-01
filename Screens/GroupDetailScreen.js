@@ -15,13 +15,7 @@ const dataGroupProfile = [
     name: 'John Nguyen',
   },
 ];
-const dataPic = [
-  { id: '1', url: require('../Images/pic1.png') },
-  { id: '2', url: require('../Images/pic1.png') },
-  { id: '3', url: require('../Images/pic1.png') },
-  { id: '4', url: require('../Images/pic1.png') },
-  { id: '5', url: require('../Images/pic1.png') },
-];
+
 
 export default function GroupDetail({ route, navigation }) {
   const [isMuted, setIsMuted] = useState(false);
@@ -32,6 +26,9 @@ export default function GroupDetail({ route, navigation }) {
 
 
   const { conversationId } = route.params;
+  const [showJoinRequestsModal, setShowJoinRequestsModal] = useState(false);
+  const [joinRequests, setJoinRequests] = useState([]);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [friends, setFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
@@ -65,6 +62,56 @@ useEffect(() => {
   })();
 }, [conversationId]);
 
+  // whenever `showJoinRequestsModal` flips to true, fetch
+  useEffect(() => {
+    if (!showJoinRequestsModal) return;
+    (async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        const res = await axios.get(
+          `/api/conversations/${conversationId}/groupRequest`,
+          { params: { userId } }
+        );
+        
+        setJoinRequests(res.data || []);
+      } catch (err) {
+        console.error("❌ Failed loading join requests:", err);
+        Alert.alert("Error", "Could not load join requests");
+      }
+    })();
+  }, [showJoinRequestsModal, conversationId]);
+
+
+  const handleAccept = async (requestingUserId) => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      await axios.post(
+        `/api/conversations/${conversationId}/groupRequest/accept/${requestingUserId}`,
+        { userId }
+      );
+      // remove from local list
+      setJoinRequests(js => js.filter(r => r.userId !== requestingUserId));
+    } catch (err) {
+      console.error('❌ Accept failed:', err);
+      Alert.alert('Error', 'Could not accept request.');
+    }
+  };
+  
+  const handleReject = async (requestingUserId) => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      await axios.post(
+        `/api/conversations/${conversationId}/groupRequest/reject/${requestingUserId}`,
+        { userId }
+      );
+      // remove from local list
+      setJoinRequests(js => js.filter(r => r.userId !== requestingUserId));
+    } catch (err) {
+      console.error('❌ Reject failed:', err);
+      Alert.alert('Error', 'Could not reject request.');
+    }
+  };
+  
 
 const toggleJoinApproval = async () => {
   const newValue = !isJoinApproval;
@@ -266,9 +313,7 @@ const handleSaveName = async () => {
     </View>
   );
 
-  const renderPicture = ({ item }) => (
-    <Image source={item.url} style={{ marginRight: 10, marginBottom: 10 }} />
-  );
+
 
   const renderFriendItem = ({ item }) => (
     <TouchableOpacity
@@ -493,14 +538,18 @@ const handleSaveName = async () => {
 { (currentUserRole === 'leader' || currentUserRole === 'manager') && showAdministrationOptions && (
   <>
         <View style={styles.authority}>
-            <TouchableOpacity style={styles.authorityOptions}>
-              <View style={styles.authorityIcon}>
-                <View style={styles.authorityBorderIcon}>
-                  <Image source={require('../icons/Verify.png')} />
-                </View>
-              </View>
-              <Text style={styles.authorityText}>Join requests</Text>
-            </TouchableOpacity>
+        <TouchableOpacity
+  style={styles.authorityOptions}
+  onPress={() => setShowJoinRequestsModal(true)}
+>
+  <View style={styles.authorityIcon}>
+    <View style={styles.authorityBorderIcon}>
+      <Image source={require('../icons/Verify.png')} />
+    </View>
+  </View>
+  <Text style={styles.authorityText}>Join requests</Text>
+</TouchableOpacity>
+
         </View>
                 <View style={styles.authority}>
                 <TouchableOpacity
@@ -589,13 +638,7 @@ const handleSaveName = async () => {
 )}
 
 
-      <FlatList
-        data={dataPic}
-        horizontal={false}
-        numColumns={3}
-        renderItem={renderPicture}
-        keyExtractor={(item) => item.id}
-      />
+
 
       <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
       <TouchableOpacity>
@@ -966,6 +1009,63 @@ const handleSaveName = async () => {
     </View>
   </View>
 </Modal>
+{/* Join Requests Modal */}
+<Modal
+  visible={showJoinRequestsModal}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setShowJoinRequestsModal(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Pending Join Requests</Text>
+      {joinRequests.length === 0 ? (
+        <Text style={{ textAlign: 'center', marginTop: 20 }}>No requests.</Text>
+      ) : (
+        <FlatList
+          data={joinRequests}
+            keyExtractor={item => item._id.toString()}
+          renderItem={({ item }) => (
+            <View style={[styles.friendItem, { justifyContent: 'space-between' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+                <Text style={[styles.friendName, { marginLeft: 10 }]}>{item.name}</Text>
+              </View>
+              <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity
+                  onPress={() => handleAccept(item.userId)}
+                  style={{ marginHorizontal: 5 }}
+                >
+                  <Image
+                    source={require('../icons/check.png')}
+                    style={{ width: 24, height: 24 }}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleReject(item.userId)}
+                  style={{ marginHorizontal: 5 }}
+                >
+                  <Image
+                    source={require('../icons/Reject.png')}
+                    style={{ width: 24, height: 24 }}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        />
+      )}
+      <TouchableOpacity
+        style={[styles.modalCloseButton, { marginTop: 20 }]}
+        onPress={() => setShowJoinRequestsModal(false)}
+      >
+        <Text style={styles.modalCloseText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+
 
 
     </SafeAreaView>

@@ -392,6 +392,9 @@ export default function GroupsScreen({ navigation }) {
         <TouchableOpacity style={styles.btnFillter}>
           <Text style={styles.txtFillter}>Favourite</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.btnFillter}>
+          <Text style={styles.txtFillter}>Requests</Text>
+        </TouchableOpacity>
       </View>
 
       {conversations.length === 0 ? (
