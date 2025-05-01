@@ -63,54 +63,67 @@ useEffect(() => {
 }, [conversationId]);
 
   // whenever `showJoinRequestsModal` flips to true, fetch
-  useEffect(() => {
-    if (!showJoinRequestsModal) return;
-    (async () => {
-      try {
-        const userId = await AsyncStorage.getItem('userId');
-        const res = await axios.get(
-          `/api/conversations/${conversationId}/groupRequest`,
-          { params: { userId } }
-        );
-        
-        setJoinRequests(res.data || []);
-      } catch (err) {
-        console.error("❌ Failed loading join requests:", err);
-        Alert.alert("Error", "Could not load join requests");
-      }
-    })();
-  }, [showJoinRequestsModal, conversationId]);
-
-
-  const handleAccept = async (requestingUserId) => {
+// 1) In your useEffect that loads the join‐requests:
+useEffect(() => {
+  if (!showJoinRequestsModal) return;
+  (async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
-      await axios.post(
-        `/api/conversations/${conversationId}/groupRequest/accept/${requestingUserId}`,
-        { userId }
+      console.log('🔹 Fetching join requests for user:', userId);
+      const res = await axios.get(
+        `/api/conversations/${conversationId}/groupRequest`,
+        { params: { userId } }
       );
-      // remove from local list
-      setJoinRequests(js => js.filter(r => r.userId !== requestingUserId));
+      console.log('🔹 Raw joinRequests payload:', JSON.stringify(res.data, null, 2));
+      setJoinRequests(res.data || []);
     } catch (err) {
-      console.error('❌ Accept failed:', err);
-      Alert.alert('Error', 'Could not accept request.');
+      console.error("❌ Failed loading join requests:", err);
+      Alert.alert("Error", "Could not load join requests");
     }
-  };
+  })();
+}, [showJoinRequestsModal, conversationId]);
+
+
+
+const handleAccept = async (requestingUserId) => {
+  try {
+    const userId = await AsyncStorage.getItem('userId');
+    console.log('🔹 handleAccept → requestingUserId:', requestingUserId);
+    console.log('🔹 handleAccept → body userId:', userId);
+
+    const url = `/api/conversations/${conversationId}/groupRequest/accept/${requestingUserId}`;
+    console.log('🔹 handleAccept → POST to:', url);
+
+    await axios.post(url, { userId });
+    setJoinRequests(js => js.filter(r => (r.userId ?? r._id) !== requestingUserId));
+    console.log('✅ Accepted request for', requestingUserId);
+  } catch (err) {
+    console.error('❌ Accept failed:', err.response?.data || err.message);
+    Alert.alert('Error', err.response?.data?.message || 'Could not accept request.');
+  }
+};
+
   
-  const handleReject = async (requestingUserId) => {
-    try {
-      const userId = await AsyncStorage.getItem('userId');
-      await axios.post(
-        `/api/conversations/${conversationId}/groupRequest/reject/${requestingUserId}`,
-        { userId }
-      );
-      // remove from local list
-      setJoinRequests(js => js.filter(r => r.userId !== requestingUserId));
-    } catch (err) {
-      console.error('❌ Reject failed:', err);
-      Alert.alert('Error', 'Could not reject request.');
-    }
-  };
+  
+const handleReject = async (requestId) => {
+  try {
+    const userId = await AsyncStorage.getItem('userId');
+    console.log('🔹 handleReject → requestId:', requestId);
+    console.log('🔹 handleReject → body userId:', userId);
+
+    const url = `/api/conversations/${conversationId}/groupRequest/reject/${requestId}`;
+    console.log('🔹 handleReject → DElETE to:', url);
+
+    await axios.delete(url, { userId });
+    // remove from local list by _id, not userId
+    setJoinRequests(js => js.filter(r => r._id !== requestId));
+    console.log('✅ Rejected request', requestId);
+  } catch (err) {
+    console.error('❌ Reject failed:', err.response?.data || err.message);
+    Alert.alert('Error', err.response?.data?.message || 'Could not reject request.');
+  }
+};
+
   
 
 const toggleJoinApproval = async () => {
@@ -1024,7 +1037,7 @@ const handleSaveName = async () => {
       ) : (
         <FlatList
           data={joinRequests}
-            keyExtractor={item => item._id.toString()}
+          keyExtractor={item => item._id}
           renderItem={({ item }) => (
             <View style={[styles.friendItem, { justifyContent: 'space-between' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1033,7 +1046,7 @@ const handleSaveName = async () => {
               </View>
               <View style={{ flexDirection: 'row' }}>
                 <TouchableOpacity
-                  onPress={() => handleAccept(item.userId)}
+                  onPress={() => handleAccept(item._id)}
                   style={{ marginHorizontal: 5 }}
                 >
                   <Image
@@ -1042,7 +1055,7 @@ const handleSaveName = async () => {
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => handleReject(item.userId)}
+                  onPress={() => handleReject(item._id)}
                   style={{ marginHorizontal: 5 }}
                 >
                   <Image
