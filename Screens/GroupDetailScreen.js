@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
-  FlatList, Modal, ActivityIndicator, Alert,Platform, StatusBar } from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert,TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
 
 import axios from '../api/apiConfig';
 const AddMember = require('../icons/addFriend.png');
@@ -13,16 +15,20 @@ const dataGroupProfile = [
     name: 'John Nguyen',
   },
 ];
-const dataPic = [
-  { id: '1', url: require('../Images/pic1.png') },
-  { id: '2', url: require('../Images/pic1.png') },
-  { id: '3', url: require('../Images/pic1.png') },
-  { id: '4', url: require('../Images/pic1.png') },
-  { id: '5', url: require('../Images/pic1.png') },
-];
+
 
 export default function GroupDetail({ route, navigation }) {
+  const [isMuted, setIsMuted] = useState(false);
+  const [isJoinApproval, setIsJoinApproval] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+
+
   const { conversationId } = route.params;
+  const [showJoinRequestsModal, setShowJoinRequestsModal] = useState(false);
+  const [joinRequests, setJoinRequests] = useState([]);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [friends, setFriends] = useState([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
@@ -33,12 +39,120 @@ export default function GroupDetail({ route, navigation }) {
   const [authorityModalVisible, setAuthorityModalVisible] = useState(false);
   const [selectedDeputyId, setSelectedDeputyId] = useState(null);
   const [groupMembers, setGroupMembers] = useState([]);
+  const [showAdministrationOptions, setShowAdministrationOptions] = useState(false);
+
+  const [currentUserRole, setCurrentUserRole] = useState(null);
+
 
   const [selectedMemberId, setSelectedMemberId] = useState(null);
 
   const [showAuthorityChoice, setShowAuthorityChoice] = useState(false);
 const [showTransferModal, setShowTransferModal] = useState(false);
 const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
+
+useEffect(() => {
+  ;(async () => {
+    try {
+      const res = await axios.get(`/api/conversations/${conversationId}`);
+      // assuming your convo object has a boolean `acceptGroupRequest` field
+      setIsJoinApproval(!!res.data.isJoinFromLink);
+    } catch (err) {
+      console.error("Couldn't load joinApproval:", err);
+    }
+  })();
+}, [conversationId]);
+
+  // whenever `showJoinRequestsModal` flips to true, fetch
+// 1) In your useEffect that loads the join‐requests:
+useEffect(() => {
+  if (!showJoinRequestsModal) return;
+  (async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      console.log('🔹 Fetching join requests for user:', userId);
+      const res = await axios.get(
+        `/api/conversations/${conversationId}/groupRequest`,
+        { params: { userId } }
+      );
+      console.log('🔹 Raw joinRequests payload:', JSON.stringify(res.data, null, 2));
+      setJoinRequests(res.data || []);
+    } catch (err) {
+      console.error("❌ Failed loading join requests:", err);
+      Alert.alert("Error", "Could not load join requests");
+    }
+  })();
+}, [showJoinRequestsModal, conversationId]);
+
+
+
+const handleAccept = async (requestingUserId) => {
+  try {
+    const userId = await AsyncStorage.getItem('userId');
+    console.log('🔹 handleAccept → requestingUserId:', requestingUserId);
+    console.log('🔹 handleAccept → body userId:', userId);
+
+    const url = `/api/conversations/${conversationId}/groupRequest/accept/${requestingUserId}`;
+    console.log('🔹 handleAccept → POST to:', url);
+
+    await axios.post(url, { userId });
+    setJoinRequests(js => js.filter(r => (r.userId ?? r._id) !== requestingUserId));
+    console.log('✅ Accepted request for', requestingUserId);
+  } catch (err) {
+    console.error('❌ Accept failed:', err.response?.data || err.message);
+    Alert.alert('Error', err.response?.data?.message || 'Could not accept request.');
+  }
+};
+
+  
+  
+const handleReject = async (requestId) => {
+  try {
+    const userId = await AsyncStorage.getItem('userId');
+    console.log('🔹 handleReject → requestId:', requestId);
+    console.log('🔹 handleReject → body userId:', userId);
+
+    const url = `/api/conversations/${conversationId}/groupRequest/reject/${requestId}`;
+    console.log('🔹 handleReject → DElETE to:', url);
+
+    await axios.delete(url, { userId });
+    // remove from local list by _id, not userId
+    setJoinRequests(js => js.filter(r => r._id !== requestId));
+    console.log('✅ Rejected request', requestId);
+  } catch (err) {
+    console.error('❌ Reject failed:', err.response?.data || err.message);
+    Alert.alert('Error', err.response?.data?.message || 'Could not reject request.');
+  }
+};
+
+  
+
+const toggleJoinApproval = async () => {
+  const newValue = !isJoinApproval;
+  try {
+    await axios.patch(
+      `/api/conversations/${conversationId}/acceptGroupRequest/${newValue}`
+    );
+    setIsJoinApproval(newValue);
+  } catch (err) {
+    console.error('❌ Error toggling joinApproval:', err);
+    Alert.alert('Error', 'Could not update join approval setting.');
+  }
+};
+
+const handleSaveName = async () => {
+  const trimmed = tempName.trim();
+  if (!trimmed) {
+    Alert.alert('Error', 'Name cannot be blank.');
+    return;
+  }
+  await axios.patch(
+    `/api/conversations/${conversationId}/name`,
+    { name: trimmed }
+  );
+  setGroupName(trimmed);
+  setIsEditingName(false);
+};
+
 
 
   const fetchGroupMembers = async () => {
@@ -55,6 +169,63 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
       console.error('Failed to fetch members', err);
     }
   };
+  useEffect(() => {
+    const loadMyRole = async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (!userId) return;
+  
+        // 1) Fetch both the conversation *and* its members
+        const [convRes, memRes] = await Promise.all([
+          axios.get(`/api/conversations/${conversationId}`),
+          axios.get(`/api/conversations/${conversationId}/members`)
+        ]);
+  
+        // support either res.data.conversation or just res.data
+        const convo = convRes.data.conversation || convRes.data;
+        setGroupName(convo.name);
+
+        const members = memRes.data || [];
+  
+        // 2) Unwrap Mongo’s {$oid: "..."} if present
+        let leaderId = convo.leaderId;
+        if (leaderId && typeof leaderId === 'object' && leaderId.$oid) {
+          leaderId = leaderId.$oid;
+        }
+  
+        const managerIds = Array.isArray(convo.managerIds)
+          ? convo.managerIds.map(m => (m && m.$oid) ? m.$oid : m)
+          : [];
+  
+        // 3) Find *your* membership record and grab its memberId
+        const myRecord = members.find(m => m.userId === userId);
+        const myMemberId = myRecord
+          ? (myRecord.memberId || myRecord._id || myRecord.id)
+          : null;
+  
+        console.log('→ meMemberId:', myMemberId,
+                    ' leaderId:', leaderId,
+                    ' managers:', managerIds);
+  
+        // 4) Compare *membership* IDs
+        if (myMemberId && myMemberId === leaderId) {
+          setCurrentUserRole('leader');
+        }
+        else if (myMemberId && managerIds.includes(myMemberId)) {
+          setCurrentUserRole('manager');
+        }
+        else {
+          setCurrentUserRole('member');
+        }
+      } catch (err) {
+        console.error('Could not load conversation or role', err);
+      }
+    };
+  
+    loadMyRole();
+  }, [conversationId]);
+  
+  
   
   const fetchModalData = async () => {
     try {
@@ -73,10 +244,8 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
   
       // ✅ Only keep friends who are NOT already in the group
       const nonMembers = allFriends.filter(friend => !memberUserIds.includes(friend._id));
-  
-      // Debug logs (optional)
-      console.log('Member User IDs:', memberUserIds);
-      console.log('Filtered friends to add:', nonMembers.map(f => f._id));
+
+
   
       setMembers(fetchedMembers);
       setFriends(nonMembers);
@@ -157,9 +326,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
     </View>
   );
 
-  const renderPicture = ({ item }) => (
-    <Image source={item.url} style={{ marginRight: 10, marginBottom: 10 }} />
-  );
+
 
   const renderFriendItem = ({ item }) => (
     <TouchableOpacity
@@ -201,38 +368,121 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
       </View>
 
       {/* Existing group profile and pictures... */}
-      <FlatList
-        data={dataGroupProfile}
-        horizontal={false}
-        numColumns={2}
-        renderItem={renderGroupProfile}
-        keyExtractor={(item) => item.id}
-      />
+      <View style={{ alignItems: 'center', marginVertical: 20 }}>
+  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    {isEditingName
+      ? (
+        <TextInput
+          value={tempName}
+          onChangeText={setTempName}
+          style={{
+            borderBottomWidth: 1,
+            borderColor: '#086DC0',
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#086DC0',
+            marginRight: 8,
+            minWidth: 120,
+          }}
+          autoFocus
+        />
+      )
+      : (
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: 'bold',
+            color: '#086DC0',
+            marginRight: 8,
+          }}
+        >
+          {groupName}
+        </Text>
+      )
+    }
+
+    {/* only leaders & managers get the button */}
+    {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
+      <TouchableOpacity
+        onPress={() => {
+          if (isEditingName) {
+            handleSaveName();
+          } else {
+            setTempName(groupName);
+            setIsEditingName(true);
+          }
+        }}
+      >
+        <Image
+          source={
+            isEditingName
+              ? require('../icons/check.png')
+              : require('../assets/Edit.png')
+          }
+          style={{ width: 20, height: 20 }}
+        />
+      </TouchableOpacity>
+    )}
+  </View>
+</View>
+
+
+
        <View style={{marginTop:30}}>
-        <View style={styles.options}>
-        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
-          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
-          borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../icons/Notification.png')} style={{alignSelf:'center'}} /></View>
-          <Text style={{color:'#086DC0', fontSize:15}}>Mute messages</Text>
-        </View>
-        <TouchableOpacity 
-          style={{width:40, backgroundColor:'#D8EDFF', height:20, borderRadius:10, position:'relative'}}>
-          <View 
-            style={{
-              width: 16,
-              height: 16,
-              backgroundColor: '#086DC0',
-              borderRadius: 10,
-              position: 'absolute',
-              right: 1,
-              top: '50%',
-              transform: [{ translateY: -8 }]  // Dịch lên trên 8 đơn vị để căn giữa
-            }
-          }>
+       <View style={styles.options}>
+        <View style={styles.optionsLeft}>
+          <View style={styles.iconCircle}>
+            <Image
+              source={require('../icons/Notification.png')}
+              style={styles.icon}
+            />
           </View>
-        </TouchableOpacity>
+          <Text style={styles.optionsText}>Mute messages</Text>
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.toggleTrack,
+            isMuted && styles.toggleTrackActive
+          ]}
+          onPress={() => setIsMuted(m => !m)}
+        >
+          <View
+            style={[
+              styles.toggleThumb,
+              isMuted ? styles.thumbRight : styles.thumbLeft
+            ]}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.options}>
+        <View style={styles.optionsLeft}>
+          <View style={styles.iconCircle}>
+            <Image
+              source={require('../icons/Notification.png')}
+              style={styles.icon}
+            />
+          </View>
+          <Text style={styles.optionsText}>Join approval</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.toggleTrack,
+            isJoinApproval && styles.toggleTrackActive
+          ]}
+          onPress={toggleJoinApproval}
+        >
+          <View
+            style={[
+              styles.toggleThumb,
+              isJoinApproval ? styles.thumbRight : styles.thumbLeft
+            ]}
+          />
+        </TouchableOpacity>
+      </View>
+ 
 
         <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
@@ -241,34 +491,78 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
           }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Photos/Videos, Files, Links</Text>
         </View>
-        <TouchableOpacity 
-          style={{width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10, justifyContent:'center',alignItems:'center'}}>
-          <Image source={require('../icons/arrow.png')} />
-        </TouchableOpacity>
+        <TouchableOpacity
+  style={{
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}
+  onPress={() => navigation.navigate('MediaScreen', { conversationId })}
+>
+  <Image
+    source={require('../icons/arrow.png')}
+    style={{ width: 12, height: 12 }}
+  />
+</TouchableOpacity>
+
         </View>
 
     </View>
-    <View style={styles.options}>
-        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
-          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
-          borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
-          <Text style={{color:'#086DC0', fontSize:15}}>Quyền quản trị</Text>
+    {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
+  <TouchableOpacity
+    style={styles.options}
+    onPress={() => setShowAdministrationOptions(v => !v)}
+  >
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{
+        width: 30, height: 30, backgroundColor: '#D8EDFF',
+        borderRadius: 15, justifyContent: 'center', marginRight: 10
+      }}>
+        <Image source={require('../icons/Photos.png')} style={{ alignSelf: 'center' }} />
+      </View>
+      <Text style={{ color: '#086DC0', fontSize: 15 }}>Administration</Text>
+    </View>
+    <View         
+  style={{
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}>
+
+
+    <Image
+      source={
+        showAdministrationOptions
+          ? require('../icons/down-arrow.png')
+          : require('../icons/arrow.png')
+      }
+      style={{ width: 12, height: 12, resizeMode: 'contain' }}
+    />
         </View>
-        <TouchableOpacity 
-          style={{width:30, backgroundColor:'#D8EDFF', height:30, borderRadius:10, justifyContent:'center',alignItems:'center'}}>
-          <Image source={require('../icons/arrow.png')} />
-        </TouchableOpacity>
-        </View>
+  </TouchableOpacity>
+)}
+
+{ (currentUserRole === 'leader' || currentUserRole === 'manager') && showAdministrationOptions && (
+  <>
         <View style={styles.authority}>
-            <TouchableOpacity style={styles.authorityOptions}>
-              <View style={styles.authorityIcon}>
-                <View style={styles.authorityBorderIcon}>
-                  <Image source={require('../icons/Verify.png')} />
-                </View>
-              </View>
-              <Text style={styles.authorityText}>Phê duyệt thành viên </Text>
-            </TouchableOpacity>
+        <TouchableOpacity
+  style={styles.authorityOptions}
+  onPress={() => setShowJoinRequestsModal(true)}
+>
+  <View style={styles.authorityIcon}>
+    <View style={styles.authorityBorderIcon}>
+      <Image source={require('../icons/Verify.png')} />
+    </View>
+  </View>
+  <Text style={styles.authorityText}>Join requests</Text>
+</TouchableOpacity>
+
         </View>
                 <View style={styles.authority}>
                 <TouchableOpacity
@@ -281,7 +575,7 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
   <View style={styles.authorityIcon}>
     <Image source={require('../icons/Branches.png')} />
   </View>
-  <Text style={styles.authorityText}>Uỷ quyền</Text>
+  <Text style={styles.authorityText}>Authority</Text>
 </TouchableOpacity>
 
         </View>
@@ -300,43 +594,64 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         </View>
 
         <View style={styles.authority}>
-  <TouchableOpacity
-    style={styles.authorityOptions}
-    onPress={async () => {
-      try {
-        const userId = await AsyncStorage.getItem('userId');
-        await axios.delete(
-          `/api/conversations/disband/${conversationId}`,
-          { data: { userId } }
-        );
-        Alert.alert('Thành công', 'Nhóm đã được giải tán.');
-        navigation.goBack(); // hoặc navigation.navigate('Home') tuỳ UX
-      } catch (err) {
-        console.error('Error disbanding group:', err);
-        Alert.alert(
-          'Lỗi',
-          err.response?.data?.message || 'Không thể giải tán nhóm.'
-        );
-      }
-    }}
-  >
-    <View style={styles.authorityIcon}>
-      <View style={styles.authorityBorderIcon}>
-        <Image source={require('../icons/Disband.png')} />
-      </View>
+        <TouchableOpacity
+  style={styles.authorityOptions}
+  onPress={async () => {
+    const userId = await AsyncStorage.getItem('userId');
+    // Show confirmation dialog
+    Alert.alert(
+      'Xác nhận',
+      'Bạn có chắc chắn muốn giải tán nhóm này?',
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Giải tán',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log("🚨 Attempting to disband group:", conversationId, "by user:", userId);
+      
+              const response = await axios.delete(
+                `/api/conversations/disband/${conversationId}`,
+                { data: { userId } }
+              );
+      
+              console.log("✅ Group disbanded on server:", response.data);
+      
+              // Emit socket event
+              socket.emit(SOCKET_EVENTS.DISBANDED_CONVERSATION, { conversationId });
+              console.log("📤 Emitted socket event: disbanded-conversation", { conversationId });
+      
+              Alert.alert('Thành công', 'Nhóm đã được giải tán.');
+              navigation.navigate('GroupsScreen');
+            } catch (err) {
+              console.error('❌ Error disbanding group:', err);
+              Alert.alert(
+                'Lỗi',
+                err.response?.data?.message || 'Không thể giải tán nhóm.'
+              );
+            }
+          }
+        }
+      ],
+      { cancelable: true }
+    );
+  }}
+>
+  <View style={styles.authorityIcon}>
+    <View style={styles.authorityBorderIcon}>
+      <Image source={require('../icons/Disband.png')} />
     </View>
-    <Text style={styles.authorityText}>Giải tán nhóm</Text>
-  </TouchableOpacity>
+  </View>
+  <Text style={styles.authorityText}>Disband group</Text>
+</TouchableOpacity>
+
 </View>
+</>
+)}
 
 
-      <FlatList
-        data={dataPic}
-        horizontal={false}
-        numColumns={3}
-        renderItem={renderPicture}
-        keyExtractor={(item) => item.id}
-      />
+
 
       <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
       <TouchableOpacity>
@@ -360,8 +675,14 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
         `/api/conversations/members/leave/${conversationId}`,
         { data: { userId } }
       );
+      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
+        conversationId,
+        userId
+      });
+      console.log("📤 Emitted leave‑conversation:", { conversationId, userId });
+
       Alert.alert('Thành công', 'Bạn đã rời nhóm.');
-      navigation.goBack();
+      navigation.navigate('GroupsScreen')
     } catch (err) {
       console.error('Error leaving group:', err);
       Alert.alert(
@@ -701,6 +1022,63 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
     </View>
   </View>
 </Modal>
+{/* Join Requests Modal */}
+<Modal
+  visible={showJoinRequestsModal}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setShowJoinRequestsModal(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Pending Join Requests</Text>
+      {joinRequests.length === 0 ? (
+        <Text style={{ textAlign: 'center', marginTop: 20 }}>No requests.</Text>
+      ) : (
+        <FlatList
+          data={joinRequests}
+          keyExtractor={item => item._id}
+          renderItem={({ item }) => (
+            <View style={[styles.friendItem, { justifyContent: 'space-between' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+                <Text style={[styles.friendName, { marginLeft: 10 }]}>{item.name}</Text>
+              </View>
+              <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity
+                  onPress={() => handleAccept(item._id)}
+                  style={{ marginHorizontal: 5 }}
+                >
+                  <Image
+                    source={require('../icons/check.png')}
+                    style={{ width: 24, height: 24 }}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleReject(item._id)}
+                  style={{ marginHorizontal: 5 }}
+                >
+                  <Image
+                    source={require('../icons/Reject.png')}
+                    style={{ width: 24, height: 24 }}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        />
+      )}
+      <TouchableOpacity
+        style={[styles.modalCloseButton, { marginTop: 20 }]}
+        onPress={() => setShowJoinRequestsModal(false)}
+      >
+        <Text style={styles.modalCloseText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+
 
 
     </SafeAreaView>
@@ -771,20 +1149,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 15,
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '80%',
-    maxHeight: '70%',
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-  },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+
   friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   friendAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
   friendName: { fontSize: 16 },
@@ -799,23 +1164,90 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#086DC0' },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',           // increased width
+    maxHeight: '80%',       // more space for content
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 25,            // more padding
+  },
+  modalTitle: {
+    fontSize: 18, 
+    fontWeight: 'bold', 
+    marginBottom: 15, 
+    textAlign: 'center' 
+  },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   modalCloseButton: {
-    flex: 1,
     marginRight: 5,
-    padding: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     backgroundColor: '#aaa',
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
   },
   modalCreateButton: {
-    flex: 1,
     marginLeft: 5,
-    padding: 10,
+    paddingVertical: 16,    // taller buttons
+    paddingHorizontal: 20,
     backgroundColor: '#086DC0',
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  modalCloseText: { color: 'white', fontWeight: 'bold' },
-  modalCreateText: { color: 'white', fontWeight: 'bold' },
+  modalCloseText: { color: 'white', fontSize:12, fontWeight:'bold' },
+  modalCreateText: { color: 'white', fontSize:12, fontWeight:'bold'},
+  options: {
+    width: '90%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingLeft: 20,
+    marginBottom: 15
+  },
+  optionsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  iconCircle: {
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10
+  },
+  icon: { width: 16, height: 16 },
+  optionsText: { color: '#086DC0', fontSize: 15 },
+
+  // Toggle “track”
+  toggleTrack: {
+    width: 40,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#D8EDFF',
+    justifyContent: 'center',
+    position: 'relative'
+  },
+  toggleTrackActive: {
+    backgroundColor: '#086DC0'
+  },
+
+  // The little “thumb”
+  toggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    position: 'absolute',
+    top: 2
+  },
+  thumbLeft: { left: 2 },
+  thumbRight: { right: 2 },
 });

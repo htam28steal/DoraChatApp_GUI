@@ -15,59 +15,41 @@ import FriendService from "../api/friendService";
 
 export default function ListFirendScreen({ navigation }) {
     const [userId, setUserId] = useState(null);
-    const [friends, setFriends] = useState([]);
+    const [sendRequest, setSendRequest] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [selectedFriend, setSelectedFriend] = useState(null);
+    const [listInvitesWasSend, setListInvitesWasSend] = useState(null);
     const [showOptions, setShowOptions] = useState(false);
 
     useEffect(() => {
-        const fetchUserId = async () => {
-            try {
-                const storedUserId = await AsyncStorage.getItem("userId");
-                if (storedUserId) {
-                    setUserId(storedUserId);
-                } else {
-                    Alert.alert("Error", "User id not found.");
-                }
-            } catch (error) {
-                Alert.alert("Error fetching user id", error.message);
-            }
+        const loadUserId = async () => {
+            const id = await AsyncStorage.getItem("userId");
+            setUserId(id);
         };
-        fetchUserId();
+        loadUserId();
     }, []);
 
+
     useEffect(() => {
-        const fetchFriends = async () => {
+        const fetchInvites = async () => {
             try {
-                const friendsData = await FriendService.getListFriends();
-                setFriends(friendsData);
+                const data = await FriendService.getListFriendInviteMe();
+                setListInvitesWasSend(data);
             } catch (err) {
-                console.log(err);
+                console.error('Failed to fetch invites', err);
+            } finally {
+                setLoading(false);
             }
         };
-        if (userId) {
-            fetchFriends();
-        }
-    }, [userId]);
+        fetchInvites();
+    }, []);
 
-    const handleDetailPress = (friend) => {
-        if (selectedFriend && selectedFriend._id === friend._id) {
-            setShowOptions(false);
-            setSelectedFriend(null);
-        } else {
-            setSelectedFriend(friend);
-            setShowOptions(true);
-        }
-    };
-
-    const handleDeleteFriend = async (friendId) => {
+    const handleThuHoi = async (userId) => {
         try {
-            await FriendService.deleteFriend(friendId);
-            Alert.alert("Success", "Friend deleted!");
-            const updatedList = friends.filter(friend => friend._id !== friendId);
-            setFriends(updatedList);
+            await FriendService.deleteInviteWasSend(userId);
+            setListInvitesWasSend((prev) => prev.filter((invite) => invite._id !== userId));
         } catch (error) {
-            Alert.alert("Error", "Failed to delete friend");
+            console.error('Lỗi khi thu hồi lời mời:', error);
+            Alert.alert('Lỗi', 'Không thể thu hồi lời mời. Vui lòng thử lại.');
         }
     };
 
@@ -87,25 +69,10 @@ export default function ListFirendScreen({ navigation }) {
                 <Text style={styles.email}>{item.username}</Text>
 
                 <View style={styles.fbtn}>
-                    <TouchableOpacity style={styles.btnDetail} onPress={() => handleDetailPress(item)}>
-                        <Image
-                            source={require('../icons/detail.png')}
-                            style={styles.iconDetail}
-                        />
-                    </TouchableOpacity>
+                    <TouchableOpacity style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }} onPress={() => { handleThuHoi(item._id) }}><Text style={{ color: 'white', fontWeight: 400 }}>Chờ xác nhận</Text></TouchableOpacity>
                 </View>
             </View>
-            {showOptions && selectedFriend && selectedFriend._id === item._id && (
-                <View style={styles.popupContainer}>
-                    <TouchableOpacity style={styles.popupItem} onPress={() => handleDeleteFriend(item._id)}>
-                        <Text style={styles.popupText}>❌ Xóa kết bạn</Text>
-                    </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.popupItem} onPress={() => setShowOptions(false)}>
-                        <Text style={styles.popupText}>Đóng</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
         </TouchableOpacity>
     );
 
@@ -120,13 +87,13 @@ export default function ListFirendScreen({ navigation }) {
 
             <View style={styles.fcontent}>
                 <View style={styles.fcontrol}>
-                    <View style={styles.fFriendList}>
+                    <TouchableOpacity style={styles.fFriendList} onPress={() => { navigation.navigate("FriendList_Screen") }}>
                         <Image
                             source={require('../icons/friend.png')}
                             style={styles.icons}
                         />
                         <Text style={styles.txtfriendlist}>Friend list</Text>
-                    </View>
+                    </TouchableOpacity>
 
                     <TouchableOpacity style={styles.fRequest} onPress={() => navigation.navigate("ListRequestFriend")}>
                         <Image
@@ -157,7 +124,7 @@ export default function ListFirendScreen({ navigation }) {
 
             <View style={styles.fListFriend}>
                 <FlatList
-                    data={friends}
+                    data={listInvitesWasSend}
                     renderItem={renderFriend}
                     keyExtractor={(item) => item._id}
                     ListEmptyComponent={<Text>No friends found.</Text>}
@@ -338,11 +305,15 @@ const styles = StyleSheet.create({
     },
     fbtn: {
         position: 'absolute',
-        width: 13,
+        width: 120,
         height: 30,
         justifyContent: 'center',
         right: 0,
         top: 5,
+        alignItems: 'center',
+        borderRadius: 30,
+        backgroundColor: 'grey',
+        borderWidth: 1
     },
     btnDetail: {
         width: 8,

@@ -14,6 +14,7 @@ import axios from '../api/apiConfig';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 
 const Add = require('../icons/plus.png');
 
@@ -27,6 +28,98 @@ export default function GroupsScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
   const [groupName, setGroupName] = useState('');
   const [userId, setUserId] = useState(null);
+
+
+  const fetchAllConversations = useCallback(async () => {
+    console.log('🔄 fetchAllConversations() start');
+    try {
+      const { data } = await axios.get('/api/conversations');
+      console.log('✅ fetchAllConversations() got:', data.map(c => c._id));
+      setConversations(data);
+    } catch (err) {
+      console.error('❌ fetchAllConversations() error:', err);
+    }
+  }, []);
+  
+  useEffect(() => {
+    fetchAllConversations();
+  }, [fetchAllConversations]);
+  
+
+  useEffect(() => {
+    (async () => {
+      const id = await AsyncStorage.getItem('userId');
+      console.log('ℹ️ Loaded userId:', id);
+      setUserId(id);
+    })();
+  }, []);
+  // 3️⃣ on mount: fetch & wire up socket
+   // Run once on mount
+   useEffect(() => {
+    console.log('🌐 Setting up socket listeners…');
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+
+    const onNew        = () => { console.log('📥 SOCKET NEW_GROUP_CONVERSATION'); fetchAllConversations(); };
+    const onDisband    = () => { console.log('📥 SOCKET DISBANDED_CONVERSATION');   fetchAllConversations(); };
+    const onLeave      = () => { console.log('📥 SOCKET LEAVE_CONVERSATION');       fetchAllConversations(); };
+
+    socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
+    socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
+    socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
+
+    return () => {
+      socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
+      socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
+      socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
+    };
+  }, [fetchAllConversations]);
+  
+  
+  
+  useEffect(() => {
+    // 1️⃣ Debug: log connection state
+    console.log("🧪 socket.connected:", socket.connected);
+    socket.on("connect", () => console.log("✅ socket connected"));
+    socket.on("disconnect", () => console.log("❌ socket disconnected"));
+  
+    // 2️⃣ Debug: catch every event
+    socket.onAny((event, payload) => {
+      console.log("📡 socket.onAny:", event, payload);
+    });
+  
+    // 3️⃣ Handle disbanded-conversation
+    const handleDisband = ({ conversationId }) => {
+      console.log("📥 Received disbanded-conversation:", conversationId);
+      setConversations(prev => {
+        const updated = prev.filter(c => c._id !== conversationId);
+        console.log("🧹 After filter:", updated.map(c => c._id));
+        console.log(updated);
+        return updated;
+      });
+    };
+    console.log("🔌 Subscribing to DISBANDED_CONVERSATION");
+    socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
+  
+    // 4️⃣ Join the global feed
+    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+  
+    return () => {
+      console.log("🛑 Unsubscribing from DISBANDED_CONVERSATION");
+      socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
+      socket.offAny();
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('⚡️ Screen focused – re-fetching conversations');
+      fetchAllConversations();
+    }, [fetchAllConversations])
+  );
+
+  
+  
+  
 
   const receiveConversation = useCallback((payload) => {
     const newConv = payload.conversation || payload;
@@ -149,44 +242,43 @@ export default function GroupsScreen({ navigation }) {
     );
   };
 
- const createGroup = async () => {
-  if (!selectedFriendIds.length || !groupName) return;
-
-  try {
-    setCreatingGroup(true);
-
-    // hit your API
-    const res = await axios.post('/api/conversations/groups', {
-      name:    groupName,
-      members: selectedFriendIds,
-    });
-
-    // build a new convo object that definitely has a name
-    const newConv = {
-      _id:     res.data._id,
-      name:    res.data.name    || groupName,
-      members: res.data.members || selectedFriendIds,
-      // …spread in any other fields your UI needs…
-    };
-
-    // prepend it
-    setConversations(prev => [newConv, ...prev]);
-
-    // notify everyone else (and yourself on other devices)
-    socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
-
-    // reset
-    setSelectedFriendIds([]);
-    setGroupName('');
-    setModalVisible(false);
-  } catch (err) {
-    console.error('Failed to create group:', err);
-    Alert.alert('Error', 'Could not create group');
-  } finally {
-    setCreatingGroup(false);
-  }
-};
-
+  const createGroup = async () => {
+    const trimmedName = groupName.trim();
+    if (!trimmedName) {
+      Alert.alert('Error', 'Group name cannot be blank.');
+      return;
+    }
+    if (!groupName) return;
+  
+    try {
+      setCreatingGroup(true);
+  
+      const res = await axios.post('/api/conversations/groups', {
+        name: trimmedName,
+        members: selectedFriendIds,
+      });
+  
+      const newConv = {
+        _id: res.data._id,
+        name: res.data.name || trimmedName,
+        members: res.data.members || selectedFriendIds,
+      };
+  
+      // ✅ Just emit to others (and yourself)
+      socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
+  
+      // ✅ Reset modal state
+      setSelectedFriendIds([]);
+      setGroupName('');
+      setModalVisible(false);
+    } catch (err) {
+      console.error('Failed to create group:', err);
+      Alert.alert('Error', 'Could not create group');
+    } finally {
+      setCreatingGroup(false);
+    }
+  };
+  
 
   const renderConversation = useCallback(
     ({ item: group }) => {
@@ -196,7 +288,7 @@ export default function GroupsScreen({ navigation }) {
       return (
         <TouchableOpacity
           onPress={() =>
-            navigation.navigate('GroupDetailScreen', { conversationId: group._id })
+            navigation.navigate('ChatGroupScreen', { conversationId: group._id })
           }
         >
           <View style={styles.fMessage}>
@@ -205,22 +297,22 @@ export default function GroupsScreen({ navigation }) {
               {members.length > 0 ? (
                 <>
                   <View style={styles.fRowOne}>
-                    {members.slice(0, 2).map((memberId, idx) => {
-                      const member = friendsById[memberId];
-                      return (
-                        <View
-                          style={styles.favatarG}
-                          key={`${group._id}-avatar-${memberId || 'unknown'}-${idx}`}
-
-                        >
-                          {member?.avatar ? (
-                            <Image source={{ uri: member.avatar }} style={styles.imgAG} />
-                          ) : (
-                            <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
-                          )}
-                        </View>
-                      );
-                    })}
+                  {members.slice(0, 2).map((memberId, idx) => {
+  if (!memberId) return null;
+  const member = friendsById[memberId];
+  return (
+    <View
+      style={styles.favatarG}
+      key={`${group._id}-avatar-${memberId}-${idx}`}
+    >
+      {member?.avatar ? (
+        <Image source={{ uri: member.avatar }} style={styles.imgAG} />
+      ) : (
+        <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
+      )}
+    </View>
+  );
+})}
                   </View>
                   <View style={styles.fRowTwo}>
                     {members[2] && (
@@ -300,6 +392,9 @@ export default function GroupsScreen({ navigation }) {
         <TouchableOpacity style={styles.btnFillter}>
           <Text style={styles.txtFillter}>Favourite</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.btnFillter}>
+          <Text style={styles.txtFillter}>Requests</Text>
+        </TouchableOpacity>
       </View>
 
       {conversations.length === 0 ? (
@@ -331,9 +426,6 @@ export default function GroupsScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnTag}>
           <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.avatarFooter}>
-          <Image source={require('../Images/nike.png')} style={styles.imgAva} />
         </TouchableOpacity>
       </View>
 
@@ -387,16 +479,20 @@ export default function GroupsScreen({ navigation }) {
                 <Text style={styles.modalCloseText}>Close</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalCreateButton, (!groupName || creatingGroup) && { backgroundColor: '#ccc' }]}
-                onPress={createGroup}
-                disabled={!groupName || creatingGroup}
-              >
-                {creatingGroup ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.modalCreateText}>Create Group</Text>
-                )}
-              </TouchableOpacity>
+  style={[
+    styles.modalCreateButton,
+    (creatingGroup || !groupName.trim()) && { backgroundColor: '#ccc' }
+  ]}
+  onPress={createGroup}
+  disabled={creatingGroup || !groupName.trim()}
+>
+  {creatingGroup
+    ? <ActivityIndicator size="small" color="white" />
+    : <Text style={styles.modalCreateText}>Create Group</Text>
+  }
+</TouchableOpacity>
+
+
             </View>
           </View>
         </View>
