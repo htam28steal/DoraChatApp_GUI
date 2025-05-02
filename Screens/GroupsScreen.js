@@ -67,6 +67,29 @@ const [editingConversations, setEditingConversations] = useState([]);
   const [convPickerVisible, setConvPickerVisible] = useState(false);
   const [allConversations, setAllConversations] = useState([]);
 
+  const [selectedFilters, setSelectedFilters] = useState([]);
+
+
+  const toggleFilter = useCallback(id => {
+    setSelectedFilters(prev =>
+      prev.includes(id)
+        ? prev.filter(x => x !== id)
+        : [...prev, id]
+    );
+  }, []);
+
+  const filteredConversations = useMemo(() => {
+    if (selectedFilters.length === 0) return conversations;
+    // collect all conversationIds from every checked tag
+    const allIds = selectedFilters.flatMap(tagId => {
+      const tag = classifies.find(c => c._id === tagId);
+      return tag?.conversationIds || [];
+    });
+    const uniq = [...new Set(allIds)];
+    return conversations.filter(c => uniq.includes(c._id));
+  }, [conversations, classifies, selectedFilters]);
+    
+
   const selectedList = editTagModalVisible
   ? editingConversations
   : assignedConversations;
@@ -157,7 +180,12 @@ const createTag = async () => {
       conversationIds: assignedConversations,
     };
     const { data } = await axios.post('/api/classifies', body);
+
+
     console.log('✅ Added new classify:', data);
+
+    const { data: latest } = await axios.get('/api/classifies');
+    setClassifies(latest);
 
     // Reset form state
     setNewTagName('');
@@ -630,7 +658,7 @@ const createTag = async () => {
           <FlatList
             style={styles.fListFriend}
             contentContainerStyle={{ paddingVertical: 5 }}
-            data={conversations}
+            data={filteredConversations}
             keyExtractor={(item, index) =>
               normalizeId(item._id) || index.toString()
             }
@@ -775,24 +803,36 @@ const createTag = async () => {
       <View style={styles.classifyModal}>
         <Text style={styles.modalTitle}>Theo thẻ phân loại</Text>
         <FlatList
-    data={classifies}
-    keyExtractor={c => c._id?.$oid || c._id}
-    ItemSeparatorComponent={() => <View style={styles.separator} />}
-    renderItem={({ item }) => {
-      console.log("🧾 Rendering classify item:", item);
-      return (
-        <TouchableOpacity style={styles.classifyRow}>
-          <View
-            style={[
-              styles.colorDot,
-              { backgroundColor: item.color?.code || '#ccc' }
-            ]}
-          />
-          <Text style={styles.classifyLabel}>{item.name}</Text>
-        </TouchableOpacity>
-      );
-    }}
-  />
+  data={classifies}
+  keyExtractor={c => c._id}
+  ItemSeparatorComponent={() => <View style={styles.separator} />}
+  renderItem={({ item }) => {
+    const isChecked = selectedFilters.includes(item._id);
+    return (
+      <TouchableOpacity
+        style={styles.classifyRow}
+        onPress={() => toggleFilter(item._id)}
+      >
+        {/* simple square checkbox */}
+        <View
+          style={[
+            styles.checkbox,
+            isChecked && styles.checkboxChecked
+          ]}
+        />
+        {/* your colored dot */}
+        <View
+          style={[
+            styles.colorDot,
+            { backgroundColor: item.color?.code || '#ccc' }
+          ]}
+        />
+        <Text style={styles.classifyLabel}>{item.name}</Text>
+      </TouchableOpacity>
+    );
+  }}
+/>
+
 
         <View style={styles.separator} />
         <TouchableOpacity
@@ -1410,6 +1450,18 @@ const createTag = async () => {
         borderRadius: 4,
         alignSelf: 'flex-end',
       },
+      checkbox: {
+        width: 20,
+        height: 20,
+        borderWidth: 1,
+        borderColor: '#333',
+        borderRadius: 3,
+        marginRight: 8,
+      },
+      checkboxChecked: {
+        backgroundColor: '#333',
+      },
+      
       
       
       
