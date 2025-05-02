@@ -9,6 +9,7 @@
     Image,
     Modal,
     ActivityIndicator,
+    Alert
   } from 'react-native';
   import axios from '../api/apiConfig';
   import { socket } from "../utils/socketClient";
@@ -45,6 +46,13 @@
   const [newTagName, setNewTagName] = useState('');
   const [selectedColorId, setSelectedColorId] = useState(null);
   const [assignedConversations, setAssignedConversations] = useState([]);
+  // at the top of your component, alongside your other useState calls:
+const [editTagModalVisible, setEditTagModalVisible] = useState(false);
+const [editingId, setEditingId] = useState(null);
+const [editingName, setEditingName] = useState('');
+const [editingColorId, setEditingColorId] = useState(null);
+const [editingConversations, setEditingConversations] = useState([]);
+
 
 
     const [classifyModalVisible, setClassifyModalVisible] = useState(false);
@@ -59,7 +67,74 @@
   const [convPickerVisible, setConvPickerVisible] = useState(false);
   const [allConversations, setAllConversations] = useState([]);
 
+  const selectedList = editTagModalVisible
+  ? editingConversations
+  : assignedConversations;
 
+
+  const loadColors = async () => {
+    try {
+      const { data } = await axios.get('/api/colors');
+      setColors(data);
+    } catch (err) {
+      console.error('❌ Failed to load colors', err);
+      Alert.alert('Lỗi', 'Không thể tải danh sách màu.');
+    }
+  };
+// call this when the ✎ button is pressed
+const openEditTagModal = async (item) => {
+  await loadColors();
+  setEditingId(item._id);
+  setEditingName(item.name);
+  // if your classify objects actually come back with `color._id`:
+  setEditingColorId(item.color?._id || item.colorId);
+  setEditingConversations(item.conversationIds || []);
+  setEditTagModalVisible(true);
+};
+
+// call this when “Cập nhật” is pressed
+const updateTag = async () => {
+  if (!editingName.trim()) {
+    return Alert.alert('Lỗi', 'Tên không được để trống.');
+  }
+  if (!editingColorId) {
+    return Alert.alert('Lỗi', 'Vui lòng chọn màu.');
+  }
+  if (editingConversations.length === 0) {
+    return Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 1 hội thoại.');
+  }
+  try {
+    const body = {
+      name: editingName.trim(),
+      colorId: editingColorId,
+      conversationIds: editingConversations,
+    };
+    const { data } = await axios.put(`/api/classifies/${editingId}`, body);
+    const { data: latest } = await axios.get('/api/classifies');
+    setClassifies(latest);
+
+    setEditTagModalVisible(false);
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Lỗi', 'Cập nhật thất bại.');
+  }
+};
+
+
+// ✂️ somewhere near createTag…
+const deleteClassify = async (id) => {
+  try {
+    await axios.delete(`/api/classifies/${id}`);
+    console.log('🗑️ Deleted classify:', id);
+    // remove it from local state so UI updates immediately
+    setClassifies(prev => prev.filter(c => c._id !== id));
+  } catch (err) {
+    console.error('❌ Failed to delete classify:', err);
+    Alert.alert('Lỗi', 'Không thể xóa thẻ phân loại.');
+  }
+};
+
+  
   // ✏️ createTag: validate + POST
 const createTag = async () => {
   const name = newTagName.trim();
@@ -109,11 +184,19 @@ const createTag = async () => {
     }
   };
   const toggleAssignConversation = (convId) => {
+    if (editTagModalVisible) {
+      setEditingConversations(prev =>
+        prev.includes(convId)
+          ? prev.filter(id => id !== convId)
+          : [...prev, convId]
+      );
+    } else {
     setAssignedConversations(prev =>
       prev.includes(convId)
         ? prev.filter(id => id !== convId)
         : [...prev, convId]
     );
+  }
   };
 
 
@@ -749,23 +832,35 @@ const createTag = async () => {
           </TouchableOpacity>
         </View>
         <FlatList
-          data={classifies}
-          keyExtractor={c => c._id}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({item}) => (
-            <View style={styles.manageRow}>
-              <View style={[styles.colorDot, {backgroundColor: item.color.code}]} />
-              <Text style={styles.classifyLabel}>{item.name}</Text>
-              <View style={styles.manageActions}>
-                <TouchableOpacity onPress={() => {/* TODO: edit */}}>
-                  <Image source={require('../icons/edit.png')} style={styles.actionIcon}/>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => {/* TODO: delete */}}>
-                  <Image source={require('../icons/Trash.png')} style={styles.actionIcon}/>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+  data={classifies}
+  keyExtractor={c => c._id}
+  ItemSeparatorComponent={() => <View style={styles.separator} />}
+  renderItem={({ item }) => (
+    <View style={styles.manageRow}>
+      <View style={[styles.colorDot, { backgroundColor:item.color?.code ?? '#ccc' }]} />
+      <Text style={styles.classifyLabel}>{item.name}</Text>
+      <View style={styles.manageActions}>
+        <TouchableOpacity onPress={() => openEditTagModal(item)}>
+          <Image source={require('../icons/edit.png')} style={styles.actionIcon}/>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert(
+              'Xác nhận xóa',
+              `Bạn có chắc muốn xóa thẻ "${item.name}"?`,
+              [
+                { text: 'Hủy', style: 'cancel' },
+                { text: 'Xóa', style: 'destructive', onPress: () => deleteClassify(item._id) }
+              ]
+            )
+          }
+        >
+          <Image source={require('../icons/Trash.png')} style={styles.actionIcon}/>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )}
+
         />
         <TouchableOpacity
           style={styles.addTagButton}
@@ -856,20 +951,22 @@ const createTag = async () => {
       <View style={styles.pickerModal}>
         <Text style={styles.manageTitle}>Chọn hội thoại</Text>
         <FlatList
-          data={allConversations}
-          keyExtractor={c => c._id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.classifyRow}
-              onPress={() => toggleAssignConversation(item._id)}
-            >
-              <Text style={{ flex: 1 }}>{item.name}</Text>
-              {assignedConversations.includes(item._id) && (
-                <Text>✓</Text>
-              )}
-            </TouchableOpacity>
-          )}
-        />
+  data={allConversations}
+  keyExtractor={c => c._id}
+  renderItem={({ item }) => {
+    const isSelected = selectedList.includes(item._id);
+    return (
+      <TouchableOpacity
+        style={styles.classifyRow}
+        onPress={() => toggleAssignConversation(item._id)}
+      >
+        <Text style={{ flex: 1 }}>{item.name}</Text>
+        {isSelected && <Text>✓</Text>}
+      </TouchableOpacity>
+    );
+  }}
+/>
+
         <TouchableOpacity
           style={[styles.confirmButton, { marginTop: 12 }]}
           onPress={() => setConvPickerVisible(false)}
@@ -879,6 +976,72 @@ const createTag = async () => {
       </View>
     </View>
   </Modal>
+  <Modal
+  visible={editTagModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setEditTagModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.addTagModal}>
+      <View style={styles.manageHeader}>
+        <Text style={styles.manageTitle}>Cập nhật thẻ phân loại</Text>
+        <TouchableOpacity onPress={() => setEditTagModalVisible(false)}>
+          <Image source={require('../icons/Reject.png')} style={styles.closeIcon} />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.label}>Tên thẻ *</Text>
+      <TextInput
+        style={styles.input}
+        value={editingName}
+        onChangeText={setEditingName}
+      />
+
+      <Text style={styles.label}>Chọn màu *</Text>
+      <View style={{ flexDirection: 'row', marginVertical: 8 }}>
+        {colors.map(c => (
+          <TouchableOpacity
+            key={c._id}
+            onPress={() => setEditingColorId(c._id)}
+            style={[
+              styles.colorOption,
+              editingColorId === c._id && styles.colorOptionSelected,
+              { backgroundColor: c.code }
+            ]}
+          />
+        ))}
+      </View>
+
+      <Text style={styles.label}>Gán hội thoại</Text>
+      <View style={styles.assignSection}>
+        <Text style={{ color: '#999' }}>
+          {editingConversations.length === 0
+            ? 'Chưa chọn hội thoại nào'
+            : `${editingConversations.length} hội thoại đã chọn`}
+        </Text>
+        <TouchableOpacity onPress={openConvPicker}>
+          <Text style={styles.addTagText}>Thêm hội thoại</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={() => setEditTagModalVisible(false)}
+        >
+          <Text>Hủy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={updateTag}
+        >
+          <Text style={{ color: 'white' }}>Cập nhật</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
 
 
 
