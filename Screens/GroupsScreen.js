@@ -300,69 +300,97 @@ const createTag = async () => {
     
 
     useEffect(() => {
-      (async () => {
-        const id = await AsyncStorage.getItem('userId');
-        console.log('ℹ️ Loaded userId:', id);
-        setUserId(id);
-      })();
-    }, []);
-    // 3️⃣ on mount: fetch & wire up socket
-    // Run once on mount
-    useEffect(() => {
-      console.log('🌐 Setting up socket listeners…');
+      // 🔧 Debug: am I connected?
+      socket.on('connect', () => console.log('✅ socket connected'));
+      socket.on('disconnect', () => console.log('❌ socket disconnected'));
+    
+      // 🔧 Debug: log every incoming event
+      socket.onAny((event, payload) => {
+        console.log('📡 socket.onAny:', event, payload);
+      });
+    
+      // 🔌 Subscribe to global list updates
       socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-
-      const onNew        = () => { console.log('📥 SOCKET NEW_GROUP_CONVERSATION'); fetchAllConversations(); };
-      const onDisband    = () => { console.log('📥 SOCKET DISBANDED_CONVERSATION');   fetchAllConversations(); };
-      const onLeave      = () => { console.log('📥 SOCKET LEAVE_CONVERSATION');       fetchAllConversations(); };
-
+      console.log('📡 Emitted JOIN_CONVERSATIONS');
+    
+      // 🔔 NEW GROUP → prepend it
+      const onNew = payload => {
+        console.log('📥 NEW_GROUP_CONVERSATION:', payload);
+        fetchAllConversations();
+      };
       socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
-      socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
+    
+      // 🔔 LEAVE → refetch
+      const onLeave = payload => {
+        console.log('📥 LEAVE_CONVERSATION:', payload);
+        fetchAllConversations();
+      };
       socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
-
+    
+      // 🔔 DISBAND → remove locally
+      const onDisband = ({ conversationId }) => {
+        console.log('📥 CONVERSATION_DISBANDED:', conversationId);
+        setConversations(prev =>
+          prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId))
+        );
+      };
+      socket.on(SOCKET_EVENTS.CONVERSATION_DISBANDED, onDisband);
+    
       return () => {
+        socket.off('connect');
+        socket.off('disconnect');
+        socket.offAny();
         socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
-        socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
         socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
+        socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, onDisband);
       };
     }, [fetchAllConversations]);
     
+
+    useEffect(() => {
+      if (conversations.length === 0) return;
+      console.log('🔌 joining individual conversation rooms…');
+      conversations.forEach(conv => {
+        socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conv._id);
+        console.log('📡 JOIN_CONVERSATION:', conv._id);
+      });
+    }, [conversations]);
+    
     
     
     useEffect(() => {
-      // 1️⃣ Debug: log connection state
-      console.log("🧪 socket.connected:", socket.connected);
-      socket.on("connect", () => console.log("✅ socket connected"));
-      socket.on("disconnect", () => console.log("❌ socket disconnected"));
+      console.log("🧩 Mount: setting up CONVERSATION_DISBANDED listener");
     
-      // 2️⃣ Debug: catch every event
-      socket.onAny((event, payload) => {
-        console.log("📡 socket.onAny:", event, payload);
-      });
+      // Join conversations room (broadcast updates to the user)
+      socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+      console.log("📡 Emitted JOIN_CONVERSATIONS");
     
-      // 3️⃣ Handle disbanded-conversation
       const handleDisband = ({ conversationId }) => {
-        console.log("📥 Received disbanded-conversation:", conversationId);
+        console.log("📥 Received CONVERSATION_DISBANDED:", conversationId);
+    
+        if (!conversationId) {
+          console.warn("⚠️ Missing conversationId in CONVERSATION_DISBANDED payload");
+          return;
+        }
+    
         setConversations(prev => {
-          const updated = prev.filter(c => c._id !== conversationId);
-          console.log("🧹 After filter:", updated.map(c => c._id));
-          console.log(updated);
+          const updated = prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId));
+          console.log(`🧹 Removed disbanded conversation. Remaining:`, updated.map(c => c._id));
           return updated;
         });
       };
-      console.log("🔌 Subscribing to DISBANDED_CONVERSATION");
-      socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
     
-      // 4️⃣ Join the global feed
-      socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+      socket.on(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
+      console.log("✅ Subscribed to CONVERSATION_DISBANDED");
     
       return () => {
-        console.log("🛑 Unsubscribing from DISBANDED_CONVERSATION");
-        socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
-        socket.offAny();
+        socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
+        console.log("🛑 Unsubscribed from CONVERSATION_DISBANDED");
       };
     }, []);
 
+
+    
     useFocusEffect(
       useCallback(() => {
         console.log('⚡️ Screen focused – re-fetching conversations');
@@ -640,8 +668,11 @@ const createTag = async () => {
         </View>
 
         <View style={styles.fFillter}>
-          <TouchableOpacity style={styles.btnFillter}>
-            <Text style={styles.txtFillter}>All</Text>
+          <TouchableOpacity
+           style={styles.btnFillter} 
+         
+           >
+            <Text style={styles.txtFillter}>Messages</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnFillter}>
             <Text style={styles.txtFillter}>Unread</Text>
@@ -673,7 +704,10 @@ const createTag = async () => {
 
         {/* FOOTER */}
         <View style={styles.fFooter}>
-          <TouchableOpacity style={styles.btnTags}>
+          <TouchableOpacity 
+            style={styles.btnTags}
+
+          >
             <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
