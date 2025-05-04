@@ -127,7 +127,7 @@ function AppContainer() {
           options={{ headerShown: false }}
 
         />
-         <Stack.Screen
+        <Stack.Screen
           name="MediaScreen"
           component={Media}
           options={{ headerShown: false }}
