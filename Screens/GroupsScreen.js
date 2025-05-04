@@ -79,15 +79,23 @@ const [editingConversations, setEditingConversations] = useState([]);
   }, []);
 
   const filteredConversations = useMemo(() => {
-    if (selectedFilters.length === 0) return conversations;
-    // collect all conversationIds from every checked tag
-    const allIds = selectedFilters.flatMap(tagId => {
-      const tag = classifies.find(c => c._id === tagId);
-      return tag?.conversationIds || [];
-    });
-    const uniq = [...new Set(allIds)];
-    return conversations.filter(c => uniq.includes(c._id));
+    // start from all conversations
+    let convs = conversations;
+  
+    // apply your existing “tag” filters
+    if (selectedFilters.length > 0) {
+      const allIds = selectedFilters.flatMap(tagId => {
+        const tag = classifies.find(c => c._id === tagId);
+        return tag?.conversationIds || [];
+      });
+      const uniq = [...new Set(allIds)];
+      convs = convs.filter(c => uniq.includes(c._id));
+    }
+  
+    // *** NEW: only keep those with type === true ***
+    return convs.filter(c => c.type === true);
   }, [conversations, classifies, selectedFilters]);
+  
     
 
   const selectedList = editTagModalVisible
@@ -637,9 +645,6 @@ const createTag = async () => {
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnFillter}>
             <Text style={styles.txtFillter}>Unread</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnFillter}>
-            <Text style={styles.txtFillter}>Favourite</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnFillter} onPress={openClassifyModal}>
     <Text style={styles.txtFillter}>Classify</Text>
