@@ -345,6 +345,8 @@ const createTag = async () => {
         socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, onDisband);
       };
     }, [fetchAllConversations]);
+
+
     
 
     useEffect(() => {
@@ -356,6 +358,34 @@ const createTag = async () => {
       });
     }, [conversations]);
     
+    // after you’ve joined each room…
+useEffect(() => {
+  const onNameUpdated = ({ conversationId: convId, newName, name }) => {
+    // payload might come in as `name` or `newName`
+    const updatedName = newName ?? name;
+    setConversations(prev =>
+      prev.map(c =>
+        c._id === convId
+          ? { ...c, name: updatedName }
+          : c
+      )
+    );
+  };
+
+  socket.on(
+    SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+    onNameUpdated
+  );
+  console.log('✅ Subscribed to UPDATE_NAME_CONVERSATION in GroupsScreen');
+
+  return () => {
+    socket.off(
+      SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+      onNameUpdated
+    );
+  };
+}, [socket, setConversations]);
+
     
     
     useEffect(() => {

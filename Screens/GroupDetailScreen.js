@@ -53,6 +53,10 @@ const filteredGroupMembers = useMemo(() => {
   );
 }, [groupMembers, memberSearchText]);
 
+useEffect(() => {
+  // ask the server to put us in the right room
+  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId });
+}, [conversationId]);
 
 useEffect(() => {
   const onMemberRemoved = ({ conversationId: convId, userId: removedUserId }) => {
@@ -70,6 +74,26 @@ useEffect(() => {
     socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onMemberRemoved);
   };
 }, [conversationId]);
+
+useEffect(() => {
+  const onNameUpdated = ({ conversationId: convId, newName, name }) => {
+    if (convId !== conversationId) return;
+    // newName if present, otherwise fallback to name
+    setGroupName(newName ?? name);
+  };
+
+  socket.on(
+    SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+    onNameUpdated
+  );
+  return () => {
+    socket.off(
+      SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+      onNameUpdated
+    );
+  };
+}, [conversationId]);
+
 
 
 useEffect(() => {
@@ -172,6 +196,10 @@ const handleSaveName = async () => {
     { name: trimmed }
   );
   setGroupName(trimmed);
+  socket.emit(
+    SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+    { conversationId, newName: trimmed }
+  );
   setIsEditingName(false);
 };
 const fetchGroupCurrentMembers = async () => {
@@ -1167,7 +1195,7 @@ const fetchGroupCurrentMembers = async () => {
         <FlatList
           data={filteredGroupMembers}
           keyExtractor={item => item.userId}
-
+          extraData={groupMembers}   
           renderItem={({ item }) => (
             <View style={styles.friendItem}>
               <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
