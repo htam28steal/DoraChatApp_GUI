@@ -204,11 +204,19 @@ const createTag = async () => {
 
   const openConvPicker = async () => {
     try {
-      const { data } = await axios.get('/api/conversations');
-      setAllConversations(data);
+      const [ convRes, friendRes ] = await Promise.all([
+        axios.get('/api/conversations'),
+        axios.get('/api/friends')
+     
+      ]);
+      console.log('📥 openConvPicker loaded conversations:', convRes.data);
+      console.log('📥 openConvPicker loaded memberships:', friendRes.data);
+      setAllConversations(convRes.data);
+      setFriends(friendRes.data);
       setConvPickerVisible(true);
     } catch (err) {
-      console.error('❌ Failed to load conversations', err);
+      console.error('❌ Failed to load conversations or friends', err);
+      Alert.alert('Lỗi', 'Không thể tải danh sách hội thoại.');
     }
   };
   const toggleAssignConversation = (convId) => {
@@ -501,11 +509,15 @@ useEffect(() => {
     
 
 
-    const friendsById = useMemo(() => {
-      const map = {};
-      friends.forEach(user => (map[user._id] = user));
-      return map;
-    }, [friends]);
+      const friendsById = useMemo(() => {
+        console.log('🗺️ building friendsById map from memberships:', friends);
+          const map = {};
+          friends.forEach(f => {
+            map[normalizeId(f._id)] = f;
+          });
+          console.log('🗺️ friendsById:', map);
+          return map;
+        }, [friends]);
     
     useEffect(() => {
       const fetchConversations = async () => {
@@ -1035,15 +1047,27 @@ useEffect(() => {
         <Text style={styles.manageTitle}>Chọn hội thoại</Text>
         <FlatList
   data={allConversations}
-  keyExtractor={c => c._id}
+  keyExtractor={c => normalizeId(c._id)}
   renderItem={({ item }) => {
-    const isSelected = selectedList.includes(item._id);
+         const isSelected = selectedList.includes(item._id);
+
+     // if it's a one‐on‐one chat (type=false), show the other member's name
+             let displayName;
+             if (item.type) {
+               // group
+               displayName = item.name;
+             } else {
+               // single chat → find the membership whose userId ≠ current user
+                         const otherMember = item.members.find(m => m.userId !== userId);
+                         console.log('🌟 otherMember for convo', item._id, otherMember);
+                         displayName = otherMember?.name || 'Unknown';
+             }
     return (
       <TouchableOpacity
         style={styles.classifyRow}
         onPress={() => toggleAssignConversation(item._id)}
       >
-        <Text style={{ flex: 1 }}>{item.name}</Text>
+        <Text style={{ flex: 1 }}>{displayName}</Text>
         {isSelected && <Text>✓</Text>}
       </TouchableOpacity>
     );

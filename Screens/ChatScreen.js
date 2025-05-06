@@ -354,7 +354,7 @@ const messageInputStyles = StyleSheet.create({
 /**
  * Header Component for the chat screen.
  */
-function HeaderSingleChat({ handleDetail }) {
+function HeaderSingleChat({ conversationId  }) {
   const navigation = useNavigation();
   return (
     <View style={headerStyles.container}>
@@ -376,7 +376,7 @@ function HeaderSingleChat({ handleDetail }) {
         <TouchableOpacity style={headerStyles.iconButton}>
           <Image source={VideoCallIcon} style={headerStyles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={headerStyles.iconButton} onPress={handleDetail}>
+        <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('DetailScreen', { conversationId })}>
           <Image source={DetailChatIcon} style={headerStyles.icon} />
         </TouchableOpacity>
       </View>

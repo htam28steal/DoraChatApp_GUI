@@ -48,6 +48,7 @@ export default function ConversationScreen({ navigation }) {
       const [classifyMenuVisible, setClassifyMenuVisible] = useState(false);
       const [classifyOptionsVisible, setClassifyOptionsVisible] = useState(false);
       const [targetConversationId, setTargetConversationId] = useState(null);
+      const [friends, setFriends] = useState([]);
 
 
       useEffect(() => {
@@ -57,6 +58,35 @@ export default function ConversationScreen({ navigation }) {
         })();
       }, []);
       
+      const friendsById = useMemo(() => {
+        const map = {};
+        friends.forEach(f => {
+          const key = f.userId ? f.userId : f._id;
+          map[key] = f;
+        });
+        return map;
+      }, [friends]);
+    
+        // load conversations and userId on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const storedUserId = await AsyncStorage.getItem('userId');
+        setUserId(storedUserId);
+        const res = await axios.get('/api/conversations', { params: { userId: storedUserId } });
+        const onlyFalse = Array.isArray(res.data)
+          ? res.data.filter(c => c.type === false)
+          : [];
+        setConversations(onlyFalse);
+        setFiltered(onlyFalse);
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'Could not load conversations.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
       
         const toggleFilter = useCallback(id => {
           setSelectedFilters(prev =>
@@ -198,15 +228,20 @@ export default function ConversationScreen({ navigation }) {
         }
       };
       
-        const openConvPicker = async () => {
-          try {
-            const { data } = await axios.get('/api/conversations');
-            setAllConversations(data);
-            setConvPickerVisible(true);
-          } catch (err) {
-            console.error('❌ Failed to load conversations', err);
-          }
-        };
+      const openConvPicker = async () => {
+        try {
+          const [convRes, friendRes] = await Promise.all([
+            axios.get('/api/conversations'),
+            axios.get('/api/friends')
+          ]);
+          setAllConversations(convRes.data);
+          setFriends(friendRes.data);
+          setConvPickerVisible(true);
+        } catch (err) {
+          console.error('❌ Failed to load conversations or friends', err);
+          Alert.alert('Error', 'Cannot load conversations.');
+        }
+      };
         const toggleAssignConversation = (convId) => {
           if (editTagModalVisible) {
             setEditingConversations(prev =>
@@ -630,40 +665,47 @@ if (!token) {
           </View>
         </Modal>
         <Modal
-          visible={convPickerVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setConvPickerVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.pickerModal}>
-              <Text style={styles.manageTitle}>Chọn hội thoại</Text>
-              <FlatList
-        data={allConversations}
-        keyExtractor={c => c._id}
-        renderItem={({ item }) => {
-          const isSelected = selectedList.includes(item._id);
-          return (
+        visible={convPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setConvPickerVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.pickerModal}>
+            <Text style={styles.manageTitle}>Chọn hội thoại</Text>
+            <FlatList
+              data={allConversations}
+              keyExtractor={c => c._id}
+              renderItem={({ item }) => {
+                const isSelected = assignedConversations.includes(item._id);
+                let displayName;
+                if (item.type) {
+                  displayName = item.name; // group
+                } else {
+                  // single chat
+                  const other = item.members.find(m => m.userId !== userId) || {};
+                  displayName = friendsById[other.userId]?.name || other.name || 'Unknown';
+                }
+                return (
+                  <TouchableOpacity
+                    style={styles.classifyRow}
+                    onPress={() => toggleAssignConversation(item._id)}
+                  >
+                    <Text style={{ flex: 1 }}>{displayName}</Text>
+                    {isSelected && <Text>✓</Text>}
+                  </TouchableOpacity>
+                );
+              }}
+            />
             <TouchableOpacity
-              style={styles.classifyRow}
-              onPress={() => toggleAssignConversation(item._id)}
+              style={[styles.confirmButton, { marginTop: 12 }]}
+              onPress={() => setConvPickerVisible(false)}
             >
-              <Text style={{ flex: 1 }}>{item.name}</Text>
-              {isSelected && <Text>✓</Text>}
+              <Text style={{ color: 'white' }}>Xong</Text>
             </TouchableOpacity>
-          );
-        }}
-      />
-      
-              <TouchableOpacity
-                style={[styles.confirmButton, { marginTop: 12 }]}
-                onPress={() => setConvPickerVisible(false)}
-              >
-                <Text style={{ color: 'white' }}>Xong</Text>
-              </TouchableOpacity>
-            </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
         <Modal
         visible={editTagModalVisible}
         transparent
