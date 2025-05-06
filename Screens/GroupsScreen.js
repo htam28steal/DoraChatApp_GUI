@@ -19,15 +19,7 @@
 
   const Add = require('../icons/plus.png');
 
-  // Classification options
-  const CLASSIFICATION_OPTIONS = [
-    { key: 'customer', label: 'Customer', color: '#E54E4E' },
-    { key: 'family', label: 'Family', color: '#F24573' },
-    { key: 'work', label: 'Work', color: '#F38B21' },
-    { key: 'friends', label: 'Friends', color: '#F7CC39' },
-    { key: 'reply_later', label: 'Reply Later', color: '#25B03C' },
-    { key: 'study', label: 'Study', color: '#3785F5' },
-  ];
+
 
   export default function GroupsScreen({ navigation }) {
     const [text, setText] = useState('');
@@ -700,12 +692,12 @@ useEffect(() => {
         <View style={styles.fFillter}>
           <TouchableOpacity
            style={styles.btnFillter} 
-         
+           onPress={() => navigation.navigate('ConversationScreen')}
            >
             <Text style={styles.txtFillter}>Messages</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnFillter}>
-            <Text style={styles.txtFillter}>Unread</Text>
+            <Text style={styles.txtFillter}>Groups</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnFillter} onPress={openClassifyModal}>
     <Text style={styles.txtFillter}>Classify</Text>
@@ -843,24 +835,6 @@ useEffect(() => {
           animationType="slide"
           onRequestClose={() => setClassifyOptionsVisible(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.optionsModalContent}>
-              {CLASSIFICATION_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={styles.optionRow}
-                  onPress={() => applyClassification(opt.key)}
-                >
-                  <View style={[styles.dot, { backgroundColor: opt.color }]} />
-                  <Text style={styles.optionLabel}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity onPress={() => setClassifyOptionsVisible(false)} style={[styles.menuItem, { marginTop: 10 }]}
-              >
-                <Text style={styles.menuText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </Modal>
         <Modal
     visible={classifyModalVisible}
@@ -1171,6 +1145,7 @@ useEffect(() => {
         flexDirection: 'row',
         paddingHorizontal: 5,
         justifyContent: 'space-between',
+        marginTop:15
       },
       fcontrol: {
         flexDirection: 'row',
@@ -1200,6 +1175,7 @@ useEffect(() => {
         width: '70%',
         flexDirection: 'row',
         justifyContent: 'space-between',
+        paddingTop:15
       },
       btnFillter: {
         width: 85,
@@ -1216,6 +1192,7 @@ useEffect(() => {
         top: 110,
         width: '100%',
         height: '75%',
+        paddingTop:15
       },
     
       fMessage: {
