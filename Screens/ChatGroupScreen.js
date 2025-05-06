@@ -12,6 +12,7 @@ import {
     Platform,
     Modal,
     Linking,
+    FlatList,
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -26,7 +27,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
 import { Video } from "expo-av";
-
+import ReactDetailModal from "./ReactDetailModal";
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
 const CallIcon = require("../assets/Call.png");
@@ -39,10 +40,18 @@ const SendIcon = require("../icons/send.png");
 const Return = require("../icons/back.png");
 
 
+
+
+const sampleReacts = [
+    { userId: '1', name: 'Alice', avatar: '👩', type: '❤️' },
+    { userId: '2', name: 'Bob', avatar: '🧔', type: '❤️' },
+    { userId: '3', name: 'Charlie', avatar: '👨', type: '😂' },
+];
+
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, onReactPress }) {
+function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, sampleReacts }) {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
     console.log(msg.content);
@@ -93,7 +102,7 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, on
                 return require("../icons/fileDefault.png");
         }
     };
-
+    console.log("msg.reacts:", msg.reacts);
 
 
     return (
@@ -149,23 +158,25 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, on
                     </Text>
                 )}
 
+
                 {msg.reacts && msg.reacts.length > 0 && (
                     <TouchableOpacity
                         style={messageItemStyles.reactContainer}
-                        onPress={() => onReactPress?.(msg)}
+                        onPress={() => handlePressEmoji(msg)}
                     >
                         {msg.reacts.map((react, idx) => {
-                            const emoji = emojiMap[react.type];
+                            const emoji = emojiMap[react.type]; // Dùng react.type để lấy emoji
                             return emoji ? (
                                 <Text key={idx} style={messageItemStyles.emojiText}>
                                     {emoji}
                                 </Text>
                             ) : null;
                         })}
-                        <Text style={messageItemStyles.reactCount}>{msg.reacts.length}</Text>
+                        <Text style={messageItemStyles.reactCount}>
+                            {msg.reacts.length}
+                        </Text>
                     </TouchableOpacity>
                 )}
-
                 {showTime && (
                     <Text style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}>
                         {dayjs(msg.createdAt).fromNow()}
@@ -274,7 +285,7 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress, onReactPress }) {
+function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji }) {
     const scrollViewRef = useRef(null);
 
     useEffect(() => {
@@ -308,7 +319,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress, onReactPress }) 
                                 ? () => onMessageLongPress(msg)
                                 : null
                         }
-                        onReactPress={onReactPress}
+                        handlePressEmoji={handlePressEmoji}
                     />
                 );
             })}
@@ -409,8 +420,12 @@ export default function ChatScreen({ route, navigation }) {
     const [modalVisible, setModalVisible] = useState(false);
     const [currentChannelId, setCurrentChannelId] = useState(null);
     const [channels, setChannels] = useState([]);
-    const [selectedReactMessage, setSelectedReactMessage] = useState(null);
-    const [reactModalVisible, setReactModalVisible] = useState(false);
+
+    const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
+
+
+    const [selectedType, setSelectedType] = useState('');
+    const [selectedReactors, setSelectedReactors] = useState([]);
 
     const emojiToType = {
         '❤️': 1,
@@ -969,9 +984,16 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    const handleReactPress = (message) => {
-        setSelectedReactMessage(message);
-        setReactModalVisible(true);
+    const handlePressEmoji = (msg) => {
+        console.log("msg.reacts:", msg.reacts);
+
+        const uniqueTypes = [...new Set(msg.reacts.map((react) => react.type))];
+
+        const reactors = msg.reacts;
+
+        setSelectedType(uniqueTypes);
+        setSelectedReactors(reactors);
+        setReactDetailModalVisible(true);  // Hiện modal
     };
 
 
@@ -1073,7 +1095,7 @@ export default function ChatScreen({ route, navigation }) {
                     messages={messages}
                     currentUserId={userId}
                     onMessageLongPress={handleMessageLongPress}
-                    onReactPress={handleReactPress}
+                    handlePressEmoji={handlePressEmoji}
                 />
             </View>
             <MessageInput
@@ -1083,6 +1105,7 @@ export default function ChatScreen({ route, navigation }) {
                 onPickMedia={pickMedia}
                 onPickFile={pickDocument}
                 onEmojiPress={() => setEmojiOpen(true)}
+                onModalReact={handlePressEmoji}
             />
             <EmojiPicker
                 onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
@@ -1090,48 +1113,7 @@ export default function ChatScreen({ route, navigation }) {
                 onClose={() => setEmojiOpen(false)}
             />
 
-            <Modal
-                visible={reactModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setReactModalVisible(false)}
-            >
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPressOut={() => setReactModalVisible(false)}
-                >
-                    <View style={styles.reactModalContainer}>
-                        <Text style={styles.reactModalTitle}>Phản ứng</Text>
 
-                        {selectedReactMessage?.reacts && selectedReactMessage.reacts.map((react, index) => {
-                            // Lấy thông tin người dùng từ react
-                            const reactor = react.memberId || {};
-                            const reactorName = reactor.name || 'Người dùng';
-                            const emoji = emojiMap[react.type] || '👍';
-                            const isCurrentUser = reactor.userId === userId;
-
-                            return (
-                                <View key={index} style={styles.reactorItem}>
-                                    <View style={styles.reactorInfo}>
-                                        <Text style={styles.emojiLarge}>{emoji}</Text>
-                                        <Text style={styles.reactorName}>{reactorName}</Text>
-                                    </View>
-
-
-                                </View>
-                            );
-                        })}
-
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={() => setReactModalVisible(false)}
-                        >
-                            <Text style={styles.closeButtonText}>Đóng</Text>
-                        </TouchableOpacity>
-                    </View>
-                </TouchableOpacity>
-            </Modal>
 
 
             {/* Modal for message actions on long press */}
@@ -1181,6 +1163,48 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
                 </TouchableOpacity>
             </Modal>
+            <Modal visible={reactDetailModalVisible} transparent animationType="slide" onRequestClose={() => setReactDetailModalVisible(false)}>
+                <View style={styles.modalBackground}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Người đã thả {selectedType}:</Text>
+
+                        <FlatList
+                            data={selectedReactors}  // Sử dụng selectedReactors làm data
+                            keyExtractor={(item) => item.userId}  // Sử dụng userId làm key
+                            renderItem={({ item }) => {
+                                const emojiMap = {
+                                    1: '❤️',
+                                    2: '😂',
+                                    3: '😢',
+                                    4: '👍',
+                                    5: '👎',
+                                    6: '😮',
+                                };
+
+                                const emoji = emojiMap[item.type];
+
+                                return (
+                                    <View style={styles.reactorItem}>
+                                        <Text style={styles.emojiText}>{emoji}</Text>
+
+                                        <Text style={styles.reactorName}>{item.name}</Text>
+                                        {item.avatar && <Image source={{ uri: item.avatar }} style={styles.avatar} />}
+                                    </View>
+                                );
+                            }}
+                        />
+
+                        <TouchableOpacity onPress={() => setReactDetailModalVisible(false)} style={styles.closeButton}>
+                            <Text style={styles.closeText}>Đóng</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+
+
+
+
 
         </View>
     );
@@ -1271,4 +1295,16 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "bold",
     },
+    container: { flex: 1, justifyContent: 'center', padding: 20 },
+    title: { fontSize: 20, marginBottom: 10 },
+    reactBar: { flexDirection: 'row', gap: 10 },
+    reactButton: { padding: 10, backgroundColor: '#eee', borderRadius: 8 },
+    emoji: { fontSize: 24 },
+    modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { width: '80%', backgroundColor: 'white', padding: 20, borderRadius: 10 },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+    reactorItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+    avatar: { fontSize: 20, marginRight: 10 },
+    closeButton: { marginTop: 15, alignSelf: 'center' },
+    closeText: { color: 'blue' },
 });

@@ -30,9 +30,13 @@ export const SOCKET_EVENTS = {
   JOIN_CONVERSATIONS: "join-conversations",
   JOIN_CONVERSATION: "join-conversation",
   LEAVE_CONVERSATION: "leave-conversation",
-  DISBANDED_CONVERSATION: "disbanded-conversation",
   NEW_GROUP_CONVERSATION: "new-group-conversation",
+  CONVERSATION_DISBANDED: "conversation-disbanded",
+  HIDE_CONVERSATION: "hide-conversation",
+  UPDATE_NAME_CONVERSATION: "update-name-conversation",
 
+  DELETE_CONVERSATION: "delete-conversation",
+  TRANSFER_ADMIN: "transfer-admin",
   // Typing indicators
   TYPING: "typing",
   NOT_TYPING: "not-typing",
@@ -53,8 +57,19 @@ export const SOCKET_EVENTS = {
   RECEIVE_SIGNAL: "receive-signal",
   LEAVE_CALL: "leave-call",
 
-
   // Last view tracking
   CONVERSATION_LAST_VIEW: "conversation-last-view",
   USER_LAST_VIEW: "user-last-view",
+
+  // Pin message
+  PIN_MESSAGE: "pin-message",
+  UNPIN_MESSAGE: "unpin-message",
+
+  // Vote
+  CREATE_VOTE: "create-vote",
+  VOTE_OPTION_SELECTED: "vote-option-selected",
+  VOTE_OPTION_DESELECTED: "vote-option-deselected",
+  ADD_VOTE_OPTION: "add-vote-option",
+  DELETE_VOTE_OPTION: "delete-vote-option",
+  VOTE_LOCKED: "vote-locked",
 };

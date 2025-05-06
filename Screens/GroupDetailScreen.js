@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback,useMemo } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
   FlatList, Modal, ActivityIndicator, Alert,TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,13 +8,6 @@ import { SOCKET_EVENTS } from "../utils/constant";
 import axios from '../api/apiConfig';
 const AddMember = require('../icons/addFriend.png');
 
-const dataGroupProfile = [
-  {
-    id: '1',
-    avatar: require('../Images/GroupAvt.png'),
-    name: 'John Nguyen',
-  },
-];
 
 
 export default function GroupDetail({ route, navigation }) {
@@ -49,6 +42,59 @@ export default function GroupDetail({ route, navigation }) {
   const [showAuthorityChoice, setShowAuthorityChoice] = useState(false);
 const [showTransferModal, setShowTransferModal] = useState(false);
 const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
+
+const [membersModalVisible, setMembersModalVisible] = useState(false);
+const [memberSearchText, setMemberSearchText] = useState('');
+
+const filteredGroupMembers = useMemo(() => {
+  const q = memberSearchText.toLowerCase();
+  return groupMembers.filter(m =>
+    m.name.toLowerCase().includes(q)
+  );
+}, [groupMembers, memberSearchText]);
+
+useEffect(() => {
+  // ask the server to put us in the right room
+  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId });
+}, [conversationId]);
+
+useEffect(() => {
+  const onMemberRemoved = ({ conversationId: convId, userId: removedUserId }) => {
+    if (convId !== conversationId) return;
+    console.log("📥 Received LEAVE_CONVERSATION:", removedUserId);
+    setGroupMembers(prev =>
+      prev.filter(m => m.userId !== removedUserId)
+    );
+  };
+
+  socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onMemberRemoved);
+  console.log("✅ Subscribed to LEAVE_CONVERSATION");
+
+  return () => {
+    socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onMemberRemoved);
+  };
+}, [conversationId]);
+
+useEffect(() => {
+  const onNameUpdated = ({ conversationId: convId, newName, name }) => {
+    if (convId !== conversationId) return;
+    // newName if present, otherwise fallback to name
+    setGroupName(newName ?? name);
+  };
+
+  socket.on(
+    SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+    onNameUpdated
+  );
+  return () => {
+    socket.off(
+      SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+      onNameUpdated
+    );
+  };
+}, [conversationId]);
+
+
 
 useEffect(() => {
   ;(async () => {
@@ -150,7 +196,20 @@ const handleSaveName = async () => {
     { name: trimmed }
   );
   setGroupName(trimmed);
+  socket.emit(
+    SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+    { conversationId, newName: trimmed }
+  );
   setIsEditingName(false);
+};
+const fetchGroupCurrentMembers = async () => {
+  try {
+    const res = await axios.get(`/api/conversations/${conversationId}/members`);
+    // assume res.data is an array of { _id, userId, name, avatar, … }
+    setGroupMembers(res.data || []);
+  } catch (err) {
+    console.error('Failed to fetch members', err);
+  }
 };
 
 
@@ -429,6 +488,27 @@ const handleSaveName = async () => {
 
 
        <View style={{marginTop:30}}>
+        
+       <TouchableOpacity
+  style={styles.options}
+  onPress={async () => {
+    // 1) load the latest members
+    await fetchGroupCurrentMembers();
+    // 2) clear any previous search
+    setMemberSearchText('');
+    // 3) show the modal
+    setMembersModalVisible(true);
+  }}
+>
+  <View style={styles.optionsLeft}>
+    <View style={styles.iconCircle}>
+      <Image source={require('../icons/member.png')} style={{ height: 18, width: 18 }} />
+    </View>
+    <Text style={styles.optionsText}>Members</Text>
+  </View>
+  <Image source={require('../icons/arrow.png')} style={{ width: 12, height: 12 }} />
+</TouchableOpacity>
+    
        <View style={styles.options}>
         <View style={styles.optionsLeft}>
           <View style={styles.iconCircle}>
@@ -805,16 +885,27 @@ const handleSaveName = async () => {
             try {
               const userId = await AsyncStorage.getItem('userId');
               await axios.delete(
-                `/api/conversations/${conversationId}/members/${selectedMemberId}`,{ data: { userId } });
+                `/api/conversations/${conversationId}/members/${selectedMemberId}`,
+                { data: { userId } }
+              );
+              // 1) Locally refresh
               await fetchGroupMembers();
               fetchModalData();
               setSelectedMemberId(null);
               setRemoveModalVisible(false);
+          
+              // 2) Emit socket
+              console.log("📤 Emitting LEAVE_CONVERSATION for removed member:", selectedMemberId);
+              socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
+                conversationId,
+                userId: selectedMemberId
+              });
             } catch (err) {
               console.error('Error removing member:', err);
               Alert.alert('Error', 'Could not remove member.');
             }
           }}
+          
         >
           <Text style={styles.modalCreateText}>Remove</Text>
         </TouchableOpacity>
@@ -1071,6 +1162,51 @@ const handleSaveName = async () => {
       <TouchableOpacity
         style={[styles.modalCloseButton, { marginTop: 20 }]}
         onPress={() => setShowJoinRequestsModal(false)}
+      >
+        <Text style={styles.modalCloseText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+<Modal
+  visible={membersModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setMembersModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={[styles.modalContent, { maxHeight: '70%' }]}>
+      <Text style={styles.modalTitle}>Group Members</Text>
+      <TextInput
+        value={memberSearchText}
+        onChangeText={setMemberSearchText}
+        placeholder="Search members…"
+        style={{
+          borderWidth: 1,
+          borderColor: '#ccc',
+          borderRadius: 6,
+          padding: 8,
+          marginBottom: 12,
+        }}
+      />
+      {filteredGroupMembers.length === 0 ? (
+        <Text style={{ textAlign: 'center', color: '#555' }}>No members found.</Text>
+      ) : (
+        <FlatList
+          data={filteredGroupMembers}
+          keyExtractor={item => item.userId}
+          extraData={groupMembers}   
+          renderItem={({ item }) => (
+            <View style={styles.friendItem}>
+              <Image source={{ uri: item.avatar }} style={styles.friendAvatar} />
+              <Text style={styles.friendName}>{item.name}</Text>
+            </View>
+          )}
+        />
+      )}
+      <TouchableOpacity
+        style={[styles.modalCloseButton, { marginTop: 16, alignSelf: 'center' }]}
+        onPress={() => setMembersModalVisible(false)}
       >
         <Text style={styles.modalCloseText}>Close</Text>
       </TouchableOpacity>

@@ -19,15 +19,7 @@
 
   const Add = require('../icons/plus.png');
 
-  // Classification options
-  const CLASSIFICATION_OPTIONS = [
-    { key: 'customer', label: 'Customer', color: '#E54E4E' },
-    { key: 'family', label: 'Family', color: '#F24573' },
-    { key: 'work', label: 'Work', color: '#F38B21' },
-    { key: 'friends', label: 'Friends', color: '#F7CC39' },
-    { key: 'reply_later', label: 'Reply Later', color: '#25B03C' },
-    { key: 'study', label: 'Study', color: '#3785F5' },
-  ];
+
 
   export default function GroupsScreen({ navigation }) {
     const [text, setText] = useState('');
@@ -300,69 +292,127 @@ const createTag = async () => {
     
 
     useEffect(() => {
-      (async () => {
-        const id = await AsyncStorage.getItem('userId');
-        console.log('ℹ️ Loaded userId:', id);
-        setUserId(id);
-      })();
-    }, []);
-    // 3️⃣ on mount: fetch & wire up socket
-    // Run once on mount
-    useEffect(() => {
-      console.log('🌐 Setting up socket listeners…');
-      socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-
-      const onNew        = () => { console.log('📥 SOCKET NEW_GROUP_CONVERSATION'); fetchAllConversations(); };
-      const onDisband    = () => { console.log('📥 SOCKET DISBANDED_CONVERSATION');   fetchAllConversations(); };
-      const onLeave      = () => { console.log('📥 SOCKET LEAVE_CONVERSATION');       fetchAllConversations(); };
-
-      socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
-      socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
-      socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
-
-      return () => {
-        socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
-        socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, onDisband);
-        socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
-      };
-    }, [fetchAllConversations]);
+      // 🔧 Debug: am I connected?
+      socket.on('connect', () => console.log('✅ socket connected'));
+      socket.on('disconnect', () => console.log('❌ socket disconnected'));
     
-    
-    
-    useEffect(() => {
-      // 1️⃣ Debug: log connection state
-      console.log("🧪 socket.connected:", socket.connected);
-      socket.on("connect", () => console.log("✅ socket connected"));
-      socket.on("disconnect", () => console.log("❌ socket disconnected"));
-    
-      // 2️⃣ Debug: catch every event
+      // 🔧 Debug: log every incoming event
       socket.onAny((event, payload) => {
-        console.log("📡 socket.onAny:", event, payload);
+        console.log('📡 socket.onAny:', event, payload);
       });
     
-      // 3️⃣ Handle disbanded-conversation
+      // 🔌 Subscribe to global list updates
+      socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+      console.log('📡 Emitted JOIN_CONVERSATIONS');
+    
+      // 🔔 NEW GROUP → prepend it
+      const onNew = payload => {
+        console.log('📥 NEW_GROUP_CONVERSATION:', payload);
+        fetchAllConversations();
+      };
+      socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
+    
+      // 🔔 LEAVE → refetch
+      const onLeave = payload => {
+        console.log('📥 LEAVE_CONVERSATION:', payload);
+        fetchAllConversations();
+      };
+      socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
+    
+      // 🔔 DISBAND → remove locally
+      const onDisband = ({ conversationId }) => {
+        console.log('📥 CONVERSATION_DISBANDED:', conversationId);
+        setConversations(prev =>
+          prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId))
+        );
+      };
+      socket.on(SOCKET_EVENTS.CONVERSATION_DISBANDED, onDisband);
+    
+      return () => {
+        socket.off('connect');
+        socket.off('disconnect');
+        socket.offAny();
+        socket.off(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
+        socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
+        socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, onDisband);
+      };
+    }, [fetchAllConversations]);
+
+
+    
+
+    useEffect(() => {
+      if (conversations.length === 0) return;
+      console.log('🔌 joining individual conversation rooms…');
+      conversations.forEach(conv => {
+        socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conv._id);
+        console.log('📡 JOIN_CONVERSATION:', conv._id);
+      });
+    }, [conversations]);
+    
+    // after you’ve joined each room…
+useEffect(() => {
+  const onNameUpdated = ({ conversationId: convId, newName, name }) => {
+    // payload might come in as `name` or `newName`
+    const updatedName = newName ?? name;
+    setConversations(prev =>
+      prev.map(c =>
+        c._id === convId
+          ? { ...c, name: updatedName }
+          : c
+      )
+    );
+  };
+
+  socket.on(
+    SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+    onNameUpdated
+  );
+  console.log('✅ Subscribed to UPDATE_NAME_CONVERSATION in GroupsScreen');
+
+  return () => {
+    socket.off(
+      SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
+      onNameUpdated
+    );
+  };
+}, [socket, setConversations]);
+
+    
+    
+    useEffect(() => {
+      console.log("🧩 Mount: setting up CONVERSATION_DISBANDED listener");
+    
+      // Join conversations room (broadcast updates to the user)
+      socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+      console.log("📡 Emitted JOIN_CONVERSATIONS");
+    
       const handleDisband = ({ conversationId }) => {
-        console.log("📥 Received disbanded-conversation:", conversationId);
+        console.log("📥 Received CONVERSATION_DISBANDED:", conversationId);
+    
+        if (!conversationId) {
+          console.warn("⚠️ Missing conversationId in CONVERSATION_DISBANDED payload");
+          return;
+        }
+    
         setConversations(prev => {
-          const updated = prev.filter(c => c._id !== conversationId);
-          console.log("🧹 After filter:", updated.map(c => c._id));
-          console.log(updated);
+          const updated = prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId));
+          console.log(`🧹 Removed disbanded conversation. Remaining:`, updated.map(c => c._id));
           return updated;
         });
       };
-      console.log("🔌 Subscribing to DISBANDED_CONVERSATION");
-      socket.on(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
     
-      // 4️⃣ Join the global feed
-      socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
+      socket.on(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
+      console.log("✅ Subscribed to CONVERSATION_DISBANDED");
     
       return () => {
-        console.log("🛑 Unsubscribing from DISBANDED_CONVERSATION");
-        socket.off(SOCKET_EVENTS.DISBANDED_CONVERSATION, handleDisband);
-        socket.offAny();
+        socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
+        console.log("🛑 Unsubscribed from CONVERSATION_DISBANDED");
       };
     }, []);
 
+
+    
     useFocusEffect(
       useCallback(() => {
         console.log('⚡️ Screen focused – re-fetching conversations');
@@ -640,11 +690,14 @@ const createTag = async () => {
         </View>
 
         <View style={styles.fFillter}>
-          <TouchableOpacity style={styles.btnFillter}>
-            <Text style={styles.txtFillter}>All</Text>
+          <TouchableOpacity
+           style={styles.btnFillter} 
+           onPress={() => navigation.navigate('ConversationScreen')}
+           >
+            <Text style={styles.txtFillter}>Messages</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnFillter}>
-            <Text style={styles.txtFillter}>Unread</Text>
+            <Text style={styles.txtFillter}>Groups</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnFillter} onPress={openClassifyModal}>
     <Text style={styles.txtFillter}>Classify</Text>
@@ -673,7 +726,10 @@ const createTag = async () => {
 
         {/* FOOTER */}
         <View style={styles.fFooter}>
-          <TouchableOpacity style={styles.btnTags}>
+          <TouchableOpacity 
+            style={styles.btnTags}
+
+          >
             <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
@@ -779,24 +835,6 @@ const createTag = async () => {
           animationType="slide"
           onRequestClose={() => setClassifyOptionsVisible(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.optionsModalContent}>
-              {CLASSIFICATION_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={styles.optionRow}
-                  onPress={() => applyClassification(opt.key)}
-                >
-                  <View style={[styles.dot, { backgroundColor: opt.color }]} />
-                  <Text style={styles.optionLabel}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity onPress={() => setClassifyOptionsVisible(false)} style={[styles.menuItem, { marginTop: 10 }]}
-              >
-                <Text style={styles.menuText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </Modal>
         <Modal
     visible={classifyModalVisible}
@@ -1107,6 +1145,7 @@ const createTag = async () => {
         flexDirection: 'row',
         paddingHorizontal: 5,
         justifyContent: 'space-between',
+        marginTop:15
       },
       fcontrol: {
         flexDirection: 'row',
@@ -1136,6 +1175,7 @@ const createTag = async () => {
         width: '70%',
         flexDirection: 'row',
         justifyContent: 'space-between',
+        paddingTop:15
       },
       btnFillter: {
         width: 85,
@@ -1152,6 +1192,7 @@ const createTag = async () => {
         top: 110,
         width: '100%',
         height: '75%',
+        paddingTop:15
       },
     
       fMessage: {

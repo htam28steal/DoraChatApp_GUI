@@ -51,7 +51,7 @@
     "react-redux": "^9.2.0",
     "redux": "^5.0.1",
     "redux-thunk": "^2.4.2",
-    "rn-emoji-keyboard": "^1.6.0",
+    "rn-emoji-keyboard": "^100.29.0",
     "setprototypeof": "^1.2.0",
     "socket.io-client": "^4.8.1"
   },
