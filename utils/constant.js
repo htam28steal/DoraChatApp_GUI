@@ -71,5 +71,8 @@ export const SOCKET_EVENTS = {
   VOTE_OPTION_DESELECTED: "vote-option-deselected",
   ADD_VOTE_OPTION: "add-vote-option",
   DELETE_VOTE_OPTION: "delete-vote-option",
-  VOTE_LOCKED: "vote-locked",
+  VOTE_LOCKED: "vote-locked", 
+
+    // Member
+    UPDATE_MEMBER_NAME: "update-member-name",
 };
