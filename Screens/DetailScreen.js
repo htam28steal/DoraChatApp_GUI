@@ -24,6 +24,7 @@ export default function SingleChatDetail({ route, navigation }) {
   const [isSaving, setIsSaving] = useState(false);
 
 
+  
   useEffect(() => {
     (async () => {
       try {
@@ -56,6 +57,39 @@ export default function SingleChatDetail({ route, navigation }) {
     })();
   }, [conversationId]);
 
+useEffect(() => {
+  const handleNameUpdate = ({ conversationId: convId, userId, name }) => {
+    console.log("📥 Received update-member-name socket event:");
+    console.log("   conversationId:", convId);
+    console.log("   userId:", userId);
+    console.log("   newName:", name);
+    console.log("   local conversationId:", conversationId);
+    console.log("   local otherMember?.userId:", otherMember?.userId);
+
+    if (convId !== conversationId) {
+      console.log("❌ Ignored: conversationId mismatch");
+      return;
+    }
+
+    if (userId !== otherMember?.userId) {
+      console.log("❌ Ignored: userId mismatch");
+      return;
+    }
+
+    console.log("✅ Matched! Updating name in local state.");
+    setOtherMember(prev => ({ ...prev, name: name }));
+  };
+
+  socket.on(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
+  console.log("🔗 Subscribed to UPDATE_MEMBER_NAME socket event");
+
+  return () => {
+    socket.off(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
+    console.log("❌ Unsubscribed from UPDATE_MEMBER_NAME socket event");
+  };
+}, [conversationId, otherMember?.userId]);
+
+
 
   const handleSaveName = async () => {
     console.log('handleSaveName called with tempName:', tempName, 'for user:', otherMember?.userId);
@@ -66,6 +100,11 @@ export default function SingleChatDetail({ route, navigation }) {
         `/api/members/${conversationId}/${otherMember._id}`,
         { name: tempName }
       );
+      socket.emit(SOCKET_EVENTS.UPDATE_MEMBER_NAME, {
+        conversationId,
+        userId: otherMember.userId,
+        newName: tempName
+      });
       // Update local state
       setOtherMember(prev => ({ ...prev, name: tempName }));
       console.log('PATCH success—name updated on server');     

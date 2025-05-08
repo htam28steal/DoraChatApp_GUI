@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import axios from '../api/apiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
+
 
 export default function ConversationScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
@@ -50,6 +53,33 @@ export default function ConversationScreen({ navigation }) {
       const [targetConversationId, setTargetConversationId] = useState(null);
       const [friends, setFriends] = useState([]);
 
+
+      useEffect(() => {
+        const handleNameUpdate = (memberUpdate) => {
+          const { conversationId, userId, name } = memberUpdate;
+          console.log("📥 [ConversationScreen] Received update-member-name:", memberUpdate);
+      
+          // Update the name in the conversation list
+          setConversations(prevConvs =>
+            prevConvs.map(conv => {
+              if (conv._id !== conversationId) return conv;
+              const updatedMembers = conv.members.map(m =>
+                m.userId === userId ? { ...m, name } : m
+              );
+              return { ...conv, members: updatedMembers };
+            })
+          );
+        };
+      
+        socket.on(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
+        console.log("✅ Subscribed to UPDATE_MEMBER_NAME in ConversationScreen");
+      
+        return () => {
+          socket.off(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
+          console.log("❌ Unsubscribed from UPDATE_MEMBER_NAME in ConversationScreen");
+        };
+      }, []);
+      
 
       useEffect(() => {
         (async () => {
