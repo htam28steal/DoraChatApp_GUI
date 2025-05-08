@@ -10,70 +10,73 @@ const AddMember = require('../icons/addFriend.png');
 
 
 
-export default function GroupDetail({ route, navigation }) {
+export default function SingleChatDetail({ route, navigation }) {
+  const { conversationId } = route.params;
+
+
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [conversation, setConversation] = useState(null);
+  const [otherMember, setOtherMember] = useState(null);
+
   const [isMuted, setIsMuted] = useState(false);
-  const [isJoinApproval, setIsJoinApproval] = useState(false);
-  const [groupName, setGroupName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
 
-  const { conversationId } = route.params;
-  const [showJoinRequestsModal, setShowJoinRequestsModal] = useState(false);
-  const [joinRequests, setJoinRequests] = useState([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        // 1. load current user
+        const uid = await AsyncStorage.getItem('userId');
+        setCurrentUserId(uid);
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [friends, setFriends] = useState([]);
-  const [loadingFriends, setLoadingFriends] = useState(false);
-  const [selectedFriendIds, setSelectedFriendIds] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [removeModalVisible, setRemoveModalVisible] = useState(false);
+        // 2. fetch conversation by ID
+        //    If you really need the "individuals" POST, replace this with your existing axios.post(...)
+        const { data: conv } = await axios.get(
+          `/api/conversations/${conversationId}`
+        );
+        setConversation(conv);
+        console.log('Fetched conversation:', conv); 
+        setIsMuted(!!conv.isMuted);
 
-  const [authorityModalVisible, setAuthorityModalVisible] = useState(false);
-  const [selectedDeputyId, setSelectedDeputyId] = useState(null);
-  const [groupMembers, setGroupMembers] = useState([]);
-  const [showAdministrationOptions, setShowAdministrationOptions] = useState(false);
-
-  const [currentUserRole, setCurrentUserRole] = useState(null);
-
-
-  const [selectedMemberId, setSelectedMemberId] = useState(null);
-
-  const [showAuthorityChoice, setShowAuthorityChoice] = useState(false);
-const [showTransferModal, setShowTransferModal] = useState(false);
-const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
-
-const [membersModalVisible, setMembersModalVisible] = useState(false);
-const [memberSearchText, setMemberSearchText] = useState('');
-
+        // 3. find the “other” member in a 1-on-1 chat
+        const other = conv.members.find(
+          m => String(m.userId) !== String(uid)
+        );
+        if (other) {
+          setOtherMember(other);            // ← store the other user
+          setTempName(other.name);     
+          console.log('Identified otherMember:', other);     // ← initialize edit buffer
+        }
+      } catch (err) {
+        console.error('❌ load single-chat detail failed', err);
+        Alert.alert('Error', 'Không thể tải chi tiết trò chuyện.');
+      }
+    })();
+  }, [conversationId]);
 
 
-const handleSaveName = async () => {
-  const trimmed = tempName.trim();
-  if (!trimmed) {
-    Alert.alert('Error', 'Name cannot be blank.');
-    return;
-  }
-  await axios.patch(
-    `/api/conversations/${conversationId}/name`,
-    { name: trimmed }
-  );
-  setGroupName(trimmed);
-  socket.emit(
-    SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
-    { conversationId, newName: trimmed }
-  );
-  setIsEditingName(false);
-};
-const fetchGroupCurrentMembers = async () => {
-  try {
-    const res = await axios.get(`/api/conversations/${conversationId}/members`);
-    // assume res.data is an array of { _id, userId, name, avatar, … }
-    setGroupMembers(res.data || []);
-  } catch (err) {
-    console.error('Failed to fetch members', err);
-  }
-};
+  const handleSaveName = async () => {
+    console.log('handleSaveName called with tempName:', tempName, 'for user:', otherMember?.userId);
+    if (!otherMember) return;
+    setIsSaving(true);
+    try {
+      await axios.patch(
+        `/api/members/${conversationId}/${otherMember._id}`,
+        { name: tempName }
+      );
+      // Update local state
+      setOtherMember(prev => ({ ...prev, name: tempName }));
+      console.log('PATCH success—name updated on server');     
+      setIsEditingName(false);
+    } catch (err) {
+      console.log('PATCH error:', err);  
+      Alert.alert('Error', 'Không thể cập nhật tên thành viên.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
 
 
@@ -99,60 +102,44 @@ const fetchGroupCurrentMembers = async () => {
         </View>
       </View>
 
-      {/* Existing group profile and pictures... */}
-      <View style={{ alignItems: 'center', marginVertical: 20 }}>
-  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-    {isEditingName
-      ? (
-        <TextInput
-          value={tempName}
-          onChangeText={setTempName}
-          style={{
-            borderBottomWidth: 1,
-            borderColor: '#086DC0',
-            fontSize: 18,
-            fontWeight: 'bold',
-            color: '#086DC0',
-            marginRight: 8,
-            minWidth: 120,
-          }}
-          autoFocus
-        />
-      )
-      : (
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: 'bold',
-            color: '#086DC0',
-            marginRight: 8,
-          }}
-        >
-          {groupName}
-        </Text>
-      )
-    }
-
-    {/* only leaders & managers get the button */}
-      <TouchableOpacity
-        onPress={() => {
-          if (isEditingName) {
-            handleSaveName();
-          } else {
-            setTempName(groupName);
-            setIsEditingName(true);
-          }
-        }}
-      >
-        <Image
-          source={
-            isEditingName
-              ? require('../icons/check.png')
-              : require('../assets/Edit.png')
-          }
-          style={{ width: 20, height: 20 }}
-        />
-      </TouchableOpacity>
+      <View style={styles.profileHeader}>
+  {otherMember?.avatar && (
+    <Image
+      source={{ uri: otherMember.avatar }}
+      style={styles.profileAvatar}
+    />
+  )}
+  <View style={styles.nameRow}>
+    {isEditingName ? (
+      <TextInput
+        value={tempName}
+        onChangeText={setTempName}
+        style={styles.editableName}
+        autoFocus
+      />
+    ) : (
+      <Text style={styles.nameText}>
+        {otherMember?.name}
+      </Text>
+    )}
+    <TouchableOpacity
+      onPress={() => {
+        if (isEditingName) handleSaveName();
+        else {
+          setTempName(otherMember?.name );
+          setIsEditingName(true);
+        }
+      }}
+    >
+      <Image
+        source={
+          isEditingName
+            ? require('../icons/check.png')
+            : require('../assets/Edit.png')
+        }
+        style={styles.editIcon}
+      />
+    </TouchableOpacity>
   </View>
 </View>
 
@@ -407,4 +394,36 @@ const styles = StyleSheet.create({
   },
   thumbLeft: { left: 2 },
   thumbRight: { right: 2 },
+  
+  profileHeader: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  profileAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  nameText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#086DC0',
+  },
+  editableName: {
+    borderBottomWidth: 1,
+    borderColor: '#086DC0',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#086DC0',
+  },
+  editIcon: {
+    width: 20,
+    height: 20,
+    marginLeft: 8,
+  },
 });
