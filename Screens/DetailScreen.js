@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback,useMemo } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
-  FlatList, Modal, ActivityIndicator, Alert,TextInput } from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert,TextInput, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 
-import axios from '../api/apiConfig';
+import axios from '../api/apiConfig'; 
 const AddMember = require('../icons/addFriend.png');
+const numColumns = 3;
+const size = Dimensions.get('window').width / numColumns - 20;
 
 
 
@@ -22,6 +24,9 @@ export default function SingleChatDetail({ route, navigation }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [recentImages, setRecentImages] = useState([]);
+  
+  
 
 
   
@@ -55,6 +60,21 @@ export default function SingleChatDetail({ route, navigation }) {
         Alert.alert('Error', 'Không thể tải chi tiết trò chuyện.');
       }
     })();
+  }, [conversationId]);
+   useEffect(() => {
+    const fetchRecentImages = async () => {
+      try {
+        const { data: msgs } = await axios.get(`/api/messages/${conversationId}`);
+        const imgs = msgs
+          .filter(m => m.type === 'IMAGE')
+          .sort((a,b) => new Date(b.createdAt?.$date||b.createdAt) - new Date(a.createdAt?.$date||a.createdAt))
+          .slice(0,6);
+        setRecentImages(imgs);
+      } catch(err) {
+        console.error('Failed to load recent images', err);
+      }
+    };
+    fetchRecentImages();
   }, [conversationId]);
 
 useEffect(() => {
@@ -245,6 +265,24 @@ useEffect(() => {
         </View>
 
     </View>
+    {recentImages.length > 0 && (
+  <FlatList
+    data={recentImages}
+    keyExtractor={i => i._id}
+    renderItem={({item}) => (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('FullScreenImage',{ uri: item.content })}
+      >
+        <Image source={{uri: item.content}}
+               style={{ width: size, height: size, margin: 5, borderRadius: 8 }}/>
+      </TouchableOpacity>
+    )}
+    numColumns={numColumns}
+    scrollEnabled={false}
+    contentContainerStyle={{ alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}
+  />
+)}
+
  
 
 

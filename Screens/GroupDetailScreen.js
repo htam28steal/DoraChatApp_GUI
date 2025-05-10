@@ -73,6 +73,24 @@ useEffect(() => {
   fetchRecentImages();
 }, [conversationId]);
 
+useEffect(() => {
+  const handleIncoming = (msg) => {
+    // only care about images in this conversation
+    if (msg.conversationId === conversationId && msg.type === 'IMAGE') {
+      setRecentImages(prev => {
+        // drop duplicates & prepend
+        const withoutDup = prev.filter(img => img._id !== msg._id);
+        const updated = [msg, ...withoutDup];
+        return updated.slice(0, 6);
+      });
+    }
+  };
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, handleIncoming);
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, handleIncoming);
+  };
+}, [conversationId]);
 
 useEffect(() => {
   const onAvatarUpdated = ({ conversationId: convId, avatar }) => {
