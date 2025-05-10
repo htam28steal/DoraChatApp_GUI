@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback,useMemo } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
+import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,ImageBackground,
   FlatList, Modal, ActivityIndicator, Alert,TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
@@ -10,6 +10,7 @@ const AddMember = require('../icons/addFriend.png');
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Camera from 'expo-camera';
+import bg from '../Images/bground.png';
 
 
 
@@ -483,7 +484,9 @@ const fetchGroupCurrentMembers = async () => {
   );
 
   return (
+          <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
     <SafeAreaView style={styles.container}>
+
       <View style={styles.header}>
         <TouchableOpacity
           style={{ position: 'absolute', left: 10 }}
@@ -642,7 +645,7 @@ const fetchGroupCurrentMembers = async () => {
         <View style={styles.optionsLeft}>
           <View style={styles.iconCircle}>
             <Image
-              source={require('../icons/Notification.png')}
+              source={require('../icons/join-approval.png')}
               style={styles.icon}
             />
           </View>
@@ -703,7 +706,7 @@ const fetchGroupCurrentMembers = async () => {
         width: 30, height: 30, backgroundColor: '#D8EDFF',
         borderRadius: 15, justifyContent: 'center', marginRight: 10
       }}>
-        <Image source={require('../icons/Photos.png')} style={{ alignSelf: 'center' }} />
+        <Image source={require('../icons/admin.png')} style={styles.icon} />
       </View>
       <Text style={{ color: '#086DC0', fontSize: 15 }}>Administration</Text>
     </View>
@@ -727,6 +730,7 @@ const fetchGroupCurrentMembers = async () => {
       style={{ width: 12, height: 12, resizeMode: 'contain' }}
     />
         </View>
+
   </TouchableOpacity>
 )}
 
@@ -830,6 +834,7 @@ const fetchGroupCurrentMembers = async () => {
 
 </View>
 </>
+
 )}
 
 
@@ -1320,16 +1325,16 @@ const fetchGroupCurrentMembers = async () => {
 
 
     </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1 },
   header: {
     justifyContent: 'center',
     flexDirection: 'row',
     paddingBottom: 10,
-    backgroundColor: '#fff',
     marginTop:35
   },
   avatar: { height: 120, width: 120, marginTop: 20, marginBottom: 10 },
@@ -1461,7 +1466,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10
   },
-  icon: { width: 16, height: 16 },
+  icon: { width: 18, height: 18,alignSelf:'center' },
   optionsText: { color: '#086DC0', fontSize: 15 },
 
   // Toggle “track”
@@ -1475,6 +1480,12 @@ const styles = StyleSheet.create({
   },
   toggleTrackActive: {
     backgroundColor: '#086DC0'
+  },
+    gradient: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    
   },
 
   // The little “thumb”
