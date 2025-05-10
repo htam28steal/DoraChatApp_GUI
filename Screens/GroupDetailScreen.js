@@ -7,6 +7,10 @@ import { SOCKET_EVENTS } from "../utils/constant";
 
 import axios from '../api/apiConfig';
 const AddMember = require('../icons/addFriend.png');
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
+import * as Camera from 'expo-camera';
+
 
 
 
@@ -21,6 +25,8 @@ export default function GroupDetail({ route, navigation }) {
   const { conversationId } = route.params;
   const [showJoinRequestsModal, setShowJoinRequestsModal] = useState(false);
   const [joinRequests, setJoinRequests] = useState([]);
+  const [groupAvatar, setGroupAvatar] = useState(null);
+
 
   const [modalVisible, setModalVisible] = useState(false);
   const [friends, setFriends] = useState([]);
@@ -45,6 +51,55 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
 const [membersModalVisible, setMembersModalVisible] = useState(false);
 const [memberSearchText, setMemberSearchText] = useState('');
+
+
+
+const handleAvatarChange = async (conversationId, option = 'gallery') => {
+  try {
+    let result;
+
+    if (option === 'gallery') {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission required', 'Media library permission is needed.');
+        return;
+      }
+
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        base64: true,  // ✅ needed to get base64 string
+        allowsEditing: false,
+        quality: 1,
+      });
+    } else {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission required', 'Camera permission is needed.');
+        return;
+      }
+
+      result = await ImagePicker.launchCameraAsync({
+        base64: true,  // ✅ for converting image to base64
+        allowsEditing: false,
+        quality: 1,
+      });
+    }
+
+    if (result.canceled) return;
+
+    const base64 = result.assets[0].base64;
+    const imageUri = `data:image/jpeg;base64,${base64}`;
+
+    await axios.patch(`/api/conversations/${conversationId}/avatar`, {
+      avatar: imageUri
+    });
+
+    Alert.alert('Success', 'Group avatar updated!');
+  } catch (err) {
+    console.error('Error updating avatar:', err);
+    Alert.alert('Error', 'Failed to update group avatar.');
+  }
+};
 
 const filteredGroupMembers = useMemo(() => {
   const q = memberSearchText.toLowerCase();
@@ -100,13 +155,16 @@ useEffect(() => {
   ;(async () => {
     try {
       const res = await axios.get(`/api/conversations/${conversationId}`);
-      // assuming your convo object has a boolean `acceptGroupRequest` field
-      setIsJoinApproval(!!res.data.isJoinFromLink);
+      const convo = res.data;
+      setIsJoinApproval(!!convo.isJoinFromLink);
+      setGroupName(convo.name || '');
+      setGroupAvatar(convo.avatar || 'https://placehold.co/120x120?text=Group');
     } catch (err) {
-      console.error("Couldn't load joinApproval:", err);
+      console.error("Couldn't load conversation details:", err);
     }
   })();
 }, [conversationId]);
+
 
   // whenever `showJoinRequestsModal` flips to true, fetch
 // 1) In your useEffect that loads the join‐requests:
@@ -428,6 +486,19 @@ const fetchGroupCurrentMembers = async () => {
 
       {/* Existing group profile and pictures... */}
       <View style={{ alignItems: 'center', marginVertical: 20 }}>
+      <TouchableOpacity
+  onPress={() => {
+    Alert.alert('Change Avatar', 'Choose option', [
+      { text: 'Gallery', onPress: () => handleAvatarChange(conversationId, 'gallery') },
+      { text: 'Camera', onPress: () => handleAvatarChange(conversationId, 'camera') },
+      { text: 'Cancel', style: 'cancel' }
+    ]);
+  }}
+>
+  <Image source={{ uri: groupAvatar }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+</TouchableOpacity>
+
+
   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
     {isEditingName
       ? (
@@ -506,7 +577,17 @@ const fetchGroupCurrentMembers = async () => {
     </View>
     <Text style={styles.optionsText}>Members</Text>
   </View>
+  <View         
+  style={{
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}>
   <Image source={require('../icons/arrow.png')} style={{ width: 12, height: 12 }} />
+  </View>
 </TouchableOpacity>
     
        <View style={styles.options}>
