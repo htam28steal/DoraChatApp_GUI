@@ -363,6 +363,25 @@ const createTag = async () => {
         socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, onDisband);
       };
     }, [fetchAllConversations]);
+    useEffect(() => {
+  const onAvatarUpdated = ({ conversationId, avatar }) => {
+    setConversations(prev =>
+      prev.map(conv =>
+        conv._id === conversationId
+          ? { ...conv, avatar }
+          : conv
+      )
+    );
+  };
+
+  socket.on(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+  console.log("✅ Subscribed to UPDATE_AVATAR_GROUP_CONVERSATION");
+
+  return () => {
+    socket.off(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+  };
+}, []);
+
 
 
     
@@ -690,12 +709,7 @@ useEffect(() => {
         </View>
 
         <View style={styles.fFillter}>
-          <TouchableOpacity
-           style={styles.btnFillter} 
-           onPress={() => navigation.navigate('ConversationScreen')}
-           >
-            <Text style={styles.txtFillter}>Messages</Text>
-          </TouchableOpacity>
+
           <TouchableOpacity style={styles.btnFillter}>
             <Text style={styles.txtFillter}>Groups</Text>
           </TouchableOpacity>
@@ -728,8 +742,9 @@ useEffect(() => {
         <View style={styles.fFooter}>
           <TouchableOpacity 
             style={styles.btnTags}
-
-          >
+              onPress={() => navigation.navigate('ConversationScreen')}
+           >
+          
             <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>

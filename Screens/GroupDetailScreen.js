@@ -53,6 +53,19 @@ const [membersModalVisible, setMembersModalVisible] = useState(false);
 const [memberSearchText, setMemberSearchText] = useState('');
 
 
+useEffect(() => {
+  const onAvatarUpdated = ({ conversationId: convId, avatar }) => {
+    if (convId !== conversationId) return;
+    setGroupAvatar(avatar);
+  };
+
+  socket.on(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+  };
+}, [conversationId]);
+
 
 const handleAvatarChange = async (conversationId, option = 'gallery') => {
   try {
@@ -67,7 +80,7 @@ const handleAvatarChange = async (conversationId, option = 'gallery') => {
 
       result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        base64: true,  // ✅ needed to get base64 string
+        base64: true,
         allowsEditing: false,
         quality: 1,
       });
@@ -79,7 +92,7 @@ const handleAvatarChange = async (conversationId, option = 'gallery') => {
       }
 
       result = await ImagePicker.launchCameraAsync({
-        base64: true,  // ✅ for converting image to base64
+        base64: true,
         allowsEditing: false,
         quality: 1,
       });
@@ -94,12 +107,20 @@ const handleAvatarChange = async (conversationId, option = 'gallery') => {
       avatar: imageUri
     });
 
+    // ✅ Emit socket event to notify others
+    socket.emit(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, {
+      conversationId,
+      avatar: imageUri
+    });
+
+    setGroupAvatar(imageUri); // update locally too
     Alert.alert('Success', 'Group avatar updated!');
   } catch (err) {
     console.error('Error updating avatar:', err);
     Alert.alert('Error', 'Failed to update group avatar.');
   }
 };
+
 
 const filteredGroupMembers = useMemo(() => {
   const q = memberSearchText.toLowerCase();
