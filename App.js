@@ -35,6 +35,8 @@ import ChatGroup from './Screens/ChatGroupScreen'
 
 import Media from './Screens/MediaScreen'
 
+import CheckMail from './Screens/CheckMailScreen'
+
 const Stack = createStackNavigator();
 
 // Component con để sử dụng các hook Redux (ví dụ useDispatch)
@@ -130,6 +132,12 @@ function AppContainer() {
          <Stack.Screen
           name="MediaScreen"
           component={Media}
+          options={{ headerShown: false }}
+
+        />
+                 <Stack.Screen
+          name="CheckMailScreen"
+          component={CheckMail}
           options={{ headerShown: false }}
 
         />

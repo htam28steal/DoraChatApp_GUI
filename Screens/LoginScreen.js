@@ -39,7 +39,7 @@ const LoginScreen = () => {
   };
 
   const handleSignup = () => {
-    navigation.navigate("SignupScreen");
+    navigation.navigate("CheckMailScreen");
   };
   const handleForgotPassword = () => {
     navigation.navigate("ResetPasswordStep1Screen");
