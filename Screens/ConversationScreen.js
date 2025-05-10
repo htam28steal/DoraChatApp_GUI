@@ -24,6 +24,8 @@ export default function ConversationScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [userId, setUserId] = useState(null);
 
+  const [currentUser, setCurrentUser] = useState(null);
+
       const [manageModalVisible, setManageModalVisible] = useState(false);
 
     const [addTagModalVisible, setAddTagModalVisible] = useState(false);
@@ -53,6 +55,20 @@ export default function ConversationScreen({ navigation }) {
       const [targetConversationId, setTargetConversationId] = useState(null);
       const [friends, setFriends] = useState([]);
 
+
+      useEffect(() => {
+        if (!userId) return;
+        const fetchUserInfo = async () => {
+          try {
+            const { data } = await axios.get(`/api/me/profile/${userId}`);
+            setCurrentUser(data);
+          } catch (err) {
+            console.error('❌ Failed to load current user info', err);
+          }
+        };
+        fetchUserInfo();
+      }, [userId]);
+      
 
       useEffect(() => {
         const handleNameUpdate = (memberUpdate) => {
@@ -435,7 +451,7 @@ if (!token) {
         />
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => navigation.navigate('NewConversation')}
+
         >
           <Image
             source={require('../icons/plus.png')}
@@ -481,6 +497,33 @@ if (!token) {
           renderItem={renderItem}
         />
       )}
+
+        {/* FOOTER */}
+        <View style={styles.fFooter}>
+          <TouchableOpacity 
+            style={styles.btnTags}
+
+          >
+            <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}>
+            <Image source={require('../icons/searchicon.png')} style={styles.iconfooter} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}>
+            <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTag}>
+            <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}>
+          {currentUser?.avatar ? (
+          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+        ) : (
+          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
+        )}
+          </TouchableOpacity>
+
+</View>
        <Modal
                 visible={classifyMenuVisible}
                 transparent
@@ -1167,4 +1210,36 @@ const styles = StyleSheet.create({
   friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   friendAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
   friendName: { fontSize: 16 },
+
+
+  fFooter: {
+    position: 'absolute',
+    bottom: 10,
+    width: '90%',
+    height: 54,
+    backgroundColor: 'white',
+    borderRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    alignSelf:'center'
+  },
+  btnTags: {
+    width: 66,
+    height: 45,
+    backgroundColor: 'white',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  btnTag: {
+    width: 66,
+    height: 45,
+    backgroundColor: '#086DC0',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconfooter: { width: 25, height: 25 },
+  avatarFooter: { width: 40, height: 40, borderRadius: 100 },
 });

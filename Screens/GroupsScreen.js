@@ -33,6 +33,9 @@
     const [userId, setUserId] = useState(null);
     const [manageModalVisible, setManageModalVisible] = useState(false);
 
+    const [currentUser, setCurrentUser] = useState(null);
+
+
   const [addTagModalVisible, setAddTagModalVisible] = useState(false);
   const [colors, setColors] = useState([]);
   const [newTagName, setNewTagName] = useState('');
@@ -60,6 +63,21 @@ const [editingConversations, setEditingConversations] = useState([]);
   const [allConversations, setAllConversations] = useState([]);
 
   const [selectedFilters, setSelectedFilters] = useState([]);
+
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchUserInfo = async () => {
+      try {
+        const { data } = await axios.get(`/api/me/profile/${userId}`);
+        setCurrentUser(data);
+      } catch (err) {
+        console.error('❌ Failed to load current user info', err);
+      }
+    };
+    fetchUserInfo();
+  }, [userId]);
+  
 
 
   const toggleFilter = useCallback(id => {
@@ -571,13 +589,16 @@ useEffect(() => {
         const res = await axios.post('/api/conversations/groups', {
           name: trimmedName,
           members: selectedFriendIds,
+          avatar: 'https://placehold.co/200x200?text=A',
         });
     
         const newConv = {
           _id: res.data._id,
           name: res.data.name || trimmedName,
           members: res.data.members || selectedFriendIds,
+          avatar: 'https://placehold.co/200x200?text=A', // patch it here manually
         };
+        
     
         // ✅ Just emit to others (and yourself)
         socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
@@ -613,56 +634,23 @@ useEffect(() => {
             <View style={styles.fMessage}>
               {/* AVATAR GROUP */}
               <View style={styles.favatarGroup}>
-                {members.length > 0 ? (
-                  <>
-                    <View style={styles.fRowOne}>
-                    {members.slice(0, 2).map((memberId, idx) => {
-    if (!memberId) return null;
-    const member = friendsById[memberId];
-    return (
-      <View
-        style={styles.favatarG}
-        key={`${group._id}-avatar-${memberId}-${idx}`}
-      >
-        {member?.avatar ? (
-          <Image source={{ uri: member.avatar }} style={styles.imgAG} />
-        ) : (
-          <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
-        )}
-      </View>
-    );
-  })}
-                    </View>
-                    <View style={styles.fRowTwo}>
-                      {members[2] && (
-                        <View
-                          style={styles.favatarG}
-                          key={`${group._id}-avatar-${members[2] || 'unknown'}`}
+              <Image
+  source={{
+    uri: group.avatar || 'https://placehold.co/200x200?text=A',
+  }}
+  style={styles.imgAG}
+/>
 
-                        >
-                          {friendsById[members[2]]?.avatar ? (
-                            <Image
-                              source={{ uri: friendsById[members[2]].avatar }}
-                              style={styles.imgAG}
-                            />
-                          ) : (
-                            <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  </>
-                ) : (
-                  <View style={styles.favatarG} />
-                )}
-              </View>
+</View>
     
               {/* GROUP NAME & MEMBERS */}
               <View style={styles.fInfor}>
                 <Text style={styles.name}>{group.name || 'New Group'}</Text>
-                <Text style={styles.email}>
-                  {members.map(id => friendsById[id]?.name || 'Unknown').join(', ')}
-                </Text>
+                <Text style={styles.email} numberOfLines={1}>
+  {group.lastMessageId?.content || 'No messages yet.'}
+</Text>
+
+
               </View>
             </View>
           </TouchableOpacity>
@@ -753,6 +741,17 @@ useEffect(() => {
           <TouchableOpacity style={styles.btnTag}>
             <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}>
+          {currentUser?.avatar ? (
+          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+        ) : (
+          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
+        )}
+          </TouchableOpacity>
+
+
+
+
         </View>
 
         {/* MODAL TẠO NHÓM */}
