@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback,useMemo } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,ImageBackground,
-  FlatList, Modal, ActivityIndicator, Alert,TextInput } from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert,TextInput, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
@@ -52,6 +52,26 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
 const [membersModalVisible, setMembersModalVisible] = useState(false);
 const [memberSearchText, setMemberSearchText] = useState('');
+const [recentImages, setRecentImages] = useState([]);
+
+
+useEffect(() => {
+  const fetchRecentImages = async () => {
+    try {
+      const res = await axios.get(`/api/messages/${conversationId}`);
+      const latestImages = res.data
+        .filter(m => m.type === 'IMAGE')
+        .sort((a, b) => new Date(b.createdAt?.$date || b.createdAt) - new Date(a.createdAt?.$date || a.createdAt))
+        .reverse()
+        .slice(0, 6);
+      setRecentImages(latestImages);
+    } catch (err) {
+      console.error('Failed to load recent images', err);
+    }
+  };
+
+  fetchRecentImages();
+}, [conversationId]);
 
 
 useEffect(() => {
@@ -450,20 +470,8 @@ const fetchGroupCurrentMembers = async () => {
       setLoadingFriends(false);
     }
   };
-  
-  const renderGroupProfile = ({ item }) => (
-    <View style={{ width: '100%' }}>
-      <View style={{ justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-        <Image source={item.avatar} style={styles.avatar} />
-        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ marginRight: 5, fontWeight: 'bold', fontSize: 15 }}>{item.name}</Text>
-          <TouchableOpacity>
-            <Image source={require('../icons/edit.png')} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+
+
 
 
 
@@ -582,7 +590,7 @@ const fetchGroupCurrentMembers = async () => {
 
 
 
-       <View style={{marginTop:30}}>
+       <View >
         
        <TouchableOpacity
   style={styles.options}
@@ -694,8 +702,31 @@ const fetchGroupCurrentMembers = async () => {
 </TouchableOpacity>
 
         </View>
+{recentImages.length > 0 && (
+  <View style={styles.recentSection}>
+    <FlatList
+      data={recentImages}
+      keyExtractor={item => item._id}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('FullScreenImage', { uri: item.content })
+          }
+        >
+          <Image
+            source={{ uri: item.content }}
+            style={styles.recentImage}
+          />
+        </TouchableOpacity>
+      )}
+      numColumns={3}
+      scrollEnabled={false}
+      contentContainerStyle={styles.recentList}
+    />
+  </View>
+)}
 
-    </View>
+</View>
     {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
   <TouchableOpacity
     style={styles.options}
@@ -1353,7 +1384,7 @@ const styles = StyleSheet.create({
     justifyContent:'space-between',
     alignItems:'center',
     paddingLeft:20,
-    marginBottom:15
+    marginBottom:5
   },
   authority:{
     marginLeft:50,
@@ -1499,4 +1530,21 @@ const styles = StyleSheet.create({
   },
   thumbLeft: { left: 2 },
   thumbRight: { right: 2 },
+    recentSection: {
+    alignSelf: 'stretch',
+    marginTop: 10,
+    paddingHorizontal: 20,
+  },
+  recentList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  recentImage: {
+    width: 95,
+    height: 60,
+    marginRight: 10,
+    marginBottom: 10,
+    borderRadius: 8,
+    backgroundColor:'#fff'
+  },
 });
