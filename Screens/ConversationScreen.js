@@ -9,7 +9,8 @@ import {
   Image,
   ActivityIndicator,
   Alert,
-  Modal
+  Modal,
+
 } from 'react-native';
 import axios from '../api/apiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -395,39 +396,52 @@ if (!token) {
     }
   }, [query, conversations]);
 
-  const renderItem = ({ item }) => {
-    // pick the other participant
-    const other = item.members.find(m => m.userId !== userId) || {};
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() =>
-          navigation.navigate('ChatScreen', {
-            conversation: item,
-            userId,
-          })
-        }
-      >
-        <Image
-          source={
-            other.avatar
-              ? { uri: other.avatar }
-              : require('../Images/avt.png')
-          }
-          style={styles.avatar}
-        />
-        <View style={styles.info}>
-          <Text style={styles.name}>
-            {other.name || 'Unnamed'}
-          </Text>
-          <Text style={styles.snippet} numberOfLines={1}>
-            {item.lastMessageId?.content || 'No messages yet.'}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+    const renderItem = useCallback(
+    ({ item: conv }) => {
+      // find the “other” participant
+      const other = conv.members.find(m => m.userId !== userId) || {};
 
+      return (
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('ChatScreen', {
+              conversation: conv,
+              userId,
+            })
+          }
+          onLongPress={() => {
+            setTargetConversationId(conv._id);
+            setClassifyMenuVisible(true);
+          }}
+        >
+          <View style={styles.fMessage}>
+            {/* AVATAR */}
+            <View style={styles.favatarGroup}>
+              <Image
+                source={
+                  other.avatar
+                    ? { uri: other.avatar }
+                    : require('../Images/avt.png')
+                }
+                style={styles.imgAG}
+              />
+            </View>
+
+            {/* NAME & LAST MESSAGE */}
+            <View style={styles.fInfor}>
+              <Text style={styles.name}>
+                {other.name || 'Unnamed'}
+              </Text>
+              <Text style={styles.email} numberOfLines={1}>
+                {conv.lastMessageId?.content || 'No messages yet.'}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [navigation, userId]
+  );
   return (
     <View style={styles.container}>
       {/* full-screen background */}
@@ -461,16 +475,7 @@ if (!token) {
       </View>
 
           <View style={styles.fFillter}>
-                <TouchableOpacity
-                 style={styles.btnFillter} 
-              
-                 >
-                  <Text style={styles.txtFillter}>Messages</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnFillter}
-                   onPress={() => navigation.navigate('GroupsScreen')}>
-                  <Text style={styles.txtFillter}>Groups</Text>
-                </TouchableOpacity>
+
           <TouchableOpacity style={styles.btnFillter} onPress={openClassifyModal}>
     <Text style={styles.txtFillter}>Classify</Text>
    </TouchableOpacity>
@@ -506,8 +511,9 @@ if (!token) {
           >
             <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-            <Image source={require('../icons/searchicon.png')} style={styles.iconfooter} />
+          <TouchableOpacity style={styles.btnTags}
+           onPress={() => navigation.navigate('GroupsScreen')}>
+            <Image source={require('../icons/member.png')} style={styles.iconfooter}  />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
             <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
@@ -1242,4 +1248,31 @@ const styles = StyleSheet.create({
   },
   iconfooter: { width: 25, height: 25 },
   avatarFooter: { width: 40, height: 40, borderRadius: 100 },
+      imgAG: {
+      width: 55,
+      height: 55,
+      borderRadius: 27.5,
+    },
+      fMessage: {
+        flexDirection: 'row',
+        alignItems:'center',
+        height: 65,
+        borderBottomWidth: 1,
+        borderBottomColor: 'white',
+        paddingHorizontal: 5,
+      },
+            favatarGroup: { width: 65, justifyContent: 'center' },
+      fRowOne: {
+        flexDirection: 'row',
+        height: 25,
+        justifyContent: 'space-around',
+      },
+      fRowTwo: {
+        flexDirection: 'row',
+        height: 25,
+        justifyContent: 'space-around',
+        alignItems: 'center',
+      },
+      favatarG: { width: 25, height: 25, borderRadius: 12.5 },    
+
 });

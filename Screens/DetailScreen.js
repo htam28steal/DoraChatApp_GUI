@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback,useMemo } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
-  FlatList, Modal, ActivityIndicator, Alert,TextInput, Dimensions } from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert,TextInput, Dimensions,ImageBackground } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
+import bg from '../Images/bground.png';
+
 
 import axios from '../api/apiConfig'; 
 const AddMember = require('../icons/addFriend.png');
@@ -145,6 +147,7 @@ useEffect(() => {
  
 
   return (
+        <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
@@ -274,12 +277,12 @@ useEffect(() => {
         onPress={() => navigation.navigate('FullScreenImage',{ uri: item.content })}
       >
         <Image source={{uri: item.content}}
-               style={{ width: size, height: size, margin: 5, borderRadius: 8 }}/>
+               style={styles.recentImage}/>
       </TouchableOpacity>
     )}
     numColumns={numColumns}
     scrollEnabled={false}
-    contentContainerStyle={{ alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', padding: 10 }}
+   contentContainerStyle={styles.recentList}
   />
 )}
 
@@ -303,16 +306,17 @@ useEffect(() => {
     </View>
 
     </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1},
   header: {
     justifyContent: 'center',
     flexDirection: 'row',
     paddingBottom: 10,
-    backgroundColor: '#fff',
+    
     marginTop:35
   },
   avatar: { height: 120, width: 120, marginTop: 20, marginBottom: 10 },
@@ -325,13 +329,14 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     marginRight: 5,
   },
+
   options:{
     width:'90%',
     flexDirection:'row',
     justifyContent:'space-between',
     alignItems:'center',
     paddingLeft:20,
-    marginBottom:15
+    marginBottom:5
   },
   authority:{
     marginLeft:50,
@@ -502,5 +507,25 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     marginLeft: 8,
+  },
+    gradient: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    
+  },
+recentList: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  paddingHorizontal: 20, // ✅ add this line
+},
+
+  recentImage: {
+    width: 95,
+    height: 60,
+    marginRight: 10,
+    marginBottom: 10,
+    borderRadius: 8,
+    backgroundColor:'#fff'
   },
 });

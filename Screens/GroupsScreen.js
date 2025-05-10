@@ -710,9 +710,7 @@ useEffect(() => {
 
         <View style={styles.fFillter}>
 
-          <TouchableOpacity style={styles.btnFillter}>
-            <Text style={styles.txtFillter}>Groups</Text>
-          </TouchableOpacity>
+
           <TouchableOpacity style={styles.btnFillter} onPress={openClassifyModal}>
     <Text style={styles.txtFillter}>Classify</Text>
   </TouchableOpacity>
@@ -748,7 +746,7 @@ useEffect(() => {
             <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
-            <Image source={require('../icons/searchicon.png')} style={styles.iconfooter} />
+            <Image source={require('../icons/member.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
             <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
@@ -1254,10 +1252,15 @@ useEffect(() => {
         alignItems: 'center',
       },
       favatarG: { width: 25, height: 25, borderRadius: 12.5 },    
-      imgAG: { width: '100%', height: '100%', borderRadius: 100 },
+      imgAG: {
+  width: 55,
+  height: 55,
+  borderRadius: 27.5,
+},
+
     
       fInfor: { flex: 1, justifyContent: 'center', paddingLeft: 10 },
-      name: { fontSize: 16, fontWeight: 'bold' },
+      name: { fontSize: 16, fontWeight: 'bold' , color:'#086dc0'},
       email: { fontSize: 13, fontWeight: '400' },
       fbtn: { position: 'absolute', right: 0, top: 5, width: 13, height: 30 },
       btnDetail: { width: 13, height: '100%' },

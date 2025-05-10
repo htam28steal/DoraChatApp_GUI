@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback,useMemo } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,ImageBackground,
-  FlatList, Modal, ActivityIndicator, Alert,TextInput, Dimensions } from 'react-native';
+  FlatList, Modal, ActivityIndicator, Alert,TextInput, Dimensions, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
@@ -639,33 +639,7 @@ const fetchGroupCurrentMembers = async () => {
   <Image source={require('../icons/arrow.png')} style={{ width: 12, height: 12 }} />
   </View>
 </TouchableOpacity>
-    
-       <View style={styles.options}>
-        <View style={styles.optionsLeft}>
-          <View style={styles.iconCircle}>
-            <Image
-              source={require('../icons/Notification.png')}
-              style={styles.icon}
-            />
-          </View>
-          <Text style={styles.optionsText}>Mute messages</Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.toggleTrack,
-            isMuted && styles.toggleTrackActive
-          ]}
-          onPress={() => setIsMuted(m => !m)}
-        >
-          <View
-            style={[
-              styles.toggleThumb,
-              isMuted ? styles.thumbRight : styles.thumbLeft
-            ]}
-          />
-        </TouchableOpacity>
-      </View>
+  
 
       <View style={styles.options}>
         <View style={styles.optionsLeft}>
@@ -1406,7 +1380,7 @@ const styles = StyleSheet.create({
   },
   authority:{
     marginLeft:50,
-    marginBottom:5
+    marginBottom:10
   },
   authorityOptions:{
     flexDirection:'row'
