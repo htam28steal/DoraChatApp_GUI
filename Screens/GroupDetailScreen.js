@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback,useMemo } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,
-  FlatList, Modal, ActivityIndicator, Alert,TextInput } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, SafeAreaView,ImageBackground,
+  FlatList, Modal, ActivityIndicator, Alert,TextInput, Dimensions, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 
 import axios from '../api/apiConfig';
 const AddMember = require('../icons/addFriend.png');
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
+import * as Camera from 'expo-camera';
+import bg from '../Images/bground.png';
+
 
 
 
@@ -21,6 +26,8 @@ export default function GroupDetail({ route, navigation }) {
   const { conversationId } = route.params;
   const [showJoinRequestsModal, setShowJoinRequestsModal] = useState(false);
   const [joinRequests, setJoinRequests] = useState([]);
+  const [groupAvatar, setGroupAvatar] = useState(null);
+
 
   const [modalVisible, setModalVisible] = useState(false);
   const [friends, setFriends] = useState([]);
@@ -45,6 +52,114 @@ const [selectedNewAdminId, setSelectedNewAdminId] = useState(null);
 
 const [membersModalVisible, setMembersModalVisible] = useState(false);
 const [memberSearchText, setMemberSearchText] = useState('');
+const [recentImages, setRecentImages] = useState([]);
+
+
+useEffect(() => {
+  const fetchRecentImages = async () => {
+    try {
+      const res = await axios.get(`/api/messages/${conversationId}`);
+      const latestImages = res.data
+        .filter(m => m.type === 'IMAGE')
+        .sort((a, b) => new Date(b.createdAt?.$date || b.createdAt) - new Date(a.createdAt?.$date || a.createdAt))
+        .reverse()
+        .slice(0, 6);
+      setRecentImages(latestImages);
+    } catch (err) {
+      console.error('Failed to load recent images', err);
+    }
+  };
+
+  fetchRecentImages();
+}, [conversationId]);
+
+useEffect(() => {
+  const handleIncoming = (msg) => {
+    // only care about images in this conversation
+    if (msg.conversationId === conversationId && msg.type === 'IMAGE') {
+      setRecentImages(prev => {
+        // drop duplicates & prepend
+        const withoutDup = prev.filter(img => img._id !== msg._id);
+        const updated = [msg, ...withoutDup];
+        return updated.slice(0, 6);
+      });
+    }
+  };
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, handleIncoming);
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, handleIncoming);
+  };
+}, [conversationId]);
+
+useEffect(() => {
+  const onAvatarUpdated = ({ conversationId: convId, avatar }) => {
+    if (convId !== conversationId) return;
+    setGroupAvatar(avatar);
+  };
+
+  socket.on(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+  };
+}, [conversationId]);
+
+
+const handleAvatarChange = async (conversationId, option = 'gallery') => {
+  try {
+    let result;
+
+    if (option === 'gallery') {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission required', 'Media library permission is needed.');
+        return;
+      }
+
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        base64: true,
+        allowsEditing: false,
+        quality: 1,
+      });
+    } else {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission required', 'Camera permission is needed.');
+        return;
+      }
+
+      result = await ImagePicker.launchCameraAsync({
+        base64: true,
+        allowsEditing: false,
+        quality: 1,
+      });
+    }
+
+    if (result.canceled) return;
+
+    const base64 = result.assets[0].base64;
+    const imageUri = `data:image/jpeg;base64,${base64}`;
+
+    await axios.patch(`/api/conversations/${conversationId}/avatar`, {
+      avatar: imageUri
+    });
+
+    // ✅ Emit socket event to notify others
+    socket.emit(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, {
+      conversationId,
+      avatar: imageUri
+    });
+
+    setGroupAvatar(imageUri); // update locally too
+    Alert.alert('Success', 'Group avatar updated!');
+  } catch (err) {
+    console.error('Error updating avatar:', err);
+    Alert.alert('Error', 'Failed to update group avatar.');
+  }
+};
+
 
 const filteredGroupMembers = useMemo(() => {
   const q = memberSearchText.toLowerCase();
@@ -100,13 +215,16 @@ useEffect(() => {
   ;(async () => {
     try {
       const res = await axios.get(`/api/conversations/${conversationId}`);
-      // assuming your convo object has a boolean `acceptGroupRequest` field
-      setIsJoinApproval(!!res.data.isJoinFromLink);
+      const convo = res.data;
+      setIsJoinApproval(!!convo.isJoinFromLink);
+      setGroupName(convo.name || '');
+      setGroupAvatar(convo.avatar || 'https://placehold.co/120x120?text=Group');
     } catch (err) {
-      console.error("Couldn't load joinApproval:", err);
+      console.error("Couldn't load conversation details:", err);
     }
   })();
 }, [conversationId]);
+
 
   // whenever `showJoinRequestsModal` flips to true, fetch
 // 1) In your useEffect that loads the join‐requests:
@@ -370,20 +488,8 @@ const fetchGroupCurrentMembers = async () => {
       setLoadingFriends(false);
     }
   };
-  
-  const renderGroupProfile = ({ item }) => (
-    <View style={{ width: '100%' }}>
-      <View style={{ justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-        <Image source={item.avatar} style={styles.avatar} />
-        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ marginRight: 5, fontWeight: 'bold', fontSize: 15 }}>{item.name}</Text>
-          <TouchableOpacity>
-            <Image source={require('../icons/edit.png')} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+
+
 
 
 
@@ -404,7 +510,9 @@ const fetchGroupCurrentMembers = async () => {
   );
 
   return (
+          <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
     <SafeAreaView style={styles.container}>
+
       <View style={styles.header}>
         <TouchableOpacity
           style={{ position: 'absolute', left: 10 }}
@@ -428,6 +536,19 @@ const fetchGroupCurrentMembers = async () => {
 
       {/* Existing group profile and pictures... */}
       <View style={{ alignItems: 'center', marginVertical: 20 }}>
+      <TouchableOpacity
+  onPress={() => {
+    Alert.alert('Change Avatar', 'Choose option', [
+      { text: 'Gallery', onPress: () => handleAvatarChange(conversationId, 'gallery') },
+      { text: 'Camera', onPress: () => handleAvatarChange(conversationId, 'camera') },
+      { text: 'Cancel', style: 'cancel' }
+    ]);
+  }}
+>
+  <Image source={{ uri: groupAvatar }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+</TouchableOpacity>
+
+
   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
     {isEditingName
       ? (
@@ -487,7 +608,7 @@ const fetchGroupCurrentMembers = async () => {
 
 
 
-       <View style={{marginTop:30}}>
+       <View >
         
        <TouchableOpacity
   style={styles.options}
@@ -506,41 +627,25 @@ const fetchGroupCurrentMembers = async () => {
     </View>
     <Text style={styles.optionsText}>Members</Text>
   </View>
+  <View         
+  style={{
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}>
   <Image source={require('../icons/arrow.png')} style={{ width: 12, height: 12 }} />
+  </View>
 </TouchableOpacity>
-    
-       <View style={styles.options}>
-        <View style={styles.optionsLeft}>
-          <View style={styles.iconCircle}>
-            <Image
-              source={require('../icons/Notification.png')}
-              style={styles.icon}
-            />
-          </View>
-          <Text style={styles.optionsText}>Mute messages</Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.toggleTrack,
-            isMuted && styles.toggleTrackActive
-          ]}
-          onPress={() => setIsMuted(m => !m)}
-        >
-          <View
-            style={[
-              styles.toggleThumb,
-              isMuted ? styles.thumbRight : styles.thumbLeft
-            ]}
-          />
-        </TouchableOpacity>
-      </View>
+  
 
       <View style={styles.options}>
         <View style={styles.optionsLeft}>
           <View style={styles.iconCircle}>
             <Image
-              source={require('../icons/Notification.png')}
+              source={require('../icons/join-approval.png')}
               style={styles.icon}
             />
           </View>
@@ -589,8 +694,31 @@ const fetchGroupCurrentMembers = async () => {
 </TouchableOpacity>
 
         </View>
+{recentImages.length > 0 && (
+  <View style={styles.recentSection}>
+    <FlatList
+      data={recentImages}
+      keyExtractor={item => item._id}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate('FullScreenImage', { uri: item.content })
+          }
+        >
+          <Image
+            source={{ uri: item.content }}
+            style={styles.recentImage}
+          />
+        </TouchableOpacity>
+      )}
+      numColumns={3}
+      scrollEnabled={false}
+      contentContainerStyle={styles.recentList}
+    />
+  </View>
+)}
 
-    </View>
+</View>
     {(currentUserRole === 'leader' || currentUserRole === 'manager') && (
   <TouchableOpacity
     style={styles.options}
@@ -601,7 +729,7 @@ const fetchGroupCurrentMembers = async () => {
         width: 30, height: 30, backgroundColor: '#D8EDFF',
         borderRadius: 15, justifyContent: 'center', marginRight: 10
       }}>
-        <Image source={require('../icons/Photos.png')} style={{ alignSelf: 'center' }} />
+        <Image source={require('../icons/admin.png')} style={styles.icon} />
       </View>
       <Text style={{ color: '#086DC0', fontSize: 15 }}>Administration</Text>
     </View>
@@ -625,6 +753,7 @@ const fetchGroupCurrentMembers = async () => {
       style={{ width: 12, height: 12, resizeMode: 'contain' }}
     />
         </View>
+
   </TouchableOpacity>
 )}
 
@@ -728,6 +857,7 @@ const fetchGroupCurrentMembers = async () => {
 
 </View>
 </>
+
 )}
 
 
@@ -1218,16 +1348,16 @@ const fetchGroupCurrentMembers = async () => {
 
 
     </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1 },
   header: {
     justifyContent: 'center',
     flexDirection: 'row',
     paddingBottom: 10,
-    backgroundColor: '#fff',
     marginTop:35
   },
   avatar: { height: 120, width: 120, marginTop: 20, marginBottom: 10 },
@@ -1246,11 +1376,11 @@ const styles = StyleSheet.create({
     justifyContent:'space-between',
     alignItems:'center',
     paddingLeft:20,
-    marginBottom:15
+    marginBottom:5
   },
   authority:{
     marginLeft:50,
-    marginBottom:5
+    marginBottom:10
   },
   authorityOptions:{
     flexDirection:'row'
@@ -1359,7 +1489,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10
   },
-  icon: { width: 16, height: 16 },
+  icon: { width: 18, height: 18,alignSelf:'center' },
   optionsText: { color: '#086DC0', fontSize: 15 },
 
   // Toggle “track”
@@ -1374,6 +1504,12 @@ const styles = StyleSheet.create({
   toggleTrackActive: {
     backgroundColor: '#086DC0'
   },
+    gradient: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    
+  },
 
   // The little “thumb”
   toggleThumb: {
@@ -1386,4 +1522,21 @@ const styles = StyleSheet.create({
   },
   thumbLeft: { left: 2 },
   thumbRight: { right: 2 },
+    recentSection: {
+    alignSelf: 'stretch',
+    marginTop: 10,
+    paddingHorizontal: 20,
+  },
+  recentList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  recentImage: {
+    width: 95,
+    height: 60,
+    marginRight: 10,
+    marginBottom: 10,
+    borderRadius: 8,
+    backgroundColor:'#fff'
+  },
 });

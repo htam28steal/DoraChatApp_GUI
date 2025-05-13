@@ -354,8 +354,12 @@ const messageInputStyles = StyleSheet.create({
 /**
  * Header Component for the chat screen.
  */
-function HeaderSingleChat({ handleDetail }) {
+function HeaderSingleChat({ conversationId, conversation,currentUserId    }) {
   const navigation = useNavigation();
+  const other = conversation.members.find(
+        (m) => m.userId !== currentUserId
+      );
+
   return (
     <View style={headerStyles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
@@ -376,7 +380,7 @@ function HeaderSingleChat({ handleDetail }) {
         <TouchableOpacity style={headerStyles.iconButton}>
           <Image source={VideoCallIcon} style={headerStyles.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={headerStyles.iconButton} onPress={handleDetail}>
+        <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('DetailScreen', { conversationId, friendId: other.userId })}>
           <Image source={DetailChatIcon} style={headerStyles.icon} />
         </TouchableOpacity>
       </View>
@@ -851,7 +855,10 @@ export default function ChatScreen({ route, navigation }) {
 
   return (
     <View style={chatScreenStyles.container}>
-      <HeaderSingleChat />
+      <HeaderSingleChat 
+        conversation={conversation}
+         conversationId={conversationId}
+         currentUserId={userId}/>
       <View style={chatScreenStyles.chatContainer}>
         <ChatBox
           messages={messages}

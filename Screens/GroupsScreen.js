@@ -33,6 +33,9 @@
     const [userId, setUserId] = useState(null);
     const [manageModalVisible, setManageModalVisible] = useState(false);
 
+    const [currentUser, setCurrentUser] = useState(null);
+
+
   const [addTagModalVisible, setAddTagModalVisible] = useState(false);
   const [colors, setColors] = useState([]);
   const [newTagName, setNewTagName] = useState('');
@@ -60,6 +63,21 @@ const [editingConversations, setEditingConversations] = useState([]);
   const [allConversations, setAllConversations] = useState([]);
 
   const [selectedFilters, setSelectedFilters] = useState([]);
+
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchUserInfo = async () => {
+      try {
+        const { data } = await axios.get(`/api/me/profile/${userId}`);
+        setCurrentUser(data);
+      } catch (err) {
+        console.error('❌ Failed to load current user info', err);
+      }
+    };
+    fetchUserInfo();
+  }, [userId]);
+  
 
 
   const toggleFilter = useCallback(id => {
@@ -204,11 +222,19 @@ const createTag = async () => {
 
   const openConvPicker = async () => {
     try {
-      const { data } = await axios.get('/api/conversations');
-      setAllConversations(data);
+      const [ convRes, friendRes ] = await Promise.all([
+        axios.get('/api/conversations'),
+        axios.get('/api/friends')
+     
+      ]);
+      console.log('📥 openConvPicker loaded conversations:', convRes.data);
+      console.log('📥 openConvPicker loaded memberships:', friendRes.data);
+      setAllConversations(convRes.data);
+      setFriends(friendRes.data);
       setConvPickerVisible(true);
     } catch (err) {
-      console.error('❌ Failed to load conversations', err);
+      console.error('❌ Failed to load conversations or friends', err);
+      Alert.alert('Lỗi', 'Không thể tải danh sách hội thoại.');
     }
   };
   const toggleAssignConversation = (convId) => {
@@ -337,6 +363,25 @@ const createTag = async () => {
         socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, onDisband);
       };
     }, [fetchAllConversations]);
+    useEffect(() => {
+  const onAvatarUpdated = ({ conversationId, avatar }) => {
+    setConversations(prev =>
+      prev.map(conv =>
+        conv._id === conversationId
+          ? { ...conv, avatar }
+          : conv
+      )
+    );
+  };
+
+  socket.on(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+  console.log("✅ Subscribed to UPDATE_AVATAR_GROUP_CONVERSATION");
+
+  return () => {
+    socket.off(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
+  };
+}, []);
+
 
 
     
@@ -501,11 +546,15 @@ useEffect(() => {
     
 
 
-    const friendsById = useMemo(() => {
-      const map = {};
-      friends.forEach(user => (map[user._id] = user));
-      return map;
-    }, [friends]);
+      const friendsById = useMemo(() => {
+        console.log('🗺️ building friendsById map from memberships:', friends);
+          const map = {};
+          friends.forEach(f => {
+            map[normalizeId(f._id)] = f;
+          });
+          console.log('🗺️ friendsById:', map);
+          return map;
+        }, [friends]);
     
     useEffect(() => {
       const fetchConversations = async () => {
@@ -559,13 +608,16 @@ useEffect(() => {
         const res = await axios.post('/api/conversations/groups', {
           name: trimmedName,
           members: selectedFriendIds,
+          avatar: 'https://placehold.co/200x200?text=A',
         });
     
         const newConv = {
           _id: res.data._id,
           name: res.data.name || trimmedName,
           members: res.data.members || selectedFriendIds,
+          avatar: 'https://placehold.co/200x200?text=A', // patch it here manually
         };
+        
     
         // ✅ Just emit to others (and yourself)
         socket.emit(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, newConv);
@@ -601,56 +653,23 @@ useEffect(() => {
             <View style={styles.fMessage}>
               {/* AVATAR GROUP */}
               <View style={styles.favatarGroup}>
-                {members.length > 0 ? (
-                  <>
-                    <View style={styles.fRowOne}>
-                    {members.slice(0, 2).map((memberId, idx) => {
-    if (!memberId) return null;
-    const member = friendsById[memberId];
-    return (
-      <View
-        style={styles.favatarG}
-        key={`${group._id}-avatar-${memberId}-${idx}`}
-      >
-        {member?.avatar ? (
-          <Image source={{ uri: member.avatar }} style={styles.imgAG} />
-        ) : (
-          <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
-        )}
-      </View>
-    );
-  })}
-                    </View>
-                    <View style={styles.fRowTwo}>
-                      {members[2] && (
-                        <View
-                          style={styles.favatarG}
-                          key={`${group._id}-avatar-${members[2] || 'unknown'}`}
+              <Image
+  source={{
+    uri: group.avatar || 'https://placehold.co/200x200?text=A',
+  }}
+  style={styles.imgAG}
+/>
 
-                        >
-                          {friendsById[members[2]]?.avatar ? (
-                            <Image
-                              source={{ uri: friendsById[members[2]].avatar }}
-                              style={styles.imgAG}
-                            />
-                          ) : (
-                            <View style={[styles.favatarG, { backgroundColor: '#ccc' }]} />
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  </>
-                ) : (
-                  <View style={styles.favatarG} />
-                )}
-              </View>
+</View>
     
               {/* GROUP NAME & MEMBERS */}
               <View style={styles.fInfor}>
                 <Text style={styles.name}>{group.name || 'New Group'}</Text>
-                <Text style={styles.email}>
-                  {members.map(id => friendsById[id]?.name || 'Unknown').join(', ')}
-                </Text>
+                <Text style={styles.email} numberOfLines={1}>
+  {group.lastMessageId?.content || 'No messages yet.'}
+</Text>
+
+
               </View>
             </View>
           </TouchableOpacity>
@@ -690,15 +709,8 @@ useEffect(() => {
         </View>
 
         <View style={styles.fFillter}>
-          <TouchableOpacity
-           style={styles.btnFillter} 
-           onPress={() => navigation.navigate('ConversationScreen')}
-           >
-            <Text style={styles.txtFillter}>Messages</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnFillter}>
-            <Text style={styles.txtFillter}>Groups</Text>
-          </TouchableOpacity>
+
+
           <TouchableOpacity style={styles.btnFillter} onPress={openClassifyModal}>
     <Text style={styles.txtFillter}>Classify</Text>
   </TouchableOpacity>
@@ -728,12 +740,13 @@ useEffect(() => {
         <View style={styles.fFooter}>
           <TouchableOpacity 
             style={styles.btnTags}
-
-          >
+              onPress={() => navigation.navigate('ConversationScreen')}
+           >
+          
             <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
-            <Image source={require('../icons/searchicon.png')} style={styles.iconfooter} />
+            <Image source={require('../icons/member.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
             <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
@@ -741,6 +754,17 @@ useEffect(() => {
           <TouchableOpacity style={styles.btnTag}>
             <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}>
+          {currentUser?.avatar ? (
+          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+        ) : (
+          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
+        )}
+          </TouchableOpacity>
+
+
+
+
         </View>
 
         {/* MODAL TẠO NHÓM */}
@@ -1035,15 +1059,27 @@ useEffect(() => {
         <Text style={styles.manageTitle}>Chọn hội thoại</Text>
         <FlatList
   data={allConversations}
-  keyExtractor={c => c._id}
+  keyExtractor={c => normalizeId(c._id)}
   renderItem={({ item }) => {
-    const isSelected = selectedList.includes(item._id);
+         const isSelected = selectedList.includes(item._id);
+
+     // if it's a one‐on‐one chat (type=false), show the other member's name
+             let displayName;
+             if (item.type) {
+               // group
+               displayName = item.name;
+             } else {
+               // single chat → find the membership whose userId ≠ current user
+                         const otherMember = item.members.find(m => m.userId !== userId);
+                         console.log('🌟 otherMember for convo', item._id, otherMember);
+                         displayName = otherMember?.name || 'Unknown';
+             }
     return (
       <TouchableOpacity
         style={styles.classifyRow}
         onPress={() => toggleAssignConversation(item._id)}
       >
-        <Text style={{ flex: 1 }}>{item.name}</Text>
+        <Text style={{ flex: 1 }}>{displayName}</Text>
         {isSelected && <Text>✓</Text>}
       </TouchableOpacity>
     );
@@ -1216,10 +1252,15 @@ useEffect(() => {
         alignItems: 'center',
       },
       favatarG: { width: 25, height: 25, borderRadius: 12.5 },    
-      imgAG: { width: '100%', height: '100%', borderRadius: 100 },
+      imgAG: {
+  width: 55,
+  height: 55,
+  borderRadius: 27.5,
+},
+
     
       fInfor: { flex: 1, justifyContent: 'center', paddingLeft: 10 },
-      name: { fontSize: 16, fontWeight: 'bold' },
+      name: { fontSize: 16, fontWeight: 'bold' , color:'#086dc0'},
       email: { fontSize: 13, fontWeight: '400' },
       fbtn: { position: 'absolute', right: 0, top: 5, width: 13, height: 30 },
       btnDetail: { width: 13, height: '100%' },

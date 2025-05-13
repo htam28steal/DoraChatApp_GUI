@@ -28,7 +28,7 @@ const LoginScreen = () => {
         await AsyncStorage.setItem('userToken', accessToken);
         await AsyncStorage.setItem('userId', id);
         console.log('Logged in userId:', id);
-        navigation.navigate("GroupsScreen", { token: accessToken, uID: id });
+        navigation.navigate("ConversationScreen", { token: accessToken, uID: id });
       }
     } catch (error) {
       console.log('Login error:', error);
@@ -39,7 +39,7 @@ const LoginScreen = () => {
   };
 
   const handleSignup = () => {
-    navigation.navigate("SignupScreen");
+    navigation.navigate("CheckMailScreen");
   };
   const handleForgotPassword = () => {
     navigation.navigate("ResetPasswordStep1Screen");

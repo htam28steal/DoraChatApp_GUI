@@ -1,10 +1,14 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, Alert, SafeAreaView, ImageBackground } from 'react-native';
 import bg from '../Images/bground.png';
+import { useNavigation } from '@react-navigation/native';
 
-const LoginScreen = () => {
+const OtpScreens = () => {
+
+  const navigation = useNavigation();
+  
   const handleLogin = () => {
-    Alert.alert("Login Pressed", "Implement authentication here!");
+    navigation.navigate("LoginScreen");
   };
 
   return (
@@ -132,4 +136,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default OtpScreens;

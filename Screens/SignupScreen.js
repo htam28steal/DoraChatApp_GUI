@@ -12,9 +12,9 @@ import {
   Button
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import bg from '../Images/bground.png';
-import React, { useState } from 'react';
+import React, { useState} from 'react';
 import axios from '../api/apiConfig';
 // import DateTimePickerModal from "react-native-modal-datetime-picker"; // Commented out DatePicker
 
@@ -31,6 +31,10 @@ const SignupScreen = () => {
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [dateOfBirth, setDateOfBirth] = useState(defaultDOB);
 
+  const route = useRoute();
+  const { email } = route.params || {};
+
+
   const showDatePicker = () => {
     setDatePickerVisibility(true);
   };
@@ -40,9 +44,10 @@ const SignupScreen = () => {
   };
 
   const handleConfirm = (date) => {
-    setDateOfBirth(date);
+    handleInputChange('dateOfBirth', date); // ✅ update formData directly
     hideDatePicker();
   };
+  
 
   const getFormattedDate = (date) => {
     if (!date) return '';
@@ -60,11 +65,14 @@ const SignupScreen = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    contact: '',
+    contact: email || '', // ✅ assign the passed email here
+    password: '',
+    passwordConfirm: '',
     gender: null,
-    dateOfBirth: defaultDOB, // Set raw data for dateOfBirth
+    dateOfBirth: defaultDOB,
     bio: '',
   });
+  
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -72,44 +80,81 @@ const SignupScreen = () => {
       [field]: value,
     }));
   };
-
   const validateForm = () => {
-    const { firstName, lastName, contact, gender, dateOfBirth } = formData;
-    if (!firstName || !lastName || !contact || !gender || !dateOfBirth) {
+    const {
+      firstName,
+      lastName,
+      contact,
+      gender,
+      dateOfBirth,
+      password,
+      passwordConfirm,
+    } = formData;
+  
+    console.log('Validating form with data:', {
+      firstName,
+      lastName,
+      contact,
+      gender,
+      dateOfBirth,
+      password,
+      passwordConfirm,
+    });
+
+    
+  
+    if (
+      !firstName ||
+      !lastName ||
+      !contact ||
+      !gender ||
+      !dateOfBirth ||
+      !password ||
+      !passwordConfirm
+    ) {
       Alert.alert('Validation Error', 'Please fill in all required fields.');
       return false;
     }
+  
+    if (password !== passwordConfirm) {
+      Alert.alert('Validation Error', 'Passwords do not match.');
+      return false;
+    }
+  
     return true;
   };
+  
   const handleLogin = () => {
     navigation.navigate("LoginScreen");
   };
   const handleNext = async () => {
     if (!validateForm()) return;
-
+  
     try {
       setLoading(true);
-      const registrationResponse = await axios.post('/api/auth/register', {
-        contact: formData.contact,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        password: 'Temporary@123',
-        dateOfBirth: formData.dateOfBirth,
+      const payload = {
+        contact: formData.contact.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        password: formData.password,
+        dateOfBirth: getFormattedDate(formData.dateOfBirth),
         gender: formData.gender,
-        bio: formData.bio || '',
-      });
+        bio: formData.bio.trim(),
+      };
+  
+      const response = await axios.post('/api/auth/register', payload);
 
-      if (registrationResponse.data.message === 'Đã lưu thông tin người dùng') {
-        navigation.navigate('WelcomeScreen', {
+      if (response.status === 200 || response.status === 201) {
+        navigation.navigate('OtpScreen', {
           email: formData.contact,
         });
+      } else {
+        Alert.alert('Error', 'Save user information failed');
       }
+      
     } catch (error) {
-      console.error('Registration error:', error.response?.data || error);
-      if (error.response) {
-        console.error('Error response data:', error.response.data);
-      }
-      const errorMessage = error.response?.data?.error || 'Registration failed. Please try again.';
+      console.error('Information submission error:', error.response?.data || error);
+      const errorMessage = error.response?.data?.message || 'Đã xảy ra lỗi. Vui lòng thử lại.';
       Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
@@ -153,15 +198,16 @@ const SignupScreen = () => {
               placeholderStyle={{ color: '#666', fontSize: 14 }}
             />
             <View style={styles.halfInput}>
-              <TouchableOpacity onPress={showDatePicker}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ngày sinh"
-                  value={getFormattedDate(dateOfBirth)}
-                  editable={false} // Không cho phép chỉnh sửa trực tiếp
-                  pointerEvents="none" // Để đảm bảo TouchableOpacity bắt được sự kiện chạm
-                />
-              </TouchableOpacity>
+            <TouchableOpacity onPress={showDatePicker}>
+  <TextInput
+    style={styles.input}
+    placeholder="Ngày sinh"
+    value={getFormattedDate(formData.dateOfBirth)} // ✅ correct
+    editable={false}
+    pointerEvents="none"
+  />
+</TouchableOpacity>
+
               {/*
               <DateTimePickerModal
                 isVisible={isDatePickerVisible}
@@ -175,12 +221,22 @@ const SignupScreen = () => {
           </View>
 
           <TextInput
-            style={styles.usernameInput}
-            placeholder="Enter your mail or phone"
-            placeholderTextColor="#666"
-            value={formData.contact}
-            onChangeText={(text) => handleInputChange('contact', text)}
-          />
+  style={styles.usernameInput}
+  placeholder="Enter your password"
+  placeholderTextColor="#666"
+  value={formData.password}
+  onChangeText={(text) => handleInputChange('password', text)}
+  secureTextEntry
+/>
+<TextInput
+  style={styles.usernameInput}
+  placeholder="Enter your password again"
+  placeholderTextColor="#666"
+  value={formData.passwordConfirm}
+  onChangeText={(text) => handleInputChange('passwordConfirm', text)}
+  secureTextEntry
+/>
+
 
           <TextInput
             style={styles.usernameInput}
