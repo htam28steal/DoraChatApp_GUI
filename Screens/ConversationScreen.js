@@ -518,8 +518,8 @@ if (!token) {
           <TouchableOpacity style={styles.btnTags}>
             <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTag}>
-            <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
+          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
+            <Image source={require('../icons/friend.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
           {currentUser?.avatar ? (
@@ -689,7 +689,7 @@ if (!token) {
                 </TouchableOpacity>
               </View>
       
-              <Text style={styles.label}>Tên thẻ phân loại *</Text>
+              <Text style={styles.label}>Tên thẻ phân loại <Text style={{color:'red'}}>*</Text></Text>
               <TextInput
                 style={styles.input}
                 placeholder="Nhập tên thẻ"
@@ -697,7 +697,7 @@ if (!token) {
                 onChangeText={setNewTagName}
               />
       
-              <Text style={styles.label}>Chọn màu *</Text>
+              <Text style={styles.label}>Chọn màu <Text style={{color:'red'}}>*</Text></Text>
               <View style={{ flexDirection: 'row', marginVertical: 8 }}>
                 {colors.map(c => (
                   <TouchableOpacity

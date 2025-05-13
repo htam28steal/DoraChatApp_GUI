@@ -50,7 +50,7 @@ function AppContainer() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="LoginScreen">
-        {/* <Stack.Screen name="FriendList_Screen" component={FriendList_Screen} options={{ headerShown: false }} /> */}
+        <Stack.Screen name="FriendList_Screen" component={FriendList_Screen} options={{ headerShown: false }} />
         <Stack.Screen name="AllFriendAndGroup" component={AllFriendAndGroup} options={{ headerShown: false }} />
         <Stack.Screen name="Screen_03" component={Screen_03} options={{ headerShown: false }} />
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
