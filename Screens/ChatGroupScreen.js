@@ -17,7 +17,7 @@ import {
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import EmojiPicker from "rn-emoji-keyboard";
+import EmojiPicker, { tr } from "rn-emoji-keyboard";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,8 +27,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
 import { Video } from "expo-av";
-import ReactDetailModal from "./ReactDetailModal";
-// ASSETS
+
 const AvatarImage = require("../Images/avt.png");
 const CallIcon = require("../assets/Call.png");
 const VideoCallIcon = require("../assets/VideoCall.png");
@@ -51,7 +50,7 @@ const sampleReacts = [
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, sampleReacts }) {
+function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned }) {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
     console.log(msg.content);
@@ -102,8 +101,22 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
                 return require("../icons/fileDefault.png");
         }
     };
-    console.log("msg.reacts:", msg.reacts);
 
+    const [pinned, setPinned] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        const checkPinned = async () => {
+            const result = await isPinned(msg);
+            if (isMounted) {
+                setPinned(result);
+            }
+        };
+        checkPinned();
+        return () => {
+            isMounted = false;
+        };
+    }, [msg]);
 
     return (
         <Container
@@ -120,7 +133,18 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
                 <View style={messageItemStyles.avatarPlaceholder} />
             )}
 
+
             <View style={messageItemStyles.contentContainer}>
+                {pinned && (
+                    <Text
+                        style={[
+                            messageItemStyles.pinnedText,
+                            isMe ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }
+                        ]}
+                    >
+                        📌 Đã ghim
+                    </Text>
+                )}
                 {msg.type === "IMAGE" ? (
                     <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
                 ) : msg.type === "VIDEO" ? (
@@ -280,12 +304,20 @@ const messageItemStyles = StyleSheet.create({
         marginLeft: 4,
         color: '#666',
     },
+    pinnedText: {
+        fontSize: 11,
+        fontWeight: "500",
+        color: "#f39c12",
+        marginBottom: 4,
+        maxWidth: '100%',
+    },
+
 });
 
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji }) {
+function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned }) {
     const scrollViewRef = useRef(null);
 
     useEffect(() => {
@@ -314,12 +346,9 @@ function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji
                         showAvatar={isFirstInGroup}
                         showTime={isLastInGroup}
                         currentUserId={currentUserId}
-                        onLongPress={
-                            msg.memberId?.userId === currentUserId
-                                ? () => onMessageLongPress(msg)
-                                : null
-                        }
+                        onLongPress={() => onMessageLongPress(msg)}
                         handlePressEmoji={handlePressEmoji}
+                        isPinned={isPinned}
                     />
                 );
             })}
@@ -417,14 +446,15 @@ export default function ChatScreen({ route, navigation }) {
     const [input, setInput] = useState("");
     const [emojiOpen, setEmojiOpen] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState(null);
+    console.log(`Tin nhắn được chọn `, selectedMessage?._id)
     const [modalVisible, setModalVisible] = useState(false);
     const [currentChannelId, setCurrentChannelId] = useState(null);
     const [channels, setChannels] = useState([]);
+    const [pinnedMessages, setPinnedMessages] = useState([]);
 
     const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
 
 
-    const [selectedType, setSelectedType] = useState('');
     const [selectedReactors, setSelectedReactors] = useState([]);
 
     const emojiToType = {
@@ -546,41 +576,199 @@ export default function ChatScreen({ route, navigation }) {
         ]);
         setModalVisible(false);
     };
-    const handlePinMessages = async (message) => {
+
+
+    const isPinned = async (msg) => {
         try {
-            const response = await axios.post('/api/pin-messages', {
-                messageId: message._id,
-                conversationId: message.conversationId,
-                pinnedBy: message.memberId._id
-            });
-            const updatedMessage = response.data;
-            setMessages(prevMessages =>
-                prevMessages.map(msg =>
-                    msg._id === updatedMessage._id ? updatedMessage : msg
-                )
-            );
+            const response = await axios.get(`/api/pin-messages/${conversationId}`);
 
-            console.log('✅ Đã ghim tin nhắn:', response.data);
-
+            const listPinMess = response.data;
+            console.log(`HAHAHAHAHA`, listPinMess);
+            return listPinMess.some(p => p.messageId === msg._id);
         } catch (err) {
-            if (err.response) {
-                console.error('❌ Lỗi khi ghim:', err.response.data);
-            } else {
-                console.error('❌ Lỗi kết nối:', err.message);
-            }
+            console.log(err)
+        }
+
+    };
+
+
+    const isMessagePinned = (messageId) => {
+        return pinnedMessages.some(pm => pm.messageId === messageId);
+    };
+
+    const fetchPinnedMessages = async () => {
+        try {
+            const response = await axios.get(`/api/pin-messages/${conversationId}`);
+            setPinnedMessages(response.data);
+        } catch (err) {
+            console.error("Error fetching pinned messages:", err);
         }
     };
+
+    useEffect(() => {
+        if (conversationId) {
+            fetchPinnedMessages();
+        }
+    }, [conversationId]);
+
+
+
+
+    const handlePinMessages = async (message) => {
+        if (!message) {
+            console.log("No message selected");
+            return;
+        }
+
+        try {
+            const isPinned = isMessagePinned(message?._id);
+
+            if (isPinned) {
+                await handleUnpinMessage(message?._id);
+            } else {
+                const response = await axios.post('/api/pin-messages', {
+                    messageId: message._id,
+                    conversationId: message.conversationId,
+                    pinnedBy: message.memberId._id,
+                });
+
+                const newPinnedMessage = response.data;
+
+                setMessages(prevMessages =>
+                    prevMessages.map(msg =>
+                        msg._id === newPinnedMessage.messageId
+                            ? { ...msg, isPinned: true }
+                            : msg
+                    )
+                );
+
+                setPinnedMessages(prevPinnedMessages => [...prevPinnedMessages, newPinnedMessage]);
+                setModalVisible(false);
+            }
+        } catch (err) {
+            console.error(' Lỗi khi thao tác ghim:', err.message);
+            Alert.alert('Lỗi', 'Không thể thực hiện thao tác ghim tin nhắn');
+        }
+    };
+
+
+    const handleUnpinMessage = async (messageId) => {
+        try {
+            const memberResponse = await axios.get(`/api/members/${conversationId}/${userId}`);
+            
+            const memberId = memberResponse.data.data?._id;
+
+            await axios.delete(`/api/pin-messages/${messageId?._id}/${memberId}`);
+
+            setMessages(prevMessages =>
+                prevMessages.map(msg =>
+                    msg._id === messageId?._id
+                        ? { ...msg, isPinned: false }
+                        : msg
+                )
+            );
+            setPinnedMessages(prevPinnedMessages =>
+                prevPinnedMessages.filter(msg => msg.messageId !== messageId)
+            );
+
+            setModalVisible(false);
+        } catch (err) {
+            console.error(" Lỗi khi gỡ ghim:", err.message);
+            Alert.alert('Lỗi', 'Không thể gỡ ghim tin nhắn');
+        }
+    };
+
+    const handlePinnedMessages = async () => {
+        try {
+            const response = await axios.get(`/api/pin-messages/${conversationId}`);
+            return response.data;
+        } catch (err) {
+            console.log(err);
+            return [];
+        }
+    };
+
+    function PinnedMessagesSection({ pinnedMessages }) {
+        if (!pinnedMessages || pinnedMessages.length === 0) {
+            return null;
+        }
+
+        return (
+            <View style={pinnedMessageStyles.container}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+
+                    <View key={pinnedMessages._id} style={pinnedMessageStyles.messageItem}>
+                        <Text style={pinnedMessageStyles.messageContent} numberOfLines={1}>
+                            {pinnedMessages.content || "Nội dung đã ghim"}
+                        </Text>
+                        <Text style={pinnedMessageStyles.pinnedBy}>
+                            Được ghim bởi {pinnedMessages.pinnedBy.name || "ai đó"}
+                        </Text>
+                    </View>
+
+                </ScrollView>
+            </View>
+        );
+    }
+
+    const pinnedMessageStyles = StyleSheet.create({
+        container: {
+            width: '100%',
+            minHeight: 40,
+            backgroundColor: 'white',
+            borderBottomWidth: 1,
+            borderColor: '#ccc',
+            padding: 8,
+        },
+        title: {
+            fontSize: 12,
+            fontWeight: '600',
+            color: '#666',
+            marginBottom: 4,
+        },
+        messageItem: {
+            backgroundColor: '#f0f8ff',
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            borderRadius: 16,
+            marginRight: 8,
+            borderWidth: 1,
+            borderColor: '#e0e0e0',
+            maxWidth: 200,
+        },
+        messageContent: {
+            fontSize: 14,
+            fontWeight: '500',
+        },
+        pinnedBy: {
+            fontSize: 10,
+            color: '#888',
+            marginTop: 2,
+        }
+    });
 
 
 
     function HeaderSingleChat({ handleDetail }) {
         const navigation = useNavigation();
+        const [localPinnedMessages, setLocalPinnedMessages] = useState([]);
 
         useEffect(() => {
             if (channels.length > 0) {
                 setCurrentChannelId(channels[0]._id);
             }
         }, [channels]);
+
+        useEffect(() => {
+            const loadPinnedMessages = async () => {
+                const messages = await handlePinnedMessages();
+                setLocalPinnedMessages(messages);
+            };
+
+            loadPinnedMessages();
+        }, [conversation, pinnedMessages]);
+
+        const lastMessage = localPinnedMessages[localPinnedMessages.length - 1];
         return (
             <View style={headerStyles.container}>
                 <View style={headerStyles.headerContent}>
@@ -611,11 +799,9 @@ export default function ChatScreen({ route, navigation }) {
                         >
                             <Image source={DetailChatIcon} style={headerStyles.icon} />
                         </TouchableOpacity>
-
                     </View>
                 </View>
 
-                {/* Channels - Tách riêng một hàng dưới */}
                 <View style={headerStyles.channelsContainer}>
                     {channels.map((channel) => (
                         <TouchableOpacity
@@ -630,6 +816,10 @@ export default function ChatScreen({ route, navigation }) {
                         </TouchableOpacity>
                     ))}
                 </View>
+                <TouchableOpacity style={[{ width: '100%', height: 40 }]}>
+                    <PinnedMessagesSection pinnedMessages={lastMessage} />
+                </TouchableOpacity>
+
             </View>
         );
     }
@@ -671,10 +861,9 @@ export default function ChatScreen({ route, navigation }) {
         statusDot: { width: 10, height: 10, backgroundColor: "#00F026", borderRadius: 5 },
         statusText: { fontSize: 14, marginLeft: 6, color: "#333" },
 
-        // Channel styling
         channelsContainer: {
             flexDirection: 'row',
-            flexWrap: 'wrap',  // Sử dụng flexWrap để các channels có thể giãn ra nếu có nhiều hơn
+            flexWrap: 'wrap',
             marginTop: 10,
         },
         channelButton: {
@@ -706,7 +895,6 @@ export default function ChatScreen({ route, navigation }) {
 
         try {
             setMessages((prev) => prev.filter((m) => m._id !== selectedMessage._id));
-
             console.log(selectedMessage._id);
             await axios.delete(`/api/messages/${selectedMessage._id}/only`, {
                 data: {
@@ -725,7 +913,6 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    // Forward action: For now, just show an alert (placeholder).
     const handleForwardAction = () => {
         Alert.alert("Chuyển tiếp", "Forward action triggered.");
         setModalVisible(false);
@@ -984,19 +1171,33 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    const handlePressEmoji = (msg) => {
-        console.log("msg.reacts:", msg.reacts);
+    const handlePressEmoji = async (msg) => {
 
-        const uniqueTypes = [...new Set(msg.reacts.map((react) => react.type))];
+        const reactors = await Promise.all(
+            msg.reacts.map(async (react) => {
+                const member = await handleGetMember(react.memberId);
+                return {
+                    ...member,
+                    type: react.type,
+                };
+            })
+        );
 
-        const reactors = msg.reacts;
-
-        setSelectedType(uniqueTypes);
         setSelectedReactors(reactors);
-        setReactDetailModalVisible(true);  // Hiện modal
+        setReactDetailModalVisible(true);
     };
 
 
+    const handleGetMember = async (memberId) => {
+
+        try {
+            const response = await axios.get(`/api/members/member/${memberId}`);
+            return response.data.data;
+        } catch (error) {
+            console.error('Failed to get member:', error);
+            throw error;
+        }
+    }
 
     const handleReact = async (message, reactType) => {
         try {
@@ -1044,7 +1245,6 @@ export default function ChatScreen({ route, navigation }) {
                 channelId: currentChannelId,
             });
 
-            // Emit the message over socket; your server should broadcast it back
             socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
                 conversationId: conversationId,
                 content: message,
@@ -1054,12 +1254,10 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    // Listen for incoming messages from the socket.
     useEffect(() => {
         if (!socket || !conversationId) return;
         const receiveHandler = (message) => {
             setMessages((prev) => {
-                // If the message is from the current user, try to update the pending message.
                 if (message.memberId?.userId === userId) {
                     const index = prev.findIndex(
                         (m) => m.pending && m.content === message.content
@@ -1070,7 +1268,6 @@ export default function ChatScreen({ route, navigation }) {
                         return updatedMessages;
                     }
                 }
-                // If the message already exists (by _id), don't add it again.
                 const exists = prev.some((m) => m._id === message._id);
                 if (exists) return prev;
                 return [...prev, message];
@@ -1096,6 +1293,7 @@ export default function ChatScreen({ route, navigation }) {
                     currentUserId={userId}
                     onMessageLongPress={handleMessageLongPress}
                     handlePressEmoji={handlePressEmoji}
+                    isPinned={isPinned}
                 />
             </View>
             <MessageInput
@@ -1113,10 +1311,6 @@ export default function ChatScreen({ route, navigation }) {
                 onClose={() => setEmojiOpen(false)}
             />
 
-
-
-
-            {/* Modal for message actions on long press */}
             <Modal
                 visible={modalVisible}
                 transparent
@@ -1140,9 +1334,19 @@ export default function ChatScreen({ route, navigation }) {
                         <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
                             <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity style={styles.modalButton} onPress={() => handlePinMessages(selectedMessage)}>
-                            <Text style={styles.modalButtonText}>Ghim</Text>
+                        <TouchableOpacity
+                            style={styles.modalButton}
+                            onPress={() => {
+                                if (selectedMessage && isMessagePinned(selectedMessage._id)) {
+                                    handleUnpinMessage(selectedMessage);
+                                } else {
+                                    handlePinMessages(selectedMessage);
+                                }
+                            }}
+                        >
+                            <Text style={styles.modalButtonText}>
+                                {selectedMessage && isMessagePinned(selectedMessage?._id) ? "Gỡ ghim" : "Ghim"}
+                            </Text>
                         </TouchableOpacity>
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }}>
@@ -1159,18 +1363,17 @@ export default function ChatScreen({ route, navigation }) {
                                 </TouchableOpacity>
                             ))}
                         </View>
-
                     </View>
                 </TouchableOpacity>
             </Modal>
             <Modal visible={reactDetailModalVisible} transparent animationType="slide" onRequestClose={() => setReactDetailModalVisible(false)}>
                 <View style={styles.modalBackground}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Người đã thả {selectedType}:</Text>
+                        <Text style={styles.modalTitle}>Người đã thả:</Text>
 
                         <FlatList
-                            data={selectedReactors}  // Sử dụng selectedReactors làm data
-                            keyExtractor={(item) => item.userId}  // Sử dụng userId làm key
+                            data={selectedReactors}
+                            keyExtractor={(item) => item.userId}
                             renderItem={({ item }) => {
                                 const emojiMap = {
                                     1: '❤️',
@@ -1185,10 +1388,12 @@ export default function ChatScreen({ route, navigation }) {
 
                                 return (
                                     <View style={styles.reactorItem}>
-                                        <Text style={styles.emojiText}>{emoji}</Text>
-
-                                        <Text style={styles.reactorName}>{item.name}</Text>
-                                        {item.avatar && <Image source={{ uri: item.avatar }} style={styles.avatar} />}
+                                        {item.avatar && (
+                                            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                                        )}
+                                        <Text style={styles.reactorName}>
+                                            {item.name} đã thả {emoji}
+                                        </Text>
                                     </View>
                                 );
                             }}
@@ -1200,11 +1405,6 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
                 </View>
             </Modal>
-
-
-
-
-
 
         </View>
     );
