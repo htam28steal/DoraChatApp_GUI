@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, use } from "react";
 import {
     View,
     Text,
@@ -27,6 +27,8 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
 import { Video } from "expo-av";
+import CreateVoteModal from "./CreateVoteModal";
+import VotedModal from './VotedModal';
 
 const AvatarImage = require("../Images/avt.png");
 const CallIcon = require("../assets/Call.png");
@@ -50,7 +52,7 @@ const sampleReacts = [
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned }) {
+function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
     console.log(msg.content);
@@ -124,7 +126,11 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
             activeOpacity={0.7}
             style={[
                 messageItemStyles.container,
-                isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
+                msg.type === "VOTE"
+                    ? messageItemStyles.centerAlign
+                    : isMe
+                        ? messageItemStyles.rightAlign
+                        : messageItemStyles.leftAlign,
             ]}
         >
             {showAvatar ? (
@@ -155,6 +161,68 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
                         resizeMode="cover"
                         isLooping={false}
                     />
+                ) : msg.type === "VOTE" ? (
+                    <View style={messageItemStyles.fVotes}>
+                        <View style={messageItemStyles.fVotesRow}><Text style={messageItemStyles.txtContent}>{msg.content}</Text></View>
+                        <View style={messageItemStyles.optionsContainer}>
+                            {msg.options.map((opt, index) => (
+                                <TouchableOpacity
+                                    key={opt._id || index}
+                                    style={messageItemStyles.optionButton}
+                                    activeOpacity={0.7}
+                                    onPress={() => console.log("Voted option:", opt.name)}
+                                >
+                                    <Text style={messageItemStyles.optionText}>{opt.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                            {msg.options?.some(opt => opt.members?.length > 0) && (
+                                <>
+                                    <View
+                                        style={{
+                                            width: 25,
+                                            height: 25,
+                                            borderRadius: 50,
+                                            borderWidth: 1,
+                                            position: 'absolute',
+                                            right: 30,
+                                            top: 8,
+                                            overflow: 'hidden',
+                                            backgroundColor: '#fff',
+                                        }}
+                                    >
+                                        <Image
+                                            source={{ uri: 'https://i.pravatar.cc/300' }}
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
+                                    </View>
+                                    <View
+                                        style={{
+                                            width: 25,
+                                            height: 25,
+                                            borderRadius: 50,
+                                            borderWidth: 1,
+                                            position: 'absolute',
+                                            right: 15,
+                                            top: 8,
+                                            overflow: 'hidden',
+                                            backgroundColor: '#fff',
+                                        }}
+                                    >
+                                        <Image
+                                            source={{ uri: 'https://i.pravatar.cc/300' }}
+                                            style={{ width: '100%', height: '100%' }}
+                                        />
+                                    </View>
+                                </>
+                            )}
+                        </View>
+
+
+                        <View style={messageItemStyles.fVotesRow}>
+                            <TouchableOpacity style={messageItemStyles.btnVote} onPress={() => { handleOpenVoteModal() }}><Text>Bình chọn</Text></TouchableOpacity>
+                        </View>
+
+                    </View>
                 ) : msg.type === "FILE" ? (
                     <TouchableOpacity
                         style={messageItemStyles.fileContainer}
@@ -189,7 +257,7 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
                         onPress={() => handlePressEmoji(msg)}
                     >
                         {msg.reacts.map((react, idx) => {
-                            const emoji = emojiMap[react.type]; // Dùng react.type để lấy emoji
+                            const emoji = emojiMap[react.type];
                             return emoji ? (
                                 <Text key={idx} style={messageItemStyles.emojiText}>
                                     {emoji}
@@ -219,6 +287,12 @@ const messageItemStyles = StyleSheet.create({
         marginVertical: 4,
         alignItems: "flex-end",
     },
+    centerAlign: {
+        justifyContent: "center",
+        flexDirection: "row",
+        width: "100%",
+    },
+
     leftAlign: { justifyContent: "flex-start" },
     rightAlign: { flexDirection: "row-reverse" },
     avatar: { width: 40, height: 40, borderRadius: 20 },
@@ -311,13 +385,64 @@ const messageItemStyles = StyleSheet.create({
         marginBottom: 4,
         maxWidth: '100%',
     },
+    fVotes: {
+        alignSelf: 'center',
+        flexWrap: 'wrap',
+        width: 350,
+        height: 'auto',
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: 'grey',
+        borderRadius: 10,
+        padding: 10,
+    },
+    fVotesRow: {
+        width: '100%',
+        height: 'auto'
+    },
+    txtContent: {
+        fontWeight: '600'
+    },
+    optionsContainer: {
+        marginTop: 10,
+        gap: 8,
+    },
+
+    optionButton: {
+        backgroundColor: '#f1f1f1',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#ccc',
+    },
+
+    optionText: {
+        fontSize: 14,
+        color: '#333',
+    },
+
+    txtContent: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    btnVote: {
+        width: '100%',
+        height: 30,
+        backgroundColor: 'aqua',
+        borderRadius: 30,
+        marginTop: 10,
+        justifyContent: 'center',
+        alignItems: 'center'
+    }
 
 });
 
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned }) {
+function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) {
     const scrollViewRef = useRef(null);
 
     useEffect(() => {
@@ -349,6 +474,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji
                         onLongPress={() => onMessageLongPress(msg)}
                         handlePressEmoji={handlePressEmoji}
                         isPinned={isPinned}
+                        handleOpenVoteModal={handleOpenVoteModal}
                     />
                 );
             })}
@@ -364,7 +490,7 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress }) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress }) {
     const handleSend = () => {
         if (!input.trim()) return;
         onSend(input);
@@ -391,6 +517,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
                 <TouchableOpacity style={messageInputStyles.iconButton} onPress={onEmojiPress}>
                     <Image source={EmojiIcon} style={messageInputStyles.icon} />
                 </TouchableOpacity>
+                <TouchableOpacity onPress={onVotePress}  ><Text>Vote</Text></TouchableOpacity>
             </View>
             <TouchableOpacity style={messageInputStyles.sendButton} onPress={handleSend}>
                 <Image source={SendIcon} style={messageInputStyles.sendIcon} />
@@ -451,11 +578,13 @@ export default function ChatScreen({ route, navigation }) {
     const [currentChannelId, setCurrentChannelId] = useState(null);
     const [channels, setChannels] = useState([]);
     const [pinnedMessages, setPinnedMessages] = useState([]);
-
     const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
-
-
     const [selectedReactors, setSelectedReactors] = useState([]);
+
+    const [showVoteModal, setVoteShowModal] = useState(false);
+
+    const [showVotedModal, setVotedModal] = useState(false);
+
 
     const emojiToType = {
         '❤️': 1,
@@ -655,7 +784,7 @@ export default function ChatScreen({ route, navigation }) {
     const handleUnpinMessage = async (messageId) => {
         try {
             const memberResponse = await axios.get(`/api/members/${conversationId}/${userId}`);
-            
+
             const memberId = memberResponse.data.data?._id;
 
             await axios.delete(`/api/pin-messages/${messageId?._id}/${memberId}`);
@@ -1171,6 +1300,10 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
+    const handleOpenVoteModal = async () => {
+        setVotedModal(true)
+    }
+
     const handlePressEmoji = async (msg) => {
 
         const reactors = await Promise.all(
@@ -1282,7 +1415,17 @@ export default function ChatScreen({ route, navigation }) {
         };
     }, [socket, conversationId, userId]);
 
-    console.log(`messages selected`, selectedMessage)
+
+    const handleCreatePoll = (pollData) => {
+        console.log('Created Poll:', pollData);
+        setVoteShowModal(false);
+    };
+
+    const handleVoteSubmit = (selectedOptionId) => {
+        console.log('Đã chọn:', selectedOptionId);
+        // Gọi API hoặc xử lý khác tại đây
+        setVotedModal(false); //
+    };
 
     return (
         <View style={chatScreenStyles.container}>
@@ -1294,6 +1437,7 @@ export default function ChatScreen({ route, navigation }) {
                     onMessageLongPress={handleMessageLongPress}
                     handlePressEmoji={handlePressEmoji}
                     isPinned={isPinned}
+                    handleOpenVoteModal={handleOpenVoteModal}
                 />
             </View>
             <MessageInput
@@ -1304,12 +1448,32 @@ export default function ChatScreen({ route, navigation }) {
                 onPickFile={pickDocument}
                 onEmojiPress={() => setEmojiOpen(true)}
                 onModalReact={handlePressEmoji}
+                onVotePress={() => handleOpenVoteModal}
+
             />
             <EmojiPicker
                 onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
                 open={emojiOpen}
                 onClose={() => setEmojiOpen(false)}
             />
+            <CreateVoteModal
+                visible={showVoteModal}
+                onClose={() => setVoteShowModal(false)}
+                onCreate={handleCreatePoll}
+            />
+            <VotedModal
+                visible={showVotedModal}
+                onClose={() => setVotedModal(false)}
+                question="Bạn muốn bình chọn về điều gì?"
+                options={[
+                    { _id: '1', name: 'Lựa chọn 1' },
+                    { _id: '2', name: 'Lựa chọn 2' },
+                    { _id: '3', name: 'Lựa chọn 3' }
+                ]}
+                onSubmit={handleVoteSubmit}
+            />
+
+
 
             <Modal
                 visible={modalVisible}
@@ -1366,6 +1530,7 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
                 </TouchableOpacity>
             </Modal>
+
             <Modal visible={reactDetailModalVisible} transparent animationType="slide" onRequestClose={() => setReactDetailModalVisible(false)}>
                 <View style={styles.modalBackground}>
                     <View style={styles.modalContent}>
@@ -1406,7 +1571,9 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
             </Modal>
 
-        </View>
+
+
+        </View >
     );
 }
 

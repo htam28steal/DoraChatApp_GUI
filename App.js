@@ -135,13 +135,13 @@ function AppContainer() {
           options={{ headerShown: false }}
 
         />
-                 <Stack.Screen
+        <Stack.Screen
           name="CheckMailScreen"
           component={CheckMail}
           options={{ headerShown: false }}
 
         />
-                         <Stack.Screen
+        <Stack.Screen
           name="FullScreenImage"
           component={FullScreenImage}
           options={{ headerShown: false }}
