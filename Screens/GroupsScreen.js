@@ -751,8 +751,8 @@ useEffect(() => {
           <TouchableOpacity style={styles.btnTags}>
             <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTag}>
-            <Image source={require('../icons/calen.png')} style={styles.iconfooter} />
+          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
+            <Image source={require('../icons/friend.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags}>
           {currentUser?.avatar ? (
@@ -994,7 +994,7 @@ useEffect(() => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>Tên thẻ phân loại *</Text>
+        <Text style={styles.label}>Tên thẻ phân loại <Text style={{color:'red'}}>*</Text></Text>
         <TextInput
           style={styles.input}
           placeholder="Nhập tên thẻ"
@@ -1002,7 +1002,7 @@ useEffect(() => {
           onChangeText={setNewTagName}
         />
 
-        <Text style={styles.label}>Chọn màu *</Text>
+        <Text style={styles.label}>Chọn màu <Text style={{color:'red'}}>*</Text></Text>
         <View style={{ flexDirection: 'row', marginVertical: 8 }}>
           {colors.map(c => (
             <TouchableOpacity
@@ -1226,7 +1226,7 @@ useEffect(() => {
       fListFriend: {
         position: 'absolute',
         top: 110,
-        width: '100%',
+        width: '95%',
         height: '75%',
         paddingTop:15
       },
@@ -1239,7 +1239,7 @@ useEffect(() => {
         borderBottomColor: 'white',
         paddingHorizontal: 5,
       },
-      favatarGroup: { width: 65, justifyContent: 'center' },
+      favatarGroup: { width: 55, justifyContent: 'center' },
       fRowOne: {
         flexDirection: 'row',
         height: 25,
@@ -1260,8 +1260,8 @@ useEffect(() => {
 
     
       fInfor: { flex: 1, justifyContent: 'center', paddingLeft: 10 },
-      name: { fontSize: 16, fontWeight: 'bold' , color:'#086dc0'},
-      email: { fontSize: 13, fontWeight: '400' },
+      name: { fontSize: 17, fontWeight: 'bold' , color:'#086dc0'},
+      email: { fontSize: 14, fontWeight: '400' },
       fbtn: { position: 'absolute', right: 0, top: 5, width: 13, height: 30 },
       btnDetail: { width: 13, height: '100%' },
     
