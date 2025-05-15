@@ -57,18 +57,30 @@ export default function ConversationScreen({ navigation }) {
       const [friends, setFriends] = useState([]);
 
 
-      useEffect(() => {
-        if (!userId) return;
-        const fetchUserInfo = async () => {
-          try {
-            const { data } = await axios.get(`/api/me/profile/${userId}`);
-            setCurrentUser(data);
-          } catch (err) {
-            console.error('❌ Failed to load current user info', err);
-          }
-        };
-        fetchUserInfo();
-      }, [userId]);
+     useEffect(() => {
+  const fetchUserInfo = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Missing token', 'Cannot fetch profile without authentication.');
+        return;
+      }
+
+      const { data } = await axios.get('/api/me/profile', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setCurrentUser(data);
+    } catch (err) {
+      console.error('❌ Failed to load current user info', err);
+    }
+  };
+
+  fetchUserInfo();
+}, []);
+
       
 
       useEffect(() => {

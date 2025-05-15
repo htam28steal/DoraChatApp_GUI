@@ -869,7 +869,7 @@ const fetchGroupCurrentMembers = async () => {
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
-            <Image source={require('../icons/Trash.png')} style={{alignSelf:'center'}} />
+            <Image source={require('../icons/Trash.png')} style={{alignSelf:'center', width:17, height:18}} />
           </View>
           <Text style={{color:'#086DC0', fontSize:15}}>Delete chat history</Text>
         </View>
@@ -906,7 +906,7 @@ const fetchGroupCurrentMembers = async () => {
     <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
-    <Image source={require('../icons/Leave.png')} style={{alignSelf:'center'}} />
+    <Image source={require('../icons/Leave.png')} style={{alignSelf:'center', width:18, height:18}} />
     </View>
 
     <Text style={{ color:'#086DC0', fontSize:15}}>Leave group</Text>

@@ -78,18 +78,30 @@ const [filtered, setFiltered] = useState([]);
       }
     }, [query, conversations]);
 
-  useEffect(() => {
-    if (!userId) return;
-    const fetchUserInfo = async () => {
-      try {
-        const { data } = await axios.get(`/api/me/profile/${userId}`);
-        setCurrentUser(data);
-      } catch (err) {
-        console.error('❌ Failed to load current user info', err);
+useEffect(() => {
+  const fetchUserInfo = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Missing token', 'Cannot fetch profile without authentication.');
+        return;
       }
-    };
-    fetchUserInfo();
-  }, [userId]);
+
+      const { data } = await axios.get('/api/me/profile', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setCurrentUser(data);
+    } catch (err) {
+      console.error('❌ Failed to load current user info', err);
+    }
+  };
+
+  fetchUserInfo();
+}, []);
+
   
 
 
