@@ -197,7 +197,7 @@ useEffect(() => {
         source={
           isEditingName
             ? require('../icons/check.png')
-            : require('../assets/Edit.png')
+            : require('../icons/edit.png')
         }
         style={styles.editIcon}
       />
@@ -245,7 +245,7 @@ useEffect(() => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center', width:18, height:18}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Photos/Videos, Files, Links</Text>
         </View>
         <TouchableOpacity
@@ -261,7 +261,7 @@ useEffect(() => {
 >
   <Image
     source={require('../icons/arrow.png')}
-    style={{ width: 12, height: 12 }}
+    style={{ width: 18, height: 18 }}
   />
 </TouchableOpacity>
 
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   },
 recentList: {
   flexDirection: 'row',
-  flexWrap: 'wrap',
+
   paddingHorizontal: 20, // ✅ add this line
 },
 

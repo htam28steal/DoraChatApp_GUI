@@ -22,6 +22,7 @@
 
 
   export default function GroupsScreen({ navigation }) {
+    const [query, setQuery] = useState('');
     const [text, setText] = useState('');
     const [selectedFriendIds, setSelectedFriendIds] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
@@ -61,9 +62,21 @@ const [editingConversations, setEditingConversations] = useState([]);
     // in your component’s top-level useState calls:
   const [convPickerVisible, setConvPickerVisible] = useState(false);
   const [allConversations, setAllConversations] = useState([]);
-
+const [filtered, setFiltered] = useState([]);
   const [selectedFilters, setSelectedFilters] = useState([]);
 
+    useEffect(() => {
+      if (!query) {
+        setFiltered(conversations);
+      } else {
+        const q = query.toLowerCase();
+        setFiltered(conversations.filter(c =>
+          c.members.some(m =>
+            (m.name || '').toLowerCase().includes(q)
+          )
+        ));
+      }
+    }, [query, conversations]);
 
   useEffect(() => {
     if (!userId) return;
@@ -687,26 +700,28 @@ useEffect(() => {
       <View style={styles.container}>
         <Image source={require('../Images/bground.png')} style={styles.bg} />
 
-        <View style={styles.fcontent}>
-          <View style={styles.fcontrol}>
-            <Image
-              source={require('../icons/searchicon.png')}
-              style={styles.icons}
-            />
-            <View style={styles.fTxtSearch}>
-              <TextInput
-                style={styles.txtSearch}
-                placeholder="Search"
-                placeholderTextColor="#aaa"
-                onChangeText={setText}
-                value={text}
-              />
-            </View>
-          </View>
-          <TouchableOpacity style={styles.btnAdd} onPress={() => setModalVisible(true)}>
-            <Image source={Add} style={styles.iconAdd} />
-          </TouchableOpacity>
-        </View>
+      <View style={styles.header}>
+        <Image
+          source={require('../icons/searchicon.png')}
+          style={styles.icon}
+        />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search"
+          placeholderTextColor="#aaa"
+          style={styles.searchInput}
+        />
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => setModalVisible(true)}
+        >
+          <Image
+            source={require('../icons/plus.png')}
+            style={styles.addIcon}
+          />
+        </TouchableOpacity>
+      </View>
 
         <View style={styles.fFillter}>
 
@@ -1549,7 +1564,43 @@ useEffect(() => {
         backgroundColor: '#333',
       },
       
-      
+       header: {
+    marginTop:15,
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    height: 45,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    zIndex: 2,
+  },
+  icon: {
+    width: 18,
+    height: 18,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 16,
+  },
+  addBtn: {
+    marginLeft: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4F9DDD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addIcon: {
+    width: 16,
+    height: 16,
+  },
       
       
     });

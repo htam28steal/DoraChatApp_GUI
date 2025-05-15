@@ -463,15 +463,7 @@ if (!token) {
           placeholderTextColor="#aaa"
           style={styles.searchInput}
         />
-        <TouchableOpacity
-          style={styles.addBtn}
 
-        >
-          <Image
-            source={require('../icons/plus.png')}
-            style={styles.addIcon}
-          />
-        </TouchableOpacity>
       </View>
 
           <View style={styles.fFillter}>
