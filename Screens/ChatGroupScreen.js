@@ -163,65 +163,55 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
                     />
                 ) : msg.type === "VOTE" ? (
                     <View style={messageItemStyles.fVotes}>
-                        <View style={messageItemStyles.fVotesRow}><Text style={messageItemStyles.txtContent}>{msg.content}</Text></View>
+                        <View style={messageItemStyles.fVotesRow}>
+                            <Text style={messageItemStyles.txtContent}>{msg.content}</Text>
+                        </View>
+
                         <View style={messageItemStyles.optionsContainer}>
                             {msg.options.map((opt, index) => (
-                                <TouchableOpacity
-                                    key={opt._id || index}
-                                    style={messageItemStyles.optionButton}
-                                    activeOpacity={0.7}
-                                    onPress={() => console.log("Voted option:", opt.name)}
-                                >
-                                    <Text style={messageItemStyles.optionText}>{opt.name}</Text>
-                                </TouchableOpacity>
-                            ))}
-                            {msg.options?.some(opt => opt.members?.length > 0) && (
-                                <>
-                                    <View
-                                        style={{
-                                            width: 25,
-                                            height: 25,
-                                            borderRadius: 50,
-                                            borderWidth: 1,
-                                            position: 'absolute',
-                                            right: 30,
-                                            top: 8,
-                                            overflow: 'hidden',
-                                            backgroundColor: '#fff',
-                                        }}
+                                <View key={opt._id || index} style={{ position: 'relative', marginBottom: 10 }}>
+                                    <TouchableOpacity
+                                        style={messageItemStyles.optionButton}
+                                        activeOpacity={0.7}
+                                        onPress={() => console.log("Voted option:", opt.name)}
                                     >
-                                        <Image
-                                            source={{ uri: 'https://i.pravatar.cc/300' }}
-                                            style={{ width: '100%', height: '100%' }}
-                                        />
-                                    </View>
-                                    <View
-                                        style={{
-                                            width: 25,
-                                            height: 25,
-                                            borderRadius: 50,
-                                            borderWidth: 1,
-                                            position: 'absolute',
-                                            right: 15,
-                                            top: 8,
-                                            overflow: 'hidden',
-                                            backgroundColor: '#fff',
-                                        }}
-                                    >
-                                        <Image
-                                            source={{ uri: 'https://i.pravatar.cc/300' }}
-                                            style={{ width: '100%', height: '100%' }}
-                                        />
-                                    </View>
-                                </>
-                            )}
-                        </View>
+                                        <Text style={messageItemStyles.optionText}>{opt.name}</Text>
+                                    </TouchableOpacity>
 
+                                    {/* Avatars của các member đã vote vào option này */}
+                                    {opt.members?.length > 0 && (
+                                        <View style={{ flexDirection: 'row', position: 'absolute', right: 10, top: 8 }}>
+                                            {opt.members.slice(0, 3).map((member, i) => (
+                                                <View
+                                                    key={i}
+                                                    style={{
+                                                        width: 25,
+                                                        height: 25,
+                                                        borderRadius: 50,
+                                                        borderWidth: 1,
+                                                        marginLeft: i === 0 ? 0 : -10,
+                                                        overflow: 'hidden',
+                                                        backgroundColor: '#fff',
+                                                        zIndex: 10 - i,
+                                                    }}
+                                                >
+                                                    <Image
+                                                        source={{ uri: member.avatar || 'https://i.pravatar.cc/300' }}
+                                                        style={{ width: '100%', height: '100%' }}
+                                                    />
+                                                </View>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            ))}
+                        </View>
 
                         <View style={messageItemStyles.fVotesRow}>
-                            <TouchableOpacity style={messageItemStyles.btnVote} onPress={() => { handleOpenVoteModal() }}><Text>Bình chọn</Text></TouchableOpacity>
+                            <TouchableOpacity style={messageItemStyles.btnVote} onPress={() => handleOpenVoteModal(msg)}>
+                                <Text>Bình chọn</Text>
+                            </TouchableOpacity>
                         </View>
-
                     </View>
                 ) : msg.type === "FILE" ? (
                     <TouchableOpacity
@@ -585,6 +575,7 @@ export default function ChatScreen({ route, navigation }) {
 
     const [showVotedModal, setVotedModal] = useState(false);
 
+    const [memberId, setMemberId] = useState(null);
 
     const emojiToType = {
         '❤️': 1,
@@ -652,22 +643,23 @@ export default function ChatScreen({ route, navigation }) {
         }
     }, [conversation, conversationId]);
 
-    // Fetch tất cả tin nhắn của cuộc trò chuyện
-    useEffect(() => {
+    const fetchAllMessages = async () => {
         if (!conversationId) return;
 
-        const fetchAllMessages = async () => {
-            try {
-                const response = await axios.get(`/api/messages/${conversationId}`);
-                setMessages(response.data);
-            } catch (error) {
-                console.error("Error fetching messages:", error);
-                Alert.alert(
-                    "Error fetching messages",
-                    error.response?.data?.message || error.message
-                );
-            }
-        };
+        try {
+            const response = await axios.get(`/api/messages/${conversationId}`);
+            setMessages(response.data);
+        } catch (error) {
+            console.error("Error fetching messages:", error);
+            Alert.alert(
+                "Error fetching messages",
+                error.response?.data?.message || error.message
+            );
+        }
+    };
+
+    // useEffect vẫn gọi lần đầu khi conversationId thay đổi
+    useEffect(() => {
         fetchAllMessages();
     }, [conversationId]);
 
@@ -679,6 +671,7 @@ export default function ChatScreen({ route, navigation }) {
         setSelectedMessage(message);
         setModalVisible(true);
     };
+
 
     const handleRecallAction = () => {
         if (!selectedMessage) return;
@@ -1300,8 +1293,11 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    const handleOpenVoteModal = async () => {
+    const handleOpenVoteModal = async (msg) => {
+        setSelectedMessage(msg);
         setVotedModal(true)
+
+
     }
 
     const handlePressEmoji = async (msg) => {
@@ -1416,16 +1412,32 @@ export default function ChatScreen({ route, navigation }) {
     }, [socket, conversationId, userId]);
 
 
-    const handleCreatePoll = (pollData) => {
-        console.log('Created Poll:', pollData);
+    const handleCreatePoll = () => {
+        fetchAllMessages();
         setVoteShowModal(false);
     };
 
     const handleVoteSubmit = (selectedOptionId) => {
         console.log('Đã chọn:', selectedOptionId);
-        // Gọi API hoặc xử lý khác tại đây
+        fetchAllMessages();
         setVotedModal(false); //
     };
+
+    useEffect(() => {
+        const fetchMemberId = async () => {
+            if (conversationId && userId) {
+                try {
+                    const res = await axios.get(`/api/members/${conversationId}/${userId}`);
+                    const member = res.data.data;
+                    setMemberId(member._id); // Resolve xong rồi set
+                } catch (err) {
+                    console.error("Lỗi lấy memberId:", err);
+                }
+            }
+        };
+
+        fetchMemberId();
+    }, [conversationId, userId]);
 
     return (
         <View style={chatScreenStyles.container}>
@@ -1448,7 +1460,7 @@ export default function ChatScreen({ route, navigation }) {
                 onPickFile={pickDocument}
                 onEmojiPress={() => setEmojiOpen(true)}
                 onModalReact={handlePressEmoji}
-                onVotePress={() => handleOpenVoteModal}
+                onVotePress={() => setVoteShowModal(true)}
 
             />
             <EmojiPicker
@@ -1458,18 +1470,16 @@ export default function ChatScreen({ route, navigation }) {
             />
             <CreateVoteModal
                 visible={showVoteModal}
+                channelId={currentChannelId}
+                conversationId={conversationId}
+                memberId={memberId}
                 onClose={() => setVoteShowModal(false)}
                 onCreate={handleCreatePoll}
             />
             <VotedModal
                 visible={showVotedModal}
                 onClose={() => setVotedModal(false)}
-                question="Bạn muốn bình chọn về điều gì?"
-                options={[
-                    { _id: '1', name: 'Lựa chọn 1' },
-                    { _id: '2', name: 'Lựa chọn 2' },
-                    { _id: '3', name: 'Lựa chọn 3' }
-                ]}
+                message={selectedMessage}
                 onSubmit={handleVoteSubmit}
             />
 

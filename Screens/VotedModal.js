@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,40 +6,179 @@ import {
     Modal,
     StyleSheet,
     ScrollView,
+    Image,
+    Alert,
+    TextInput
 } from 'react-native';
 
-const VoteModal = ({ visible, onClose, question, options = [], onSubmit }) => {
-    const [selectedOption, setSelectedOption] = useState(null);
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import voteService from '../api/voteService';
+import userService from '../api/userService';
 
-    const handleSubmit = () => {
-        if (selectedOption) {
-            onSubmit(selectedOption);
+const VoteModal = ({ visible, onClose, message, onSubmit }) => {
+
+    const [selectedOptions, setSelectedOptions] = useState([]);
+    const [msg, setMsg] = useState(null);
+    const [user, setUser] = useState(null);
+    const [dynamicOptions, setDynamicOptions] = useState([]);
+    const [newOptionText, setNewOptionText] = useState('');
+
+    console.log(msg);
+    console.log(`User Vote là : `, user);
+    useEffect(() => {
+        const fetchUserId = async () => {
+            try {
+                const storedUserId = await AsyncStorage.getItem("userId");
+                setSelectedOptions([]);
+                setMsg(message);
+                setDynamicOptions(message?.options || []);
+
+                if (storedUserId) {
+                    setUser(await userService.getUserById(storedUserId));
+                } else {
+                    Alert.alert("Lỗi", "Không tìm thấy userId.");
+                }
+            } catch (error) {
+                Alert.alert("Lỗi khi lấy userId", error.message);
+            }
+        };
+        fetchUserId();
+    }, [message]);
+
+    const toggleOption = (optionId) => {
+        if (msg?.isMultipleChoice) {
+            if (selectedOptions.includes(optionId)) {
+                setSelectedOptions(selectedOptions.filter(id => id !== optionId));
+            } else {
+                setSelectedOptions([...selectedOptions, optionId]);
+            }
         } else {
-            alert('Vui lòng chọn một phương án.');
+            setSelectedOptions([optionId]);
         }
     };
 
+
+    const handleSubmit = async () => {
+        if (selectedOptions.length === 0) {
+            Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một phương án.');
+            return;
+        }
+
+        try {
+            await Promise.all(selectedOptions.map((optionId) =>
+                voteService.selectOption({
+                    voteId: msg._id,
+                    optionId: optionId,
+                    memberId: msg.memberId._id,
+                    memberInfo: {
+                        name: user.name,
+                        avatar: user.avatar,
+                        avatarColor: user.avatarColor,
+                    },
+                })
+            ));
+
+            Alert.alert("Thành công", "Bạn đã bình chọn thành công.");
+            onSubmit();
+        } catch (error) {
+            console.error('Lỗi khi bình chọn:', error);
+            Alert.alert("Lỗi", "Không thể gửi bình chọn.");
+        }
+    };
+
+    const { content, options = [] } = message || {};
+
     return (
         <Modal visible={visible} animationType="slide" transparent={true}>
-
             <View style={styles.modalContainer}>
                 <Text style={styles.title}>Bình chọn</Text>
 
-                <Text style={styles.question}>{question}</Text>
+                <Text style={styles.question}>{content}</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <TextInput
+                        placeholder="Nhập phương án mới"
+                        value={newOptionText}
+                        onChangeText={setNewOptionText}
+                        style={{
+                            flex: 1,
+                            borderWidth: 1,
+                            borderColor: '#ccc',
+                            borderRadius: 8,
+                            paddingHorizontal: 10,
+                            paddingVertical: 8,
+                        }}
+                    />
+                    <TouchableOpacity
+                        onPress={async () => {
+                            const trimmed = newOptionText.trim();
+                            if (!trimmed || !msg || !user) return;
+
+                            try {
+                                const res = await voteService.addVoteOption(msg._id, msg.memberId._id, trimmed);
+
+                                setDynamicOptions(prev => [...prev, res]);
+                                setNewOptionText('');
+                            } catch (err) {
+                                console.error('Lỗi khi thêm phương án:', err);
+                                Alert.alert('Lỗi', 'Không thể thêm phương án mới.');
+                            }
+                        }}
+
+                        style={{
+                            marginLeft: 8,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            backgroundColor: '#2F80ED',
+                            borderRadius: 6,
+                        }}
+                    >
+                        <Text style={{ color: 'white' }}>Thêm</Text>
+                    </TouchableOpacity>
+                </View>
 
                 <ScrollView style={styles.optionsList}>
-                    {options.map((opt) => (
-                        <TouchableOpacity
-                            key={opt._id}
-                            style={[
-                                styles.optionItem,
-                                selectedOption === opt._id && styles.optionSelected,
-                            ]}
-                            onPress={() => setSelectedOption(opt._id)}
-                        >
-                            <Text style={styles.optionText}>{opt.name}</Text>
-                        </TouchableOpacity>
+                    {dynamicOptions.map((opt) => (
+                        <View key={opt._id} style={{ position: 'relative' }}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.optionItem,
+                                    selectedOptions.includes(opt._id) && styles.optionSelected,
+                                ]}
+                                onPress={() => toggleOption(opt._id)}
+                            >
+                                <Text style={styles.optionText}>{opt.name}</Text>
+                            </TouchableOpacity>
+
+                            {opt.members?.length > 0 && (
+                                <>
+                                    {opt.members.slice(0, 2).map((member, index) => (
+                                        <View
+                                            key={index}
+                                            style={{
+                                                width: 25,
+                                                height: 25,
+                                                borderRadius: 50,
+                                                borderWidth: 1,
+                                                position: 'absolute',
+                                                right: 15 + index * 15,
+                                                top: 8,
+                                                overflow: 'hidden',
+                                                backgroundColor: '#fff',
+                                                zIndex: 2 - index,
+                                            }}
+                                        >
+                                            <Image
+                                                source={{ uri: member.avatar || 'https://i.pravatar.cc/300' }}
+                                                style={{ width: '100%', height: '100%' }}
+                                            />
+                                        </View>
+                                    ))}
+                                </>
+                            )}
+                        </View>
                     ))}
+
                 </ScrollView>
 
                 <View style={styles.buttonRow}>
@@ -52,8 +191,8 @@ const VoteModal = ({ visible, onClose, question, options = [], onSubmit }) => {
                     </TouchableOpacity>
                 </View>
             </View>
-
         </Modal>
+
     );
 };
 

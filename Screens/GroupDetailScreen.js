@@ -597,7 +597,7 @@ const fetchGroupCurrentMembers = async () => {
           source={
             isEditingName
               ? require('../icons/check.png')
-              : require('../assets/Edit.png')
+              : require('../icons/edit.png')
           }
           style={{ width: 20, height: 20 }}
         />
@@ -636,7 +636,7 @@ const fetchGroupCurrentMembers = async () => {
     justifyContent: 'center',
     alignItems: 'center',
   }}>
-  <Image source={require('../icons/arrow.png')} style={{ width: 12, height: 12 }} />
+  <Image source={require('../icons/arrow.png')} style={{ width: 18, height: 18 }} />
   </View>
 </TouchableOpacity>
   
@@ -673,7 +673,7 @@ const fetchGroupCurrentMembers = async () => {
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
-          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center'}} /></View>
+          }}><Image source={require('../icons/Photos.png')} style={{alignSelf:'center',  width:18, height:18}} /></View>
           <Text style={{color:'#086DC0', fontSize:15}}>Photos/Videos, Files, Links</Text>
         </View>
         <TouchableOpacity
@@ -689,7 +689,7 @@ const fetchGroupCurrentMembers = async () => {
 >
   <Image
     source={require('../icons/arrow.png')}
-    style={{ width: 12, height: 12 }}
+    style={{ width: 18, height: 18 }}
   />
 </TouchableOpacity>
 
@@ -750,7 +750,7 @@ const fetchGroupCurrentMembers = async () => {
           ? require('../icons/down-arrow.png')
           : require('../icons/arrow.png')
       }
-      style={{ width: 12, height: 12, resizeMode: 'contain' }}
+      style={{ width: 18, height: 18, resizeMode: 'contain' }}
     />
         </View>
 
@@ -869,7 +869,7 @@ const fetchGroupCurrentMembers = async () => {
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
-            <Image source={require('../icons/Trash.png')} style={{alignSelf:'center'}} />
+            <Image source={require('../icons/Trash.png')} style={{alignSelf:'center', width:17, height:18}} />
           </View>
           <Text style={{color:'#086DC0', fontSize:15}}>Delete chat history</Text>
         </View>
@@ -906,7 +906,7 @@ const fetchGroupCurrentMembers = async () => {
     <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
           }}>
-    <Image source={require('../icons/Leave.png')} style={{alignSelf:'center'}} />
+    <Image source={require('../icons/Leave.png')} style={{alignSelf:'center', width:18, height:18}} />
     </View>
 
     <Text style={{ color:'#086DC0', fontSize:15}}>Leave group</Text>
@@ -1527,10 +1527,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 20,
   },
-  recentList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
+recentList: {
+  justifyContent: 'flex-start',
+
+},
+
   recentImage: {
     width: 95,
     height: 60,

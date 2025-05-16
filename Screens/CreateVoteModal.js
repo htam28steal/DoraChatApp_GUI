@@ -8,15 +8,16 @@ import {
     ScrollView,
     StyleSheet,
     Switch,
+    Alert
 } from 'react-native';
+import voteService from '../api/voteService';
 
-const PollCreatorModal = ({ visible, onClose, onCreate }) => {
+const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId, channelId }) => {
 
     const [question, setQuestion] = useState('');
     const [options, setOptions] = useState(['', '']);
     const [allowMultiple, setAllowMultiple] = useState(false);
     const [isAnonymous, setIsAnonymous] = useState(false);
-
     const handleOptionChange = (text, index) => {
         const updated = [...options];
         updated[index] = text;
@@ -33,7 +34,7 @@ const PollCreatorModal = ({ visible, onClose, onCreate }) => {
         setOptions(updated);
     };
 
-    const handleCreatePoll = () => {
+    const handleCreatePoll = async () => {
         const filteredOptions = options
             .map((text) => ({ name: text.trim() }))
             .filter(opt => opt.name !== '');
@@ -43,16 +44,32 @@ const PollCreatorModal = ({ visible, onClose, onCreate }) => {
             return;
         }
 
-        onCreate({
+        console.log(`Fillter Option`, filteredOptions);
+        const payload = {
             content: question.trim(),
             options: filteredOptions,
             isMultipleChoice: allowMultiple,
             isAnonymous: isAnonymous,
-        });
+            memberId,
+            channelId,
+            conversationId,
+        };
+        console.log(`Payload`, payload)
 
-        setQuestion('');
-        setOptions(['', '']);
-        setAllowMultiple(false);
+        try {
+            const result = await voteService.createVote(payload);
+            onCreate?.(result);
+            onClose();
+
+            setQuestion('');
+            setOptions(['', '']);
+            setAllowMultiple(false);
+            setIsAnonymous(false);
+
+        } catch (error) {
+            Alert.alert("Lỗi", "Không thể tạo bình chọn");
+            console.error("Vote create error:", error);
+        }
     };
 
     return (

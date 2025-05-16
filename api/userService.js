@@ -11,7 +11,16 @@ const UserService = {
             throw error;
         }
     },
+    getUserById: async (userId) => {
+        try {
+            const response = await api.get(`/api/users/search/id/${userId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Lỗi khi lấy user theo số điện thoại:', error);
+            throw error;
+        }
+    }
 
 };
 
-export default UserService
+export default UserService;
