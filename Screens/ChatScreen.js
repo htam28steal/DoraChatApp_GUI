@@ -28,6 +28,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
 import { Video } from "expo-av";
+import UserService from "../api/userService";  
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
@@ -46,7 +47,16 @@ const screenWidth = Dimensions.get("window").width;
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, currentUserAvatar }) {
+function MessageItem({
+  msg,
+  showAvatar,
+  showTime,
+  currentUserId,
+  onLongPress,
+  currentUserAvatar,
+  otherUserAvatar, // ✅ ADD THIS
+}) {
+
 
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
@@ -121,7 +131,9 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, cu
         ? currentUserAvatar
           ? { uri: currentUserAvatar }
           : AvatarImage
-        : AvatarImage
+        : otherUserAvatar
+          ? { uri: otherUserAvatar }
+          : AvatarImage
     }
     style={messageItemStyles.avatar}
   />
@@ -249,7 +261,8 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, currentUserAvatar, onMessageLongPress }) {
+function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, onMessageLongPress }) {
+
 
   const scrollViewRef = useRef(null);
   
@@ -275,19 +288,20 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, onMessageLongPres
         const key = `${msg._id}-${index}`;
 
         return (
-         <MessageItem
-  key={key}
-  msg={msg}
-  showAvatar={isFirstInGroup}
-  showTime={isLastInGroup}
-  currentUserId={currentUserId}
-  currentUserAvatar={currentUserAvatar}
-  onLongPress={
-    msg.memberId?.userId === currentUserId
-      ? () => onMessageLongPress(msg)
-      : null
-  }
-/>
+        <MessageItem
+          key={key}
+          msg={msg}
+          showAvatar={isFirstInGroup}
+          showTime={isLastInGroup}
+          currentUserId={currentUserId}
+          currentUserAvatar={currentUserAvatar}
+           otherUserAvatar={otherUserAvatar}
+          onLongPress={
+            msg.memberId?.userId === currentUserId
+              ? () => onMessageLongPress(msg)
+              : null
+          }
+        />
 
         );
       })}
@@ -371,7 +385,7 @@ const messageInputStyles = StyleSheet.create({
 /**
  * Header Component for the chat screen.
  */
-function HeaderSingleChat({ conversationId, conversation,currentUserId    }) {
+function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser     }) {
   const navigation = useNavigation();
   const other = conversation.members.find(m => m.userId !== currentUserId);
   return (
@@ -379,7 +393,10 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId    }) {
       <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
         <Image source={Return} style={headerStyles.backBtn} />
       </TouchableOpacity>
-      <Image source={AvatarImage} style={headerStyles.avatar} />
+           <Image
+        source={otherUser?.avatar ? { uri: otherUser.avatar } : AvatarImage}
+        style={headerStyles.avatar}
+      />
       <View style={headerStyles.infoContainer}>
         <Text style={headerStyles.name}>John Doe</Text>
         <View style={headerStyles.statusContainer}>
@@ -451,6 +468,24 @@ const [userId, setUserId] = useState(null);
 const [friends, setFriends] = useState([]);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
+const [otherUser, setOtherUser] = useState(null);
+
+
+useEffect(() => {
+  const fetchOther = async () => {
+    try {
+      const otherId = conversation.members.find(m => m.userId !== userId)?.userId;
+      if (!otherId) return;
+
+      const data = await UserService.getUserById(otherId);
+      setOtherUser(data);
+    } catch (err) {
+      console.error("Failed to fetch other user:", err);
+    }
+  };
+
+  if (userId) fetchOther();
+}, [userId, conversation]);
 
 
 useEffect(() => {
@@ -1004,17 +1039,24 @@ const receiveHandler = (message) => {
 
   return (
     <View style={chatScreenStyles.container}>
-      <HeaderSingleChat 
-        conversation={conversation}
-         conversationId={conversationId}
-         currentUserId={userId}/>
+<HeaderSingleChat
+  conversation={conversation}
+  conversationId={conversationId}
+  currentUserId={userId}
+  otherUser={otherUser}
+/>
       <View style={chatScreenStyles.chatContainer}>
+          {otherUser && (
+
 <ChatBox
   messages={messages}
   currentUserId={userId}
   currentUserAvatar={currentUser?.avatar}
+   otherUserAvatar={otherUser?.avatar}// ✅ this is fine
   onMessageLongPress={handleMessageLongPress}
 />
+  )}
+
 
       </View>
       <MessageInput
