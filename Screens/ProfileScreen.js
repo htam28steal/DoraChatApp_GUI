@@ -285,7 +285,7 @@ export default function Screen_04({ navigation, route }) {
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>{userInfo.dateOfBirth.day}/{userInfo.dateOfBirth.month}/{userInfo.dateOfBirth.year}</Text>
+                  {/* <Text style={styles.txtInput}>{userInfo.dateOfBirth.day}/{userInfo.dateOfBirth.month}/{userInfo.dateOfBirth.year}</Text> */}
                 </View>
               </View>
 

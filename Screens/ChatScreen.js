@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -433,7 +433,118 @@ export default function ChatScreen({ route, navigation }) {
   // State for long press options modal.
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [forwardModalVisible, setForwardModalVisible] = useState(false);
+const [friends, setFriends] = useState([]);
+const [selectedForwardId, setSelectedForwardId] = useState(null);
 
+
+const recallHandler = useCallback((data) => {
+  const messageId = data.messageId ?? data._id;
+  const newContent = data.content ?? "[Message recalled]";
+
+  setMessages((prev) =>
+    prev.map((m) =>
+      m._id === messageId
+        ? { ...m, content: newContent, type: "RECALL" }
+        : m
+    )
+  );
+}, []);
+
+useEffect(() => {
+  if (!socket || !conversationId) return;
+
+  const receiveHandler = (message) => {
+    setMessages((prev) => {
+      const exists = prev.some((m) => m._id === message._id);
+      if (exists) return prev;
+      return [...prev, message];
+    });
+  };
+
+  socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+  socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+  socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+
+  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+    socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+  };
+}, [socket, conversationId, recallHandler]);
+
+
+  const handleSelectFriendToForward = async (friend) => {
+  try {
+    const convResponse = await axios.post(`/api/conversations/individuals/${friend._id}`);
+    const newConv = convResponse.data;
+
+    const messageToForward = {
+      conversationId: newConv._id,
+      content: selectedMessage.content,
+      type: selectedMessage.type,
+      fileName: selectedMessage.fileName,
+    };
+
+    await axios.post("/api/messages/text", messageToForward);
+
+    Alert.alert("Chuyển tiếp thành công!");
+    setForwardModalVisible(false);
+  } catch (err) {
+    Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
+  }
+};
+
+
+  const handleForwardAction = async () => {
+    try {
+      const response = await axios.get("/api/friends");
+      const friends = response.data;
+  
+      if (!friends || friends.length === 0) {
+        Alert.alert("Không có bạn bè nào để chuyển tiếp.");
+        return;
+      }
+  
+      // Hiện danh sách bạn bè bằng Alert để chọn
+      Alert.alert(
+        "Chọn người nhận",
+        "Hãy chọn người để chuyển tiếp:",
+        friends.map((friend) => ({
+          text: friend.name || friend.username,
+          onPress: async () => {
+            try {
+              // Gọi API tạo cuộc trò chuyện nếu chưa có
+              const convResponse = await axios.post(
+                `/api/conversations/individuals/${friend._id}`
+              );
+  
+              const newConv = convResponse.data;
+              const messageToForward = {
+                conversationId: newConv._id,
+                content: selectedMessage.content,
+                type: selectedMessage.type,
+                fileName: selectedMessage.fileName,
+              };
+  
+              // Gửi message chuyển tiếp
+              await axios.post("/api/messages/text", messageToForward);
+              Alert.alert("Chuyển tiếp thành công!");
+            } catch (err) {
+              Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
+            }
+          },
+        }))
+      );
+    } catch (error) {
+      Alert.alert("Lỗi lấy danh sách bạn bè", error.response?.data?.message || error.message);
+    }
+    setModalVisible(false);
+  };
   // Retrieve userId from AsyncStorage.
   useEffect(() => {
     const fetchUserId = async () => {
@@ -970,6 +1081,30 @@ export default function ChatScreen({ route, navigation }) {
 
 
 
+  <Modal
+  visible={forwardModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setForwardModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.forwardContainer}>
+      <Text style={styles.forwardTitle}>Chọn người để chuyển tiếp</Text>
+      {friends.map((friend) => (
+        <TouchableOpacity
+          key={friend._id}
+          style={styles.friendItem}
+          onPress={() => handleSelectFriendToForward(friend)}
+        >
+          <Text style={styles.friendName}>{friend.name || friend.username}</Text>
+        </TouchableOpacity>
+      ))}
+      <TouchableOpacity onPress={() => setForwardModalVisible(false)}>
+        <Text style={{ color: "red", marginTop: 10 }}>Đóng</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
 
 
     </View>
