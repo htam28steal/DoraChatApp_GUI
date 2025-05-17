@@ -16,6 +16,7 @@ import searchIcon from '../icons/searchicon.png';
 import axios from '../api/apiConfig';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
+import UserService from '../api/userService';
 
 
 const bgImage    = require('../Images/bground.png');
@@ -35,6 +36,101 @@ export default function ListRequestFriendScreen({ navigation }) {
   const [userId, setUserId] = useState(null);
   const [token, setToken] = useState(null);
    const [currentUser, setCurrentUser] = useState(null);
+   const [txtSearch, setTxtSearch] = useState('');
+const [searchResults, setSearchResults] = useState([]);
+const [stateFriend, setStateFriend] = useState(null);
+const [sentInvites, setSentInvites] = useState(null);
+
+
+const handleSearch = async (phoneNumber) => {
+  if (!phoneNumber) {
+    Alert.alert('Vui lòng nhập số điện thoại');
+    return;
+  }
+
+  let user;
+  try {
+    const resp = await UserService.getUserByPhoneNumber(phoneNumber);
+    user = resp.data ?? resp;
+    if (!user._id) throw new Error('Không nhận được dữ liệu người dùng');
+    setSearchResults([user]);
+  } catch (err) {
+    console.error('Error fetching user by phone:', err);
+    Alert.alert('Không tìm thấy người dùng');
+    setSearchResults([]);
+    return;
+  }
+
+  try {
+    const isF = await FriendService.isFriend(userId, user._id);
+    setStateFriend(isF);
+  } catch (err) {
+    console.warn('Could not check friendship status:', err);
+  }
+
+  try {
+    const invites = await FriendService.getListFriendInviteMe();
+    const pending = invites.some(inv => inv._id === user._id);
+    setSentInvites(pending ? 'pending' : null);
+  } catch (err) {
+    console.warn('Could not load pending invites:', err);
+  }
+};
+const handleAddFriend = async (friendId) => {
+  try {
+    const response = await FriendService.sendFriendInvite(friendId);
+    if (response.status === 201) {
+      setSentInvites('pending');
+    }
+  } catch (error) {
+    console.error('Error sending friend request:', error);
+    Alert.alert('Không thể gửi lời mời kết bạn');
+  }
+};
+
+const handleThuHoi = async (friendId) => {
+  try {
+    await FriendService.deleteInviteWasSend(friendId);
+    setSentInvites(null);
+    setStateFriend(false);
+  } catch (error) {
+    console.error('Lỗi khi thu hồi lời mời:', error);
+    Alert.alert('Lỗi', 'Không thể thu hồi lời mời. Vui lòng thử lại.');
+  }
+};
+const renderSearchItem = ({ item }) => (
+  <View style={styles.fMessage}>
+    <Image source={item.avatar ? { uri: item.avatar } : userIcon} style={styles.imgAG} />
+    <View style={styles.fInfor}>
+      <Text style={styles.name}>{item.name}</Text>
+      <Text style={styles.phoneNumber} numberOfLines={1}>{item.username}</Text>
+    </View>
+    <View style={styles.actionContainer}>
+      {stateFriend === false && sentInvites !== 'pending' && (
+        <TouchableOpacity
+          style={[styles.requestSent, { backgroundColor: '#4CBB17' }]}
+          onPress={() => handleAddFriend(item._id)}
+        >
+          <Text style={styles.txtAccecpt}>Kết bạn</Text>
+        </TouchableOpacity>
+      )}
+      {stateFriend === true && (
+        <View style={[styles.requestSent, { backgroundColor: '#999' }]}>
+          <Text style={styles.txtAccecpt}>Đã kết bạn</Text>
+        </View>
+      )}
+      {sentInvites === 'pending' && (
+        <TouchableOpacity
+          style={[styles.requestSent, { backgroundColor: '#FFA500' }]}
+          onPress={() => handleThuHoi(item._id)}
+        >
+          <Text style={styles.txtAccecpt}>Đã gửi lời mời</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
+
 
   useEffect(() => {
   const fetchCurrentUser = async () => {
@@ -97,54 +193,84 @@ export default function ListRequestFriendScreen({ navigation }) {
       Alert.alert('Error', 'Failed to accept request');
     }
   };
+  const handleFriendAccepted = async (data) => {
+  if (!data?._id) return;
 
-  useEffect(() => {
+  try {
+    const resp = await UserService.getUserById(data._id);
+    const fullUser = resp.data ?? resp;
+    setFriends((prev) => prev.filter(f => f._id !== fullUser._id));
+  } catch (err) {
+    console.warn('Could not fetch accepted user data:', err);
+    setFriends((prev) => prev.filter(f => f._id !== data._id));
+  }
+
+  // Reset search status if matched
+  if (searchResults.length > 0 && searchResults[0]._id === data._id) {
+    setStateFriend(true);
+    setSentInvites(null);
+  }
+};
+
+const handleFriendInviteDeleted = (senderId) => {
+  const id = typeof senderId === 'string' ? senderId : senderId?.senderId;
+  if (!id) return;
+
+  setFriends((prev) => prev.filter(f => f._id !== id));
+
+  if (searchResults.length > 0 && searchResults[0]._id === id) {
+    setStateFriend(false);
+    setSentInvites(null);
+  }
+};
+
+
+ useEffect(() => {
   if (!currentUser?._id) return;
 
   console.log('[SOCKET] JOIN_USER →', currentUser._id);
   socket.emit(SOCKET_EVENTS.JOIN_USER, currentUser._id);
 
-  const onInviteDeleted = (data) => {
-    console.log('[SOCKET] DELETED_FRIEND_INVITE received:', data);
-    const senderId = typeof data === 'string' ? data : data.senderId;
-    setFriends(prev => prev.filter(f => f._id !== senderId));
+  const onInviteDeleted = handleFriendInviteDeleted;
+  const onFriendAccepted = handleFriendAccepted;
+
+  const onNewInvite = (user) => {
+    console.log('[SOCKET] SEND_FRIEND_INVITE received:', user);
+
+    const normalizedUser = {
+      _id: user._id,
+      name: user.name || 'Unnamed',
+      username: user.username || 'unknown',
+      avatar: user.avatar || null,
+    };
+
+    setFriends((prev) => {
+      const already = prev.find(f => f._id === normalizedUser._id);
+      return already ? prev : [...prev, normalizedUser];
+    });
   };
+  const onFriendDeleted = (data) => {
+    if (!data?._id) return;
 
-  const onFriendAccepted = (user) => {
-    console.log('[SOCKET] ACCEPT_FRIEND received:', user);
-    // someone accepted your request
+    setFriends(prev => prev.filter(f => f._id !== data._id));
 
-    setFriends(prev => prev.filter(f => f._id !== user._id));
+    if (searchResults.length > 0 && searchResults[0]._id === data._id) {
+      setStateFriend(false);
+    }
   };
-
-const onNewInvite = (user) => {
-  console.log('[SOCKET] SEND_FRIEND_INVITE received:', user);
-
-  // Defensive: Ensure all fields are present
-  const normalizedUser = {
-    _id: user._id,
-    name: user.name || 'Unnamed',
-    username: user.username || 'unknown',
-    avatar: user.avatar || null,
-  };
-
-  setFriends(prev => {
-    const already = prev.find(f => f._id === normalizedUser._id);
-    return already ? prev : [...prev, normalizedUser];
-  });
-};
-
 
   socket.on(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onInviteDeleted);
   socket.on(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
   socket.on(SOCKET_EVENTS.SEND_FRIEND_INVITE, onNewInvite);
-
+  socket.on(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
   return () => {
     socket.off(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onInviteDeleted);
     socket.off(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
     socket.off(SOCKET_EVENTS.SEND_FRIEND_INVITE, onNewInvite);
+     socket.off(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
   };
-}, [currentUser]);
+}, [currentUser, searchResults]);
+
 
 
   const handleReject = async (friendId) => {
@@ -205,15 +331,19 @@ const renderFriend = ({ item }) => (
       <Image source={bgImage} style={styles.bg} />
 
       <View style={styles.header}>
-        <Image source={searchIcon} style={styles.icon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search requests"
-          placeholderTextColor="#aaa"
-          value={query}
-          onChangeText={setQuery}
-        />
-      </View>
+  <TouchableOpacity onPress={() => handleSearch(txtSearch)}>
+    <Image source={searchIcon} style={styles.icon} />
+  </TouchableOpacity>
+  <TextInput
+    style={styles.searchInput}
+    placeholder="Search phone number"
+    placeholderTextColor="#aaa"
+    value={txtSearch}
+    onChangeText={(text) => { setTxtSearch(text); setQuery(''); }}
+    onSubmitEditing={() => handleSearch(txtSearch)}
+  />
+</View>
+
              <View style={styles.fFillter}>
                     <TouchableOpacity style={styles.btnFillterChosen}> 
                       <Text style={styles.txtFillter}>Requests</Text>
@@ -224,17 +354,26 @@ const renderFriend = ({ item }) => (
 
       
                   </View>
+{loading ? (
+  <ActivityIndicator size="large" color="#086DC0" style={{ marginTop: 150 }} />
+) : txtSearch && searchResults.length > 0 ? (
+  <FlatList
+    contentContainerStyle={styles.list}
+    data={searchResults}
+    keyExtractor={item => item._id}
+    renderItem={renderSearchItem}
+    ListEmptyComponent={<Text style={styles.placeholderText}>Không tìm thấy người dùng.</Text>}
+  />
+) : (
+  <FlatList
+    contentContainerStyle={styles.list}
+    data={filtered}
+    keyExtractor={item => item._id}
+    renderItem={renderFriend}
+    ListEmptyComponent={<Text style={styles.placeholderText}>Không có lời mời kết bạn nào.</Text>}
+  />
+)}
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#086DC0" style={{ marginTop: 150 }} />
-      ) : (
-        <FlatList
-          contentContainerStyle={styles.list}
-          data={filtered}
-          keyExtractor={item => item._id}
-          renderItem={renderFriend}
-        />
-      )}
 
 
       <View style={styles.fFooter}>
