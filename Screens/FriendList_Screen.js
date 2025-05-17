@@ -268,6 +268,12 @@ socket.onAny((event, data) => {
     <TouchableOpacity
       style={styles.fMessage}
       onLongPress={() => { setSelectedFriend(user); setShowModal(true); }}
+            onPress={() =>
+            navigation.navigate('ChatScreen', {
+              conversation: conv,
+              userId,
+            })
+          }
     >
       <Image
         source={user.avatar ? { uri: user.avatar } : require('../Images/avt.png')}

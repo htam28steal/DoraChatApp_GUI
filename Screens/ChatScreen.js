@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   Linking,
+  FlatList
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -246,6 +247,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
   }, [messages]);
 
   return (
+    
     <ScrollView
       ref={scrollViewRef}
       style={chatBoxStyles.container}
@@ -356,10 +358,7 @@ const messageInputStyles = StyleSheet.create({
  */
 function HeaderSingleChat({ conversationId, conversation,currentUserId    }) {
   const navigation = useNavigation();
-  const other = conversation.members.find(
-        (m) => m.userId !== currentUserId
-      );
-
+  const other = conversation.members.find(m => m.userId !== currentUserId);
   return (
     <View style={headerStyles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
@@ -421,11 +420,11 @@ const headerStyles = StyleSheet.create({
  */
 export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from route parameters.
+const [userId, setUserId] = useState(null);
   const { conversation } = route.params;
   const conversationId = conversation._id;
 
 
-  const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -436,6 +435,7 @@ export default function ChatScreen({ route, navigation }) {
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
 const [friends, setFriends] = useState([]);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
+
 
 
 const recallHandler = useCallback((data) => {
@@ -1011,101 +1011,86 @@ useEffect(() => {
             <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
               <Text style={styles.modalButtonText}>Xoá</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
-              <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-            </TouchableOpacity>
+<TouchableOpacity
+  style={styles.modalButton}
+  onPress={async () => {
+    try {
+      const res = await axios.get("/api/friends");
+      setFriends(res.data);
+      setModalVisible(false);            // close the action menu
+      setSelectedForwardId(null);         // clear any previous selection
+      setForwardModalVisible(true);       // open your new classifyModal
+    } catch (err) {
+      Alert.alert("Lỗi lấy danh sách bạn bè", err.message);
+    }
+  }}
+>
+  <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+</TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
 
-      <Modal
-        visible={forwardModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setForwardModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.forwardContainer}>
-            <Text style={styles.forwardTitle}>Chọn người để chuyển tiếp</Text>
-            {friends.map((friend) => {
-              const isSelected = friend._id === selectedForwardId;
-              return (
-                <TouchableOpacity
-                  key={friend._id}
-                  style={[
-                    styles.friendItem,
-                    isSelected && styles.friendItemSelected
-                  ]}
-                  onPress={() => setSelectedForwardId(friend._id)}
-                >
-                  {/* Avatar */}
-                  <Image
-                    source={
-                      friend.avatar
-                        ? { uri: friend.avatar }
-                        : { AvatarImage }
-                    }
-                    style={styles.friendAvatar}
-                  />
-                  {/* Name */}
-                  <Text style={styles.friendName}>{friend.name || friend.username}</Text>
-                  {/* Radio Button */}
-                  <View style={styles.radioWrapper}>
-                    {isSelected
-                      ? <View style={styles.radioOuter}><View style={styles.radioInner} /></View>
-                      : <View style={styles.radioOuter} />}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            {/* Confirm Button */}
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={() => {
-                if (selectedForwardId) {
-                  const friend = friends.find(f => f._id === selectedForwardId);
-                  handleSelectFriendToForward(friend);
-                } else {
-                  Alert.alert("Vui lòng chọn bạn để chuyển tiếp");
-                }
-              }}
-            >
-              <Text style={styles.confirmText}>Xác nhận</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setForwardModalVisible(false)}>
-              <Text style={styles.cancelText}>Đóng</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
-
-
-  <Modal
+<Modal
   visible={forwardModalVisible}
   transparent
   animationType="slide"
   onRequestClose={() => setForwardModalVisible(false)}
 >
   <View style={styles.modalOverlay}>
-    <View style={styles.forwardContainer}>
-      <Text style={styles.forwardTitle}>Chọn người để chuyển tiếp</Text>
-      {friends.map((friend) => (
-        <TouchableOpacity
-          key={friend._id}
-          style={styles.friendItem}
-          onPress={() => handleSelectFriendToForward(friend)}
-        >
-          <Text style={styles.friendName}>{friend.name || friend.username}</Text>
-        </TouchableOpacity>
-      ))}
-      <TouchableOpacity onPress={() => setForwardModalVisible(false)}>
-        <Text style={{ color: "red", marginTop: 10 }}>Đóng</Text>
+    <View style={styles.classifyModal}>
+      <Text style={styles.manageTitle}>Chọn người để chuyển tiếp</Text>
+
+      <FlatList
+        data={friends}
+        keyExtractor={(f) => f._id}
+        style={{ flexGrow: 0, marginBottom: 12 }}
+        renderItem={({ item }) => {
+          const isSelected = item._id === selectedForwardId;
+          return (
+            <TouchableOpacity
+              style={styles.classifyRow}
+              onPress={() => setSelectedForwardId(item._id)}
+            >
+              <Image
+                source={ item.avatar ? { uri: item.avatar } : AvatarImage }
+                style={styles.friendAvatar}
+              />
+              <Text style={styles.classifyLabel}>
+                {item.name || item.username}
+              </Text>
+              <View
+                style={[
+                  styles.checkbox,
+                  isSelected && styles.checkboxSelected
+                ]}
+              >
+                {isSelected && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+      />
+
+      <TouchableOpacity
+        style={styles.confirmButton}
+        disabled={!selectedForwardId}
+        onPress={() => {
+          const friend = friends.find(f => f._id === selectedForwardId);
+          handleSelectFriendToForward(friend);
+        }}
+      >
+        <Text style={styles.confirmText}>Chuyển tiếp</Text>
       </TouchableOpacity>
     </View>
   </View>
 </Modal>
 
+
+
+
+ 
 
     </View>
   );
@@ -1224,6 +1209,79 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
   },
+   modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
+  // white card
+  classifyModal: {
+    backgroundColor: "white",
+    width: "80%",
+    borderRadius: 8,
+    padding: 16,
+    maxHeight: "60%",
+  },
+
+  manageTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+
+  classifyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+
+  classifyLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: "#086DC0",
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  checkboxSelected: {
+    backgroundColor: "#086DC0",
+  },
+
+  checkmark: {
+    color: "#fff",
+    fontSize: 16,
+    lineHeight: 18,
+  },
+
+  confirmButton: {
+    backgroundColor: "#086DC0",
+    borderRadius: 24,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+
+  confirmText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 
 });
