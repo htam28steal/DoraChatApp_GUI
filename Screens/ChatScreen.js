@@ -402,7 +402,7 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser
         style={headerStyles.avatar}
       />
       <View style={headerStyles.infoContainer}>
-        <Text style={headerStyles.name}>John Doe</Text>
+        <Text style={headerStyles.name} numberOfLines={1}>{otherUser?.name}</Text>
         <View style={headerStyles.statusContainer}>
           <View style={headerStyles.statusDot} />
           <Text style={headerStyles.statusText}>Active</Text>
@@ -434,10 +434,10 @@ const headerStyles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-  backBtn: { width: 50, height: 35, marginRight: 20 },
-  avatar: { width: 70, height: 70, borderRadius: 35 },
+  backBtn: { width: 25, height: 20, marginRight: 20 },
+  avatar: { width: 50, height: 50, borderRadius: 35 },
   infoContainer: { marginLeft: 12, flex: 1 },
-  name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
+  name: { fontSize: 15, fontWeight: "600", color: "#086DC0" },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -447,7 +447,7 @@ const headerStyles = StyleSheet.create({
   statusText: { fontSize: 14, marginLeft: 6, color: "#333" },
   iconsContainer: { flexDirection: "row" },
   iconButton: { padding: 8, marginLeft: 8 },
-  icon: { width: 24, height: 24, resizeMode: "contain" },
+  icon: { width: 20, height: 20, resizeMode: "contain" },
 });
 
 /**
@@ -470,7 +470,6 @@ const [conversationsList, setConversationsList] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
-const [friends, setFriends] = useState([]);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
