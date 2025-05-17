@@ -288,17 +288,36 @@ useEffect(() => {
         </Text>
       </View>
 
-      {!alreadyFriend && (
-        isRequestSent ? (
-          <View style={styles.requestSent}>
-            <Text style={styles.requestSentText}>Request Sent</Text>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={handleAddFriend} style={styles.addFriendBtn}>
-            <Image source={addFrIcon} style={styles.addFrIcon} />
-          </TouchableOpacity>
-        )
-      )}
+    {!alreadyFriend && (
+  isRequestSent ? (
+    <TouchableOpacity
+      onPress={async () => {
+        try {
+          await FriendService.deleteInviteWasSend(user._id);
+          setSentRequests(prev => prev.filter(id => id !== user._id));
+
+          socket.emit(SOCKET_EVENTS.DELETED_FRIEND_INVITE, {
+            senderId: currentUser._id,
+            receiverId: user._id,
+          });
+
+          Alert.alert('Cancelled', `Friend request to ${user.name} has been cancelled.`);
+        } catch (err) {
+          console.error('❌ Error cancelling friend request:', err);
+          Alert.alert('Error', 'Failed to cancel the friend request.');
+        }
+      }}
+      style={styles.requestSent}
+    >
+      <Text style={styles.requestSentText}>Request Sent</Text>
+    </TouchableOpacity>
+  ) : (
+    <TouchableOpacity onPress={handleAddFriend} style={styles.addFriendBtn}>
+      <Image source={addFrIcon} style={styles.addFrIcon} />
+    </TouchableOpacity>
+  )
+)}
+
     </View>
   );
 };
