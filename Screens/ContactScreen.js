@@ -36,6 +36,23 @@ export default function ContactScreen({ navigation }) {
   const [lookupLoading, setLookupLoading] = useState(true);
   const [sentRequests, setSentRequests] = useState([]);
 
+    const handleOpenChat = async (contactUser) => {
+    try {
+      const resp = await axios.post(
+        `/api/conversations/individuals/${contactUser._id}`
+      );
+      const conversation = resp.data;
+
+      navigation.navigate('ChatScreen', {
+        conversation,
+        userId,
+      });
+    } catch (err) {
+      console.error('Error opening chat:', err);
+      Alert.alert('Không thể mở trò chuyện', err.message);
+    }
+  };
+
   useEffect(() => {
     if (!currentUser?._id) return;
 
@@ -260,7 +277,10 @@ export default function ContactScreen({ navigation }) {
     };
 
     return (
-      <View style={styles.fMessage}>
+      <TouchableOpacity style={styles.fMessage}
+        activeOpacity={0.7}
+        onPress={() => handleOpenChat(user)}
+      >
         <Image
           source={
             user.avatar ? { uri: user.avatar } : require('../Images/avt.png')
@@ -308,7 +328,7 @@ export default function ContactScreen({ navigation }) {
               <Image source={addFrIcon} style={styles.addFrIcon} />
             </TouchableOpacity>
           ))}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -333,15 +353,14 @@ export default function ContactScreen({ navigation }) {
       </View>
 
       <View style={styles.fFillter}>
-        <TouchableOpacity style={styles.btnFillter}>
+        <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('ListRequestFriendScreen')}>
           <Text style={styles.txtFillter}>Requests</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnFillter}>
-        <Text style={styles.txtFillter}>Add Friend</Text>
-      </TouchableOpacity>
         <TouchableOpacity style={styles.btnFillterChosen}>
-          <Text style={styles.txtFillterChosen}>Contacts</Text>
+          <Text style={styles.txtFillterChosen}>Address Book</Text>
         </TouchableOpacity>
+
+
       </View>
       {/* optionally, filter tabs could go here */}
       {/* <View style={styles.filterRow}>…</View> */}
@@ -381,9 +400,9 @@ export default function ContactScreen({ navigation }) {
             style={styles.iconfooter}
           />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnTags}>
+        <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
           <Image
-            source={require('../icons/Home.png')}
+            source={require('../icons/QR.png')}
             style={styles.iconfooter}
           />
         </TouchableOpacity>
@@ -513,7 +532,7 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   btnFillter: {
-    width: 85,
+    width: 115,
     height: 30,
     borderRadius: 30,
     backgroundColor: '#FFEED4',
@@ -521,7 +540,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
     btnFillterChosen: {
-    width: 85,
+    width: 115,
     height: 30,
     borderRadius: 30,
     backgroundColor: '#AFDDFF',

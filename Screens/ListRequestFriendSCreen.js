@@ -1,433 +1,536 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    View,
-    FlatList,
-    StyleSheet,
-    Text,
-    StatusBar,
-    TextInput,
-    TouchableOpacity,
-    Image,
-    Alert
+  View,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import FriendService from "../api/friendService";
-
-export default function ListRequestFirendScreen({ navigation }) {
-    const [userId, setUserId] = useState(null);
-    const [friends, setFriends] = useState([]);
-    const [tokens, setToken] = useState(true);
-    console.log(userId)
-    console.log(friends)
-
-    const handleAccept = async (friendId) => {
-        console.log(friendId);
-        try {
-
-            await FriendService.acceptFriend(friendId);
-            Alert.alert("Success", "Friend request accepted!");
-            const updatedList = friends.filter(friend => friend._id !== friendId);
-            setFriends(updatedList);
-        } catch (error) {
-            Alert.alert("Error", "Failed to accept friend request");
-        }
-    };
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import FriendService from '../api/friendService';
+import searchIcon from '../icons/searchicon.png';
+import axios from '../api/apiConfig';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
+import UserService from '../api/userService';
 
 
-    useEffect(() => {
-        const fetchUserId = async () => {
-            try {
-                const storedUserId = await AsyncStorage.getItem("userId");
-                const token = await AsyncStorage.getItem("userToken");
-                setToken(token);
-                if (storedUserId) {
-                    setUserId(storedUserId);
-                } else {
-                    Alert.alert("Error", "User id not found.");
-                }
-            } catch (error) {
-                Alert.alert("Error fetching user id", error.message);
-            }
-        };
-        fetchUserId();
-    }, []);
-
-    useEffect(() => {
-        if (userId && tokens) {
-            const fetchFriendsRequest = async () => {
-                try {
-                    const friendsRequestData = await FriendService.getListRequestFriends(userId, tokens);
-                    setFriends(friendsRequestData);
-                } catch (err) {
-                    console.log(err);
-                }
-            };
-            fetchFriendsRequest();
-        }
-    }, [userId, tokens]);
-    const handleRejectInvite = async (friendId) => {
-        try {
-            await FriendService.deleteFriendInvite(friendId);
-            const updatedList = friends.filter(friend => friend._id !== friendId);
-            setFriends(updatedList);
+const bgImage    = require('../Images/bground.png');
+const messIcon   = require('../icons/mess.png');
+const memberIcon = require('../icons/member.png');
+const homeIcon   = require('../icons/QR.png');
+const friendIcon = require('../icons/friend.png');
+const userIcon   = require('../Images/avt.png');
+const checkIcon = require('../icons/check.png');
+const rejectIcon = require('../icons/Reject.png');
 
 
-        } catch (error) {
-            console.error("Lỗi khi từ chối lời mời:", error);
-            Alert.alert("Lỗi", "Không thể từ chối lời mời. Vui lòng thử lại.");
-        }
-    };
+export default function ListRequestFriendScreen({ navigation }) {
+  const [friends, setFriends] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [userId, setUserId] = useState(null);
+  const [token, setToken] = useState(null);
+   const [currentUser, setCurrentUser] = useState(null);
+   const [txtSearch, setTxtSearch] = useState('');
+const [searchResults, setSearchResults] = useState([]);
+const [stateFriend, setStateFriend] = useState(null);
+const [sentInvites, setSentInvites] = useState(null);
 
 
+const handleSearch = async (phoneNumber) => {
+  if (!phoneNumber) {
+    Alert.alert('Vui lòng nhập số điện thoại');
+    return;
+  }
 
+  let user;
+  try {
+    const resp = await UserService.getUserByPhoneNumber(phoneNumber);
+    user = resp.data ?? resp;
+    if (!user._id) throw new Error('Không nhận được dữ liệu người dùng');
+    setSearchResults([user]);
+  } catch (err) {
+    console.error('Error fetching user by phone:', err);
+    Alert.alert('Không tìm thấy người dùng');
+    setSearchResults([]);
+    return;
+  }
 
-    const renderFriend = ({ item }) => (
+  try {
+    const isF = await FriendService.isFriend(userId, user._id);
+    setStateFriend(isF);
+  } catch (err) {
+    console.warn('Could not check friendship status:', err);
+  }
 
+  try {
+    const invites = await FriendService.getListFriendInviteMe();
+    const pending = invites.some(inv => inv._id === user._id);
+    setSentInvites(pending ? 'pending' : null);
+  } catch (err) {
+    console.warn('Could not load pending invites:', err);
+  }
+};
+const handleAddFriend = async (friendId) => {
+  try {
+    const response = await FriendService.sendFriendInvite(friendId);
+    if (response.status === 201) {
+      setSentInvites('pending');
+    }
+  } catch (error) {
+    console.error('Error sending friend request:', error);
+    Alert.alert('Không thể gửi lời mời kết bạn');
+  }
+};
 
-        <TouchableOpacity style={styles.fMessage}>
-            <Image
-                source={item.avatar ? { uri: item.avatar } : null}
-                style={styles.avatar}
-            />
-
-            {!item.avatar && item.avatarColor ? (
-                <View style={[styles.avatarCl, { backgroundColor: item.avatarColor }, { backgroundColor: item.avatarColor, justifyContent: 'center', alignItems: 'center' }]}>
-                    <Text style={styles.avatarText}>{item.name?.charAt(0)}</Text>
-                </View>
-            ) : null}
-            <View style={styles.fInfor}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.email}>{item.username}</Text>
-
-                <View style={styles.fbtn}>
-                    <TouchableOpacity style={styles.btnAccept} onPress={() => {
-                        console.log("Accept button pressed for ID:", item._id);
-                        handleAccept(item._id);
-                    }}
-                    >
-                        <Text style={styles.txtAccecpt}>Chấp nhận</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.btnTC} onPress={() => { handleRejectInvite(item._id) }}>
-                        <Text style={styles.txtTC}>Từ chối</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+const handleThuHoi = async (friendId) => {
+  try {
+    await FriendService.deleteInviteWasSend(friendId);
+    setSentInvites(null);
+    setStateFriend(false);
+  } catch (error) {
+    console.error('Lỗi khi thu hồi lời mời:', error);
+    Alert.alert('Lỗi', 'Không thể thu hồi lời mời. Vui lòng thử lại.');
+  }
+};
+const renderSearchItem = ({ item }) => (
+  <View style={styles.fMessage}>
+    <Image source={item.avatar ? { uri: item.avatar } : userIcon} style={styles.imgAG} />
+    <View style={styles.fInfor}>
+      <Text style={styles.name}>{item.name}</Text>
+      <Text style={styles.phoneNumber} numberOfLines={1}>{item.username}</Text>
+    </View>
+    <View style={styles.actionContainer}>
+      {stateFriend === false && sentInvites !== 'pending' && (
+        <TouchableOpacity
+          style={[styles.requestSent, { backgroundColor: '#4CBB17' }]}
+          onPress={() => handleAddFriend(item._id)}
+        >
+          <Text style={styles.txtAccecpt}>Kết bạn</Text>
         </TouchableOpacity>
+      )}
+      {stateFriend === true && (
+        <View style={[styles.requestSent, { backgroundColor: '#999' }]}>
+          <Text style={styles.txtAccecpt}>Đã kết bạn</Text>
+        </View>
+      )}
+      {sentInvites === 'pending' && (
+        <TouchableOpacity
+          style={[styles.requestSent, { backgroundColor: '#FFA500' }]}
+          onPress={() => handleThuHoi(item._id)}
+        >
+          <Text style={styles.txtAccecpt}>Đã gửi lời mời</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
 
-    );
 
-    return (
-        <View style={styles.container}>
-            <View style={styles.fbg}>
-                <Image
-                    source={require('../Images/bground.png')}
-                    style={styles.bg}
-                />
-            </View>
+  useEffect(() => {
+  const fetchCurrentUser = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.warn('⚠️ No token found in storage');
+        return;
+      }
 
-            <View style={styles.fcontent}>
-                <View style={styles.fcontrol}>
-                    <TouchableOpacity style={styles.fFriendList} onPress={() => navigation.navigate("FriendList_Screen")}>
-                        <Image
-                            source={require('../icons/friend.png')}
-                            style={styles.icons}
-                        />
-                        <Text style={styles.txtfriendlist}>Friend list</Text>
+      const { data } = await axios.get('/api/me/profile', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log('✅ Loaded current user:', data);
+      setCurrentUser(data);
+    } catch (err) {
+      console.error('❌ Failed to fetch current user', err);
+    }
+  };
+
+  fetchCurrentUser();
+}, []);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const id = await AsyncStorage.getItem('userId');
+        const tk = await AsyncStorage.getItem('userToken');
+        setUserId(id);
+        setToken(tk);
+      } catch (err) {
+        Alert.alert('Error', 'Failed to load user');
+      }
+    };
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    if (userId && token) {
+      FriendService.getListRequestFriends(userId, token)
+        .then(setFriends)
+        .catch(err => console.log(err))
+        .finally(() => setLoading(false));
+    }
+  }, [userId, token]);
+
+  const handleAccept = async (friendId) => {
+    try {
+      await FriendService.acceptFriend(friendId);
+          // Emit accept event to let the other user update their state
+    socket.emit(SOCKET_EVENTS.ACCEPT_FRIEND, {
+      senderId: friendId,
+      receiverId: currentUser?._id,
+    });
+      setFriends(prev => prev.filter(f => f._id !== friendId));
+    } catch {
+      Alert.alert('Error', 'Failed to accept request');
+    }
+  };
+  const handleFriendAccepted = async (data) => {
+  if (!data?._id) return;
+
+  try {
+    const resp = await UserService.getUserById(data._id);
+    const fullUser = resp.data ?? resp;
+    setFriends((prev) => prev.filter(f => f._id !== fullUser._id));
+  } catch (err) {
+    console.warn('Could not fetch accepted user data:', err);
+    setFriends((prev) => prev.filter(f => f._id !== data._id));
+  }
+
+  // Reset search status if matched
+  if (searchResults.length > 0 && searchResults[0]._id === data._id) {
+    setStateFriend(true);
+    setSentInvites(null);
+  }
+};
+
+const handleFriendInviteDeleted = (senderId) => {
+  const id = typeof senderId === 'string' ? senderId : senderId?.senderId;
+  if (!id) return;
+
+  setFriends((prev) => prev.filter(f => f._id !== id));
+
+  if (searchResults.length > 0 && searchResults[0]._id === id) {
+    setStateFriend(false);
+    setSentInvites(null);
+  }
+};
+
+
+ useEffect(() => {
+  if (!currentUser?._id) return;
+
+  console.log('[SOCKET] JOIN_USER →', currentUser._id);
+  socket.emit(SOCKET_EVENTS.JOIN_USER, currentUser._id);
+
+  const onInviteDeleted = handleFriendInviteDeleted;
+  const onFriendAccepted = handleFriendAccepted;
+
+  const onNewInvite = (user) => {
+    console.log('[SOCKET] SEND_FRIEND_INVITE received:', user);
+
+    const normalizedUser = {
+      _id: user._id,
+      name: user.name || 'Unnamed',
+      username: user.username || 'unknown',
+      avatar: user.avatar || null,
+    };
+
+    setFriends((prev) => {
+      const already = prev.find(f => f._id === normalizedUser._id);
+      return already ? prev : [...prev, normalizedUser];
+    });
+  };
+  const onFriendDeleted = (data) => {
+    if (!data?._id) return;
+
+    setFriends(prev => prev.filter(f => f._id !== data._id));
+
+    if (searchResults.length > 0 && searchResults[0]._id === data._id) {
+      setStateFriend(false);
+    }
+  };
+
+  socket.on(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onInviteDeleted);
+  socket.on(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
+  socket.on(SOCKET_EVENTS.SEND_FRIEND_INVITE, onNewInvite);
+  socket.on(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
+  return () => {
+    socket.off(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onInviteDeleted);
+    socket.off(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
+    socket.off(SOCKET_EVENTS.SEND_FRIEND_INVITE, onNewInvite);
+     socket.off(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
+  };
+}, [currentUser, searchResults]);
+
+
+
+  const handleReject = async (friendId) => {
+    try {
+      await FriendService.deleteFriendInvite(friendId);
+     socket.emit(SOCKET_EVENTS.DELETED_FRIEND_INVITE, {
+      senderId: currentUser?._id,
+      receiverId: friendId,
+    });
+      setFriends(prev => prev.filter(f => f._id !== friendId));
+    } catch {
+      Alert.alert('Error', 'Failed to reject request');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    if (!query) return friends;
+    return friends.filter(f => f.name.toLowerCase().includes(query.toLowerCase()));
+  }, [query, friends]);
+
+const renderFriend = ({ item }) => (
+  <View style={styles.fMessage}>
+    <Image
+      source={item.avatar ? { uri: item.avatar } : userIcon}
+      style={styles.imgAG}
+    />
+
+<View style={styles.fInfor}>
+  <Text style={styles.name}>{item.name}</Text>
+  <Text style={styles.phoneNumber} numberOfLines={1}>
+     Hello, I'm {item.name}
+  </Text>
+</View>
+
+
+    <View style={styles.actionContainer}>
+      <TouchableOpacity
+        onPress={() => handleAccept(item._id)}
+        style={[styles.requestSent, { backgroundColor: '#4CAF50' }]}
+      >
+        <Image source={checkIcon} style={styles.iconAction} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => handleReject(item._id)}
+        style={[styles.requestSent, { backgroundColor: '#F44336', marginLeft:5}]}
+      >
+        <Image source={rejectIcon} style={styles.iconAction} />
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+
+
+  return (
+    <View style={styles.container}>
+      <Image source={bgImage} style={styles.bg} />
+
+      <View style={styles.header}>
+  <TouchableOpacity onPress={() => handleSearch(txtSearch)}>
+    <Image source={searchIcon} style={styles.icon} />
+  </TouchableOpacity>
+  <TextInput
+    style={styles.searchInput}
+    placeholder="Search phone number"
+    placeholderTextColor="#aaa"
+    value={txtSearch}
+    onChangeText={(text) => { setTxtSearch(text); setQuery(''); }}
+    onSubmitEditing={() => handleSearch(txtSearch)}
+  />
+</View>
+
+             <View style={styles.fFillter}>
+                    <TouchableOpacity style={styles.btnFillterChosen}> 
+                      <Text style={styles.txtFillter}>Requests</Text>
+                    </TouchableOpacity>
+                      <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('ContactScreen')}> 
+                      <Text style={styles.txtFillter}>Address Book</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.fRequest} >
-                        <Image
-                            source={require('../icons/friendrequest.png')}
-                            style={styles.icons}
-                        />
-                        <Text style={styles.txtRequest}>Friend request</Text>
-                        <Text style={styles.txtRequest}>(1)</Text>
-                    </TouchableOpacity>
+      
+                  </View>
+{loading ? (
+  <ActivityIndicator size="large" color="#086DC0" style={{ marginTop: 150 }} />
+) : txtSearch && searchResults.length > 0 ? (
+  <FlatList
+    contentContainerStyle={styles.list}
+    data={searchResults}
+    keyExtractor={item => item._id}
+    renderItem={renderSearchItem}
+    ListEmptyComponent={<Text style={styles.placeholderText}>Không tìm thấy người dùng.</Text>}
+  />
+) : (
+  <FlatList
+    contentContainerStyle={styles.list}
+    data={filtered}
+    keyExtractor={item => item._id}
+    renderItem={renderFriend}
+    ListEmptyComponent={<Text style={styles.placeholderText}>Không có lời mời kết bạn nào.</Text>}
+  />
+)}
 
-                    <TouchableOpacity style={styles.fContact} onPress={() => { navigation.navigate("ContactScreen") }}>
-                        <Image
-                            source={require('../icons/contact.png')}
-                            style={styles.icons}
-                        />
-                        <Text style={styles.txtRequest}>Contact</Text>
-                    </TouchableOpacity>
-                </View>
-                <TouchableOpacity style={styles.btnAdd}>
-                    <TouchableOpacity style={styles.btnAdd} onPress={() => navigation.navigate('FindUserScreen')}>
-                        <Image
-                            source={require('../icons/addFriend.png')}
-                            style={styles.iconAdd}
-                        />
-                    </TouchableOpacity>
-                </TouchableOpacity>
+
+
+      <View style={styles.fFooter}>
+              <TouchableOpacity style={styles.btnTags}>
+                <Image source={messIcon} style={styles.iconfooter} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnTags}
+                onPress={() => navigation.navigate('GroupsScreen')}
+              >
+                <Image source={memberIcon} style={styles.iconfooter} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
+                <Image source={homeIcon} style={styles.iconfooter} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.btnTags}
+                onPress={() => navigation.navigate('FriendList_Screen')}
+              >
+                <Image source={friendIcon} style={styles.iconfooter} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnTags}>
+               {currentUser?.avatar ? (
+        <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+      ) : (
+        <Image source={userIcon} style={styles.avatarFooter} />
+      )}
+      
+              </TouchableOpacity>
             </View>
-            <View style={styles.fListFriend}>
-                <FlatList
-                    data={friends}
-                    renderItem={renderFriend}
-                    keyExtractor={(item) => item._id}
-                    ListEmptyComponent={<Text>No friends found.</Text>} // Hiển thị khi mảng rỗng
-                />
-            </View>
-            <View style={styles.fFooter}>
-                <TouchableOpacity style={styles.btnTags}>
-                    <Image
-                        source={require('../icons/mess.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnTags}>
-                    <Image
-                        source={require('../icons/searchicon.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnTags}>
-                    <Image
-                        source={require('../icons/Home.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnTag}>
-                    <Image
-                        source={require('../icons/calen.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.avatarFooter}>
-                    <View style={styles.fImaFooter}>
-                        <Image
-                            source={require('../Images/nike.png')}
-                            style={styles.imgAva}
-                        />
-                    </View>
-                </TouchableOpacity>
-            </View>
-        </View >
-    );
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        marginTop: 30,
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+  container: { flex: 1, backgroundColor: '#D8EDFF' },
+  bg: { position: 'absolute', width: '100%', height: '100%' },
+  header: {
+    marginTop: 15,
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    height: 45,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    zIndex: 2,
+  },
+  icon: { width: 18, height: 18, marginRight: 8 },
+  searchInput: { flex: 1, height: '100%', fontSize: 16 },
+  list:             { paddingTop: 130, paddingHorizontal: 10, paddingBottom: 20 },
+fMessage: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  height: 65,
+  borderBottomWidth: 1,
+  borderBottomColor: 'white',
+  paddingHorizontal: 5,
+  width: '100%',
+},
+  imgAG: {
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
+  },
+  fInfor: {
+    flex: 1,
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+  name: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#086DC0',
+  },
+  phoneNumber: {
+    fontSize: 14,
+    color: '#444',
+    marginTop: 4,
+  },
+  requestSent: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 5,
+  },
+  requestSentText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  fFooter: {
+    position: 'absolute',
+    bottom: 10,
+    width: '90%',
+    height: 54,
+    backgroundColor: 'white',
+    borderRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    alignSelf: 'center',
+  },
+  btnTags:     { width: 66, height: 45, backgroundColor: 'white', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  btnTag:      { width: 66, height: 45, backgroundColor: '#086DC0', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  iconfooter:  { width: 25, height: 25 },
+  avatarFooter:{ width: 40, height: 40, borderRadius: 100 },
+   fFillter: {
+    position: 'absolute',
+    top: 70,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 15,
+    zIndex: 3,
+  },
+  iconAction: {
+  width: 20,
+  height: 20,
+  tintColor: 'white',
+},
+actionContainer: {
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginLeft: 10,
+  flexDirection:'row',
+},
+fFillter: {
+    position: 'absolute',
+    top: 70,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 15,
+    zIndex: 3,
+  },
+  btnFillter: {
+    width: 115,
+    height: 30,
+    borderRadius: 30,
+    backgroundColor: '#FFEED4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+    btnFillterChosen: {
+    width: 85,
+    height: 30,
+    borderRadius: 30,
+    backgroundColor: '#AFDDFF',
+    justifyContent: 'center',
+    alignItems: 'center',
     },
-    fbg: {
-        width: '100%',
-        height: '100%',
-    },
-    bg: {
-        width: '100%',
-        height: '100%',
-    },
-    fcontent: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        padding: 5,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    fcontrol: {
-        width: '90%',
-        height: 35,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    fFriendList: {
-        width: 100,
-        height: '100%',
-        backgroundColor: '#086DC0',
-        borderRadius: 16.5,
-        justifyContent: 'space-around',
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 5,
-    },
-    icons: {
-        width: 14,
-        height: 14,
-    },
-    txtfriendlist: {
-        fontSize: 13,
-        color: 'white',
-        fontWeight: 'bold',
-    },
-    fRequest: {
-        width: 150,
-        height: '100%',
-        backgroundColor: 'white',
-        borderRadius: 16.5,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        padding: 5,
-    },
-    txtRequest: {
-        fontSize: 13,
-        color: '#086DC0',
-        fontWeight: 'bold',
-    },
-    fContact: {
-        width: 94,
-        height: '100%',
-        backgroundColor: 'white',
-        borderRadius: 16.5,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        padding: 5,
-    },
-    btnAdd: {
-        width: 33,
-        height: 33,
-        backgroundColor: 'white',
-        borderRadius: '50%',
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    iconAdd: {
-        width: 16,
-        height: 16,
-    },
-    fListFriend: {
-        position: 'absolute',
-        width: '100%',
-        height: '80%',
-        padding: 5,
-    },
-    fMessage: {
-        width: '100%',
-        height: 65,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 5,
-        borderBottomWidth: 1,
-        borderColor: 'white'
+  txtFillter: { fontSize: 16, fontWeight: '600', color: '#F49300' },
+txtFillterChosen: { fontSize: 16, fontWeight: '600', color: '#F49300' },
 
-    },
-    avatar: {
-        width: 65,
-        height: 60,
-        borderRadius: 100,
-        marginRight: 0,
-    },
-    avatarCl: {
-        position: 'absolute',
-        width: 65,
-        height: 60,
-        borderRadius: 100,
-        marginRight: 0,
-        left: 0
-    },
-    fInfor: {
-        width: '90%',
-        height: '100%',
-        justifyContent: 'center',
-    },
-    name: {
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    email: {
-        fontSize: 13,
-        fontWeight: 400,
-    },
-    fbtn: {
-        display: 'flex',
-        position: 'absolute',
-        width: 150,
-        height: 30,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        right: 5,
-    },
-    btnAccept: {
-        display: 'flex',
-        width: 70,
-        height: '100%',
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#4CBB17',
-    },
-    txtAccecpt: {
-        fontSize: 11,
-        fontWeight: 500,
-        color: 'white'
-    },
-    btnTC: {
-        display: 'flex',
-        width: 70,
-        height: '100%',
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'red'
 
-    },
-    txtTC: {
-        fontSize: 11,
-        fontWeight: 500,
-        color: 'white'
-    },
-    fFooter: {
-        position: 'absolute',
-        width: 386,
-        height: 54,
-        bottom: 10,
-        backgroundColor: 'white',
-        borderRadius: 30,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-    },
-    btnTag: {
-        width: 66,
-        height: 45,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 30,
-        backgroundColor: '#086DC0',
-    },
-    btnTags: {
-        width: 66,
-        height: 45,
-        borderRadius: 30,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    iconfooter: {
-        width: 25,
-        height: 25,
-    },
-    avatarFooter: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: '50%',
-    },
-    imgAva: {
-        display: 'flex',
-        width: '100%',
-        height: '100%',
-    },
-    fImaFooter: {
-        display: 'flex',
-        overflow: 'hidden',
-        width: '100%',
-        height: '100%',
-        borderRadius: '50%',
-    },
-
-    avatarText: {
-        fontSize: 25,
-        fontWeight: 'bold',
-        color: 'white',
-    },
 });

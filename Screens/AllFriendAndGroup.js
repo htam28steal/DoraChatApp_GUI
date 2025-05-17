@@ -125,7 +125,7 @@ export default function Screen_02({ navigation }) {
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnTags}>
                     <Image
-                        source={require('../icons/Home.png')}
+                        source={require('../icons/QR.png')}
                         style={styles.iconfooter}></Image>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnTag}>

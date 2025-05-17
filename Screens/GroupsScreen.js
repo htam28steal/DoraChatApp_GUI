@@ -775,8 +775,8 @@ useEffect(() => {
           <TouchableOpacity style={styles.btnTags}>
             <Image source={require('../icons/member.png')} style={styles.iconfooter} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-            <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
+          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
+            <Image source={require('../icons/QR.png')} style={styles.iconfooter} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
             <Image source={require('../icons/friend.png')} style={styles.iconfooter} />

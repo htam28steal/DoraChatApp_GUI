@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   Linking,
+  FlatList
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -27,16 +28,17 @@ import { useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
 import { Video } from "expo-av";
+import UserService from "../api/userService";  
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
-const CallIcon = require("../assets/Call.png");
-const VideoCallIcon = require("../assets/VideoCall.png");
-const DetailChatIcon = require("../icons/userdetail.png");
+const CallIcon = require("../icons/call.png");
+const VideoCallIcon = require("../icons/video_call.png");
+const DetailChatIcon = require("../icons/detail_chat.png");
 const FileIcon = require("../icons/paperclip.png");
 const PictureIcon = require("../icons/picture.png");
 const EmojiIcon = require("../icons/emoji.png");
-const SendIcon = require("../icons/send.png");
+const SendIcon = require("../icons/send_icon.png");
 const FileSent = require("../icons/filesent.png");
 const Return = require("../icons/back.png");
 
@@ -45,7 +47,17 @@ const screenWidth = Dimensions.get("window").width;
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) {
+function MessageItem({
+  msg,
+  showAvatar,
+  showTime,
+  currentUserId,
+  onLongPress,
+  currentUserAvatar,
+  otherUserAvatar, // ✅ ADD THIS
+}) {
+
+
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
@@ -112,11 +124,23 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
         isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
       ]}
     >
-      {showAvatar ? (
-        <Image source={AvatarImage} style={messageItemStyles.avatar} />
-      ) : (
-        <View style={messageItemStyles.avatarPlaceholder} />
-      )}
+{showAvatar ? (
+  <Image
+    source={
+      isMe
+        ? currentUserAvatar
+          ? { uri: currentUserAvatar }
+          : AvatarImage
+        : otherUserAvatar
+          ? { uri: otherUserAvatar }
+          : AvatarImage
+    }
+    style={messageItemStyles.avatar}
+  />
+) : (
+  <View style={messageItemStyles.avatarPlaceholder} />
+)}
+
       <View style={messageItemStyles.contentContainer}>
         {msg.type === "IMAGE" ? (
           <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
@@ -140,19 +164,23 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
             </Text>
           </TouchableOpacity>
         ) : (
-          <Text
-            style={[
-              messageItemStyles.textContent,
-              isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
-              msg.type === "RECALL" && { fontStyle: "italic", color: "#999" },
-            ]}
-          >
-            {msg.type === "RECALL"
-              ? "Message has been recalled"
-              : content.length > MAX_TEXT_LENGTH
-                ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-                : content}
-          </Text>
+         <Text
+  style={[
+    messageItemStyles.textContent,
+    isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
+    (msg.isDeleted || msg.type === "RECALL") && {
+      fontStyle: "italic",
+      color: "#999",
+   
+    },
+  ]}
+>
+  {msg.isDeleted || msg.type === "RECALL"
+    ? "Message has been recalled"
+    : content.length > MAX_TEXT_LENGTH
+    ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+    : content}
+</Text>
         )}
         {showTime && (
           <Text style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}>
@@ -237,8 +265,11 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress }) {
+function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, onMessageLongPress }) {
+
+
   const scrollViewRef = useRef(null);
+  
 
   useEffect(() => {
     if (scrollViewRef.current)
@@ -246,6 +277,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
   }, [messages]);
 
   return (
+    
     <ScrollView
       ref={scrollViewRef}
       style={chatBoxStyles.container}
@@ -260,18 +292,21 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
         const key = `${msg._id}-${index}`;
 
         return (
-          <MessageItem
-            key={key}
-            msg={msg}
-            showAvatar={isFirstInGroup}
-            showTime={isLastInGroup}
-            currentUserId={currentUserId}
-            onLongPress={
-              msg.memberId?.userId === currentUserId
-                ? () => onMessageLongPress(msg)
-                : null
-            }
-          />
+        <MessageItem
+          key={key}
+          msg={msg}
+          showAvatar={isFirstInGroup}
+          showTime={isLastInGroup}
+          currentUserId={currentUserId}
+          currentUserAvatar={currentUserAvatar}
+           otherUserAvatar={otherUserAvatar}
+          onLongPress={
+            msg.memberId?.userId === currentUserId
+              ? () => onMessageLongPress(msg)
+              : null
+          }
+        />
+
         );
       })}
     </ScrollView>
@@ -354,20 +389,20 @@ const messageInputStyles = StyleSheet.create({
 /**
  * Header Component for the chat screen.
  */
-function HeaderSingleChat({ conversationId, conversation,currentUserId    }) {
+function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser     }) {
   const navigation = useNavigation();
-  const other = conversation.members.find(
-        (m) => m.userId !== currentUserId
-      );
-
+  const other = conversation.members.find(m => m.userId !== currentUserId);
   return (
     <View style={headerStyles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
         <Image source={Return} style={headerStyles.backBtn} />
       </TouchableOpacity>
-      <Image source={AvatarImage} style={headerStyles.avatar} />
+           <Image
+        source={otherUser?.avatar ? { uri: otherUser.avatar } : AvatarImage}
+        style={headerStyles.avatar}
+      />
       <View style={headerStyles.infoContainer}>
-        <Text style={headerStyles.name}>John Doe</Text>
+        <Text style={headerStyles.name} numberOfLines={1}>{otherUser?.name}</Text>
         <View style={headerStyles.statusContainer}>
           <View style={headerStyles.statusDot} />
           <Text style={headerStyles.statusText}>Active</Text>
@@ -399,10 +434,10 @@ const headerStyles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
-  backBtn: { width: 50, height: 35, marginRight: 20 },
-  avatar: { width: 70, height: 70, borderRadius: 35 },
+  backBtn: { width: 25, height: 20, marginRight: 20 },
+  avatar: { width: 50, height: 50, borderRadius: 35 },
   infoContainer: { marginLeft: 12, flex: 1 },
-  name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
+  name: { fontSize: 15, fontWeight: "600", color: "#086DC0" },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -412,7 +447,7 @@ const headerStyles = StyleSheet.create({
   statusText: { fontSize: 14, marginLeft: 6, color: "#333" },
   iconsContainer: { flexDirection: "row" },
   iconButton: { padding: 8, marginLeft: 8 },
-  icon: { width: 24, height: 24, resizeMode: "contain" },
+  icon: { width: 20, height: 20, resizeMode: "contain" },
 });
 
 /**
@@ -421,11 +456,12 @@ const headerStyles = StyleSheet.create({
  */
 export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from route parameters.
+const [userId, setUserId] = useState(null);
   const { conversation } = route.params;
   const conversationId = conversation._id;
+const [conversationsList, setConversationsList] = useState([]);
 
 
-  const [userId, setUserId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -433,7 +469,174 @@ export default function ChatScreen({ route, navigation }) {
   // State for long press options modal.
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [forwardModalVisible, setForwardModalVisible] = useState(false);
+const [selectedForwardId, setSelectedForwardId] = useState(null);
+const [currentUser, setCurrentUser] = useState(null);
+const [otherUser, setOtherUser] = useState(null);
 
+
+const openForwardModal = async () => {
+  try {
+    const { data } = await axios.get("/api/conversations");
+    console.log("🔍 all conversations:", data);
+    setConversationsList(data);
+    setModalVisible(false);
+    setForwardModalVisible(true);
+  } catch (err) {
+    console.error("Error fetching conversations:", err);
+    Alert.alert("Lỗi lấy cuộc trò chuyện", err.message);
+  }
+};
+
+useEffect(() => {
+  const fetchOther = async () => {
+    try {
+      const otherId = conversation.members.find(m => m.userId !== userId)?.userId;
+      if (!otherId) return;
+
+      const data = await UserService.getUserById(otherId);
+      setOtherUser(data);
+    } catch (err) {
+      console.error("Failed to fetch other user:", err);
+    }
+  };
+
+  if (userId) fetchOther();
+}, [userId, conversation]);
+
+
+useEffect(() => {
+  const fetchMe = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+      const { data } = await axios.get('/api/me/profile', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setCurrentUser(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  fetchMe();
+}, []);
+
+
+
+
+const recallHandler = useCallback((data) => {
+  const messageId = data.messageId ?? data._id;
+  const newContent = data.content ?? "[Message recalled]";
+
+  setMessages((prev) =>
+    prev.map((m) =>
+      m._id === messageId
+        ? {
+            ...m,
+            content: newContent,
+            type: "RECALL",
+            isDeleted: true, // <== Make sure this is preserved in memory
+          }
+        : m
+    )
+  );
+}, []);
+
+
+useEffect(() => {
+  if (!socket || !conversationId) return;
+
+  const receiveHandler = (message) => {
+    setMessages((prev) => {
+      const exists = prev.some((m) => m._id === message._id);
+      if (exists) return prev;
+      return [...prev, message];
+    });
+  };
+
+  socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+  socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+  socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+
+  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+    socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+  };
+}, [socket, conversationId, recallHandler]);
+
+
+  const handleSelectFriendToForward = async (friend) => {
+  try {
+    const convResponse = await axios.post(`/api/conversations/individuals/${friend._id}`);
+    const newConv = convResponse.data;
+
+    const messageToForward = {
+      conversationId: newConv._id,
+      content: selectedMessage.content,
+      type: selectedMessage.type,
+      fileName: selectedMessage.fileName,
+    };
+
+    await axios.post("/api/messages/text", messageToForward);
+
+    Alert.alert("Chuyển tiếp thành công!");
+    setForwardModalVisible(false);
+  } catch (err) {
+    Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
+  }
+};
+
+
+  const handleForwardAction = async () => {
+    try {
+      const response = await axios.get("/api/friends");
+      const friends = response.data;
+  
+      if (!friends || friends.length === 0) {
+        Alert.alert("Không có bạn bè nào để chuyển tiếp.");
+        return;
+      }
+  
+      // Hiện danh sách bạn bè bằng Alert để chọn
+      Alert.alert(
+        "Chọn người nhận",
+        "Hãy chọn người để chuyển tiếp:",
+        friends.map((friend) => ({
+          text: friend.name || friend.username,
+          onPress: async () => {
+            try {
+              // Gọi API tạo cuộc trò chuyện nếu chưa có
+              const convResponse = await axios.post(
+                `/api/conversations/individuals/${friend._id}`
+              );
+  
+              const newConv = convResponse.data;
+              const messageToForward = {
+                conversationId: newConv._id,
+                content: selectedMessage.content,
+                type: selectedMessage.type,
+                fileName: selectedMessage.fileName,
+              };
+  
+              // Gửi message chuyển tiếp
+              await axios.post("/api/messages/text", messageToForward);
+              Alert.alert("Chuyển tiếp thành công!");
+            } catch (err) {
+              Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
+            }
+          },
+        }))
+      );
+    } catch (error) {
+      Alert.alert("Lỗi lấy danh sách bạn bè", error.response?.data?.message || error.message);
+    }
+    setModalVisible(false);
+  };
   // Retrieve userId from AsyncStorage.
   useEffect(() => {
     const fetchUserId = async () => {
@@ -511,6 +714,21 @@ export default function ChatScreen({ route, navigation }) {
     setModalVisible(false);
   };
 
+const handleSelectConversationToForward = async (convId) => {
+  try {
+    await axios.post("/api/messages/text", {
+      conversationId: convId,
+      content: selectedMessage.content,
+      type: selectedMessage.type,
+      fileName: selectedMessage.fileName,
+    });
+    Alert.alert("Chuyển tiếp thành công!");
+  } catch (err) {
+    Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
+  } finally {
+    setForwardModalVisible(false);
+  }
+};
 
 
   // Delete action: Remove the message from local state.
@@ -790,16 +1008,17 @@ export default function ChatScreen({ route, navigation }) {
     }
     try {
       // Create an optimistic message with a pending flag.
-      const newMessage = {
-        _id: String(Date.now()), // temporary id
-        memberId: { userId: userId },
-        type: "TEXT",
-        content: message,
-        createdAt: new Date().toISOString(),
-        pending: true,
-      };
-      // Update local state immediately (optimistic UI update)
-      setMessages((prev) => [...prev, newMessage]);
+     const newMessage = {
+  _id: String(Date.now()),
+  memberId: { userId },
+  type: "TEXT",
+  content: message,
+  createdAt: new Date().toISOString(),
+  pending: true, // <== important
+};
+
+setMessages((prev) => [...prev, newMessage]);
+
 
       await axios.post("/api/messages/text", {
         conversationId: conversationId,
@@ -819,25 +1038,28 @@ export default function ChatScreen({ route, navigation }) {
   // Listen for incoming messages from the socket.
   useEffect(() => {
     if (!socket || !conversationId) return;
-    const receiveHandler = (message) => {
-      setMessages((prev) => {
-        // If the message is from the current user, try to update the pending message.
-        if (message.memberId?.userId === userId) {
-          const index = prev.findIndex(
-            (m) => m.pending && m.content === message.content
-          );
-          if (index !== -1) {
-            const updatedMessages = [...prev];
-            updatedMessages[index] = message;
-            return updatedMessages;
-          }
-        }
-        // If the message already exists (by _id), don't add it again.
-        const exists = prev.some((m) => m._id === message._id);
-        if (exists) return prev;
-        return [...prev, message];
-      });
-    };
+const receiveHandler = (message) => {
+  setMessages((prev) => {
+    // If it's from the current user, replace the optimistic one
+    if (message.memberId?.userId === userId) {
+      const index = prev.findIndex(
+        (m) => m.pending && m.content === message.content
+      );
+      if (index !== -1) {
+        const updated = [...prev];
+        updated[index] = message;
+        return updated;
+      }
+    }
+
+    // If it already exists by ID, don't add
+    if (prev.some((m) => m._id === message._id)) return prev;
+
+    // Otherwise, add the new message
+    return [...prev, message];
+  });
+};
+
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
 
@@ -855,16 +1077,25 @@ export default function ChatScreen({ route, navigation }) {
 
   return (
     <View style={chatScreenStyles.container}>
-      <HeaderSingleChat 
-        conversation={conversation}
-         conversationId={conversationId}
-         currentUserId={userId}/>
+<HeaderSingleChat
+  conversation={conversation}
+  conversationId={conversationId}
+  currentUserId={userId}
+  otherUser={otherUser}
+/>
       <View style={chatScreenStyles.chatContainer}>
-        <ChatBox
-          messages={messages}
-          currentUserId={userId}
-          onMessageLongPress={handleMessageLongPress}
-        />
+          {otherUser && (
+
+<ChatBox
+  messages={messages}
+  currentUserId={userId}
+  currentUserAvatar={currentUser?.avatar}
+   otherUserAvatar={otherUser?.avatar}// ✅ this is fine
+  onMessageLongPress={handleMessageLongPress}
+/>
+  )}
+
+
       </View>
       <MessageInput
         input={input}
@@ -882,95 +1113,125 @@ export default function ChatScreen({ route, navigation }) {
       />
 
       {/* Modal for message actions on long press */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
+     <Modal
+  visible={modalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setModalVisible(false)}
+>
+  <TouchableOpacity
+    style={styles.modalOverlay}
+    activeOpacity={1}
+    onPressOut={() => setModalVisible(false)}
+  >
+    <View style={styles.modalContainer}>
+      {selectedMessage?.isDeleted ? (
+        // Already recalled/deleted → only allow permanent delete
         <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={() => setModalVisible(false)}
+          style={styles.modalButton}
+          onPress={handleDeleteAction}
         >
-          <View style={styles.modalContainer}>
-            <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
-              <Text style={styles.modalButtonText}>Thu hồi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
-              <Text style={styles.modalButtonText}>Xoá</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
-              <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.modalButtonText}>Xoá</Text>
         </TouchableOpacity>
-      </Modal>
+      ) : (
+        // Normal message → all three actions
+        <>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={handleRecallAction}
+          >
+            <Text style={styles.modalButtonText}>Thu hồi</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={handleDeleteAction}
+          >
+            <Text style={styles.modalButtonText}>Xoá</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalButton}
+             onPress={openForwardModal}
+          >
+            <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  </TouchableOpacity>
+</Modal>
 
-      <Modal
-        visible={forwardModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setForwardModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.forwardContainer}>
-            <Text style={styles.forwardTitle}>Chọn người để chuyển tiếp</Text>
-            {friends.map((friend) => {
-              const isSelected = friend._id === selectedForwardId;
-              return (
-                <TouchableOpacity
-                  key={friend._id}
-                  style={[
-                    styles.friendItem,
-                    isSelected && styles.friendItemSelected
-                  ]}
-                  onPress={() => setSelectedForwardId(friend._id)}
-                >
-                  {/* Avatar */}
-                  <Image
-                    source={
-                      friend.avatar
-                        ? { uri: friend.avatar }
-                        : { AvatarImage }
-                    }
-                    style={styles.friendAvatar}
-                  />
-                  {/* Name */}
-                  <Text style={styles.friendName}>{friend.name || friend.username}</Text>
-                  {/* Radio Button */}
-                  <View style={styles.radioWrapper}>
-                    {isSelected
-                      ? <View style={styles.radioOuter}><View style={styles.radioInner} /></View>
-                      : <View style={styles.radioOuter} />}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            {/* Confirm Button */}
+
+<Modal
+  visible={forwardModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setForwardModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.classifyModal}>
+      <Text style={styles.manageTitle}>Chọn cuộc trò chuyện</Text>
+      <FlatList
+        data={conversationsList}
+        keyExtractor={(c) => c._id}
+        renderItem={({ item: conv }) => {
+          console.log("🔸 render conv:", conv);
+
+               const isGroup = conv.type === true;
+      let title, avatarUri;
+
+      if (isGroup) {
+        // group chat
+        title = conv.name;
+        avatarUri = conv.avatar;
+      } else {
+        // private chat: use the `userId` from state, not `currentUserId`
+        const other = conv.members.find(m => m.userId !== userId);
+        console.log("   private-other:", other);
+        title = other?.name ?? "Unknown";
+        avatarUri = other?.avatar;
+      }
+          const isSelected = conv._id === selectedForwardId;
+          return (
             <TouchableOpacity
-              style={styles.confirmButton}
+              style={styles.classifyRow}
               onPress={() => {
-                if (selectedForwardId) {
-                  const friend = friends.find(f => f._id === selectedForwardId);
-                  handleSelectFriendToForward(friend);
-                } else {
-                  Alert.alert("Vui lòng chọn bạn để chuyển tiếp");
-                }
+                console.log("→ selected conversation:", conv._id);
+                setSelectedForwardId(conv._id);
               }}
             >
-              <Text style={styles.confirmText}>Xác nhận</Text>
+              <Image
+                source={avatarUri ? { uri: avatarUri } : AvatarImage}
+                style={styles.friendAvatar}
+              />
+              <Text style={styles.classifyLabel}>{title}</Text>
+              <View
+                style={[
+                  styles.checkbox,
+                  isSelected && styles.checkboxSelected,
+                ]}
+              >
+                {isSelected && <Text style={styles.checkmark}>✓</Text>}
+              </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setForwardModalVisible(false)}>
-              <Text style={styles.cancelText}>Đóng</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+          );
+        }}
+      />
 
+      <TouchableOpacity
+        style={[
+          styles.confirmButton,
+          !selectedForwardId && { opacity: 0.5 },
+        ]}
+        disabled={!selectedForwardId}
+        onPress={() => handleSelectConversationToForward(selectedForwardId)}
+      >
+        <Text style={styles.confirmText}>Chuyển tiếp</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
 
-
-
+ 
 
     </View>
   );
@@ -1089,6 +1350,79 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
   },
+   modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
+  // white card
+  classifyModal: {
+    backgroundColor: "white",
+    width: "80%",
+    borderRadius: 8,
+    padding: 16,
+    maxHeight: "60%",
+  },
+
+  manageTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+
+  classifyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+
+  classifyLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: "#086DC0",
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  checkboxSelected: {
+    backgroundColor: "#086DC0",
+  },
+
+  checkmark: {
+    color: "#fff",
+    fontSize: 16,
+    lineHeight: 18,
+  },
+
+  confirmButton: {
+    backgroundColor: "#086DC0",
+    borderRadius: 24,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+
+  confirmText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 
 });

@@ -25,7 +25,7 @@ import ResetPasswordStep2 from './Screens/ResetPasswordStep2';
 import useSocketListeners from './hooks/useSocketListeners';
 import Conversations from './Screens/ConversationScreen'
 
-import ListRequestFriend from './Screens/ListRequestFriendSCreen';
+import ListRequestFriend from './Screens/ListRequestFriendScreen';
 import FindUser from './Screens/FindUserScreen';
 import Contact from './Screens/ContactScreen';
 
@@ -37,6 +37,7 @@ import Media from './Screens/MediaScreen'
 
 import CheckMail from './Screens/CheckMailScreen'
 import FullScreenImage from './Screens/FullSreenImage';
+import QR from './Screens/QRScreen'
 const Stack = createStackNavigator();
 
 // Component con để sử dụng các hook Redux (ví dụ useDispatch)
@@ -56,7 +57,7 @@ function AppContainer() {
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AddFriendScreen" component={AddFriendScreen} options={{ headerShown: false }} />
         <Stack.Screen name="YourFriendScreen" component={YourFriendScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="ListRequestFriend" component={ListRequestFriend} options={{ headerShown: false }} />
+        <Stack.Screen name="ListRequestFriendScreen" component={ListRequestFriend} options={{ headerShown: false }} />
         <Stack.Screen name="FindUserScreen" component={FindUser} options={{ headerShown: false }} />
         <Stack.Screen name="ContactScreen" component={Contact} options={{ headerShown: false }} />
         <Stack.Screen name="ChatGroup" component={ChatGroup} options={{ headerShown: false }} />
@@ -120,6 +121,12 @@ function AppContainer() {
         <Stack.Screen
           name="GroupsScreen"
           component={Groups}
+          options={{ headerShown: false }}
+
+        />
+                <Stack.Screen
+          name="QRScreen"
+          component={QR}
           options={{ headerShown: false }}
 
         />
