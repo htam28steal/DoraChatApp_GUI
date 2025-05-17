@@ -71,7 +71,19 @@ useEffect(() => {
       setFriends(friendsList);
     });
 };
+  const onFriendDeleted = (data) => {
+    console.log('[SOCKET] DELETED_FRIEND received:', data);
 
+    const deletedUserId = data?._id;
+    if (!deletedUserId) return;
+
+    // Remove from friends
+    setFriends(prev => {
+      const next = prev.filter(f => f._id !== deletedUserId && f.userId !== deletedUserId);
+      console.log('[SOCKET] Updated friends list after deletion:', next);
+      return next;
+    });
+  };
 
 
   const onFriendInviteDeleted = (data) => {
@@ -84,10 +96,11 @@ useEffect(() => {
 
   socket.on(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
   socket.on(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onFriendInviteDeleted);
-
+  socket.on(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
   return () => {
     socket.off(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
     socket.off(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onFriendInviteDeleted);
+    socket.off(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
   };
 }, [currentUser]);
 
