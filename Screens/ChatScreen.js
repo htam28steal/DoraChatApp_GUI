@@ -164,19 +164,23 @@ function MessageItem({
             </Text>
           </TouchableOpacity>
         ) : (
-          <Text
-            style={[
-              messageItemStyles.textContent,
-              isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
-              msg.type === "RECALL" && { fontStyle: "italic", color: "#999" },
-            ]}
-          >
-            {msg.type === "RECALL"
-              ? "Message has been recalled"
-              : content.length > MAX_TEXT_LENGTH
-                ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-                : content}
-          </Text>
+         <Text
+  style={[
+    messageItemStyles.textContent,
+    isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
+    (msg.isDeleted || msg.type === "RECALL") && {
+      fontStyle: "italic",
+      color: "#999",
+   
+    },
+  ]}
+>
+  {msg.isDeleted || msg.type === "RECALL"
+    ? "Message has been recalled"
+    : content.length > MAX_TEXT_LENGTH
+    ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+    : content}
+</Text>
         )}
         {showTime && (
           <Text style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}>
@@ -514,11 +518,17 @@ const recallHandler = useCallback((data) => {
   setMessages((prev) =>
     prev.map((m) =>
       m._id === messageId
-        ? { ...m, content: newContent, type: "RECALL" }
+        ? {
+            ...m,
+            content: newContent,
+            type: "RECALL",
+            isDeleted: true, // <== Make sure this is preserved in memory
+          }
         : m
     )
   );
 }, []);
+
 
 useEffect(() => {
   if (!socket || !conversationId) return;
@@ -1075,43 +1085,52 @@ const receiveHandler = (message) => {
       />
 
       {/* Modal for message actions on long press */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={() => setModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
-              <Text style={styles.modalButtonText}>Thu hồi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
-              <Text style={styles.modalButtonText}>Xoá</Text>
-            </TouchableOpacity>
-<TouchableOpacity
-  style={styles.modalButton}
-  onPress={async () => {
-    try {
-      const res = await axios.get("/api/friends");
-      setFriends(res.data);
-      setModalVisible(false);            // close the action menu
-      setSelectedForwardId(null);         // clear any previous selection
-      setForwardModalVisible(true);       // open your new classifyModal
-    } catch (err) {
-      Alert.alert("Lỗi lấy danh sách bạn bè", err.message);
-    }
-  }}
+     <Modal
+  visible={modalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setModalVisible(false)}
 >
-  <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-</TouchableOpacity>
-          </View>
+  <TouchableOpacity
+    style={styles.modalOverlay}
+    activeOpacity={1}
+    onPressOut={() => setModalVisible(false)}
+  >
+    <View style={styles.modalContainer}>
+      {selectedMessage?.isDeleted ? (
+        // Already recalled/deleted → only allow permanent delete
+        <TouchableOpacity
+          style={styles.modalButton}
+          onPress={handleDeleteAction}
+        >
+          <Text style={styles.modalButtonText}>Xoá</Text>
         </TouchableOpacity>
-      </Modal>
+      ) : (
+        // Normal message → all three actions
+        <>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={handleRecallAction}
+          >
+            <Text style={styles.modalButtonText}>Thu hồi</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={handleDeleteAction}
+          >
+            <Text style={styles.modalButtonText}>Xoá</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={handleForwardAction}
+          >
+            <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  </TouchableOpacity>
+</Modal>
 
 
 <Modal
