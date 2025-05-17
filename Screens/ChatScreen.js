@@ -459,6 +459,7 @@ export default function ChatScreen({ route, navigation }) {
 const [userId, setUserId] = useState(null);
   const { conversation } = route.params;
   const conversationId = conversation._id;
+const [conversationsList, setConversationsList] = useState([]);
 
 
   const [messages, setMessages] = useState([]);
@@ -474,6 +475,19 @@ const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
 
+
+const openForwardModal = async () => {
+  try {
+    const { data } = await axios.get("/api/conversations");
+    console.log("🔍 all conversations:", data);
+    setConversationsList(data);
+    setModalVisible(false);
+    setForwardModalVisible(true);
+  } catch (err) {
+    console.error("Error fetching conversations:", err);
+    Alert.alert("Lỗi lấy cuộc trò chuyện", err.message);
+  }
+};
 
 useEffect(() => {
   const fetchOther = async () => {
@@ -701,6 +715,21 @@ useEffect(() => {
     setModalVisible(false);
   };
 
+const handleSelectConversationToForward = async (convId) => {
+  try {
+    await axios.post("/api/messages/text", {
+      conversationId: convId,
+      content: selectedMessage.content,
+      type: selectedMessage.type,
+      fileName: selectedMessage.fileName,
+    });
+    Alert.alert("Chuyển tiếp thành công!");
+  } catch (err) {
+    Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
+  } finally {
+    setForwardModalVisible(false);
+  }
+};
 
 
   // Delete action: Remove the message from local state.
@@ -1122,7 +1151,7 @@ const receiveHandler = (message) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.modalButton}
-            onPress={handleForwardAction}
+             onPress={openForwardModal}
           >
             <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
           </TouchableOpacity>
@@ -1141,30 +1170,45 @@ const receiveHandler = (message) => {
 >
   <View style={styles.modalOverlay}>
     <View style={styles.classifyModal}>
-      <Text style={styles.manageTitle}>Chọn người để chuyển tiếp</Text>
-
+      <Text style={styles.manageTitle}>Chọn cuộc trò chuyện</Text>
       <FlatList
-        data={friends}
-        keyExtractor={(f) => f._id}
-        style={{ flexGrow: 0, marginBottom: 12 }}
-        renderItem={({ item }) => {
-          const isSelected = item._id === selectedForwardId;
+        data={conversationsList}
+        keyExtractor={(c) => c._id}
+        renderItem={({ item: conv }) => {
+          console.log("🔸 render conv:", conv);
+
+               const isGroup = conv.type === true;
+      let title, avatarUri;
+
+      if (isGroup) {
+        // group chat
+        title = conv.name;
+        avatarUri = conv.avatar;
+      } else {
+        // private chat: use the `userId` from state, not `currentUserId`
+        const other = conv.members.find(m => m.userId !== userId);
+        console.log("   private-other:", other);
+        title = other?.name ?? "Unknown";
+        avatarUri = other?.avatar;
+      }
+          const isSelected = conv._id === selectedForwardId;
           return (
             <TouchableOpacity
               style={styles.classifyRow}
-              onPress={() => setSelectedForwardId(item._id)}
+              onPress={() => {
+                console.log("→ selected conversation:", conv._id);
+                setSelectedForwardId(conv._id);
+              }}
             >
               <Image
-                source={ item.avatar ? { uri: item.avatar } : AvatarImage }
+                source={avatarUri ? { uri: avatarUri } : AvatarImage}
                 style={styles.friendAvatar}
               />
-              <Text style={styles.classifyLabel}>
-                {item.name || item.username}
-              </Text>
+              <Text style={styles.classifyLabel}>{title}</Text>
               <View
                 style={[
                   styles.checkbox,
-                  isSelected && styles.checkboxSelected
+                  isSelected && styles.checkboxSelected,
                 ]}
               >
                 {isSelected && <Text style={styles.checkmark}>✓</Text>}
@@ -1175,21 +1219,18 @@ const receiveHandler = (message) => {
       />
 
       <TouchableOpacity
-        style={styles.confirmButton}
+        style={[
+          styles.confirmButton,
+          !selectedForwardId && { opacity: 0.5 },
+        ]}
         disabled={!selectedForwardId}
-        onPress={() => {
-          const friend = friends.find(f => f._id === selectedForwardId);
-          handleSelectFriendToForward(friend);
-        }}
+        onPress={() => handleSelectConversationToForward(selectedForwardId)}
       >
         <Text style={styles.confirmText}>Chuyển tiếp</Text>
       </TouchableOpacity>
     </View>
   </View>
 </Modal>
-
-
-
 
  
 
