@@ -691,7 +691,7 @@ useEffect(() => {
               <View style={styles.fInfor}>
                 <Text style={styles.name}>{group.name || 'New Group'}</Text>
                 <Text style={styles.email} numberOfLines={1}>
-  {group.lastMessageId?.content || 'No messages yet.'}
+    {group.lastMessageId?.content || 'No messages yet.'}
 </Text>
 
 

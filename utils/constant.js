@@ -14,6 +14,8 @@ export const SOCKET_EVENTS = {
   RECEIVE_MESSAGE: "receive-message",
   MESSAGE_RECALLED: "message-recalled",
   MESSAGE_DELETED_FOR_ME: "message_deleted_for_me",
+  TAGGED: "tagged",
+
   // Friend system
   ACCEPT_FRIEND: "accept-friend",
   SEND_FRIEND_INVITE: "send-friend-invite",
@@ -58,6 +60,11 @@ export const SOCKET_EVENTS = {
   RECEIVE_SIGNAL: "receive-signal",
   LEAVE_CALL: "leave-call",
 
+  // Call - Group call (Metered)
+  GROUP_CALL_USER: "group-call-user",
+  GROUP_CALL_ENDED: "group-call-ended",
+
+
   // Last view tracking
   CONVERSATION_LAST_VIEW: "conversation-last-view",
   USER_LAST_VIEW: "user-last-view",
@@ -72,8 +79,13 @@ export const SOCKET_EVENTS = {
   VOTE_OPTION_DESELECTED: "vote-option-deselected",
   ADD_VOTE_OPTION: "add-vote-option",
   DELETE_VOTE_OPTION: "delete-vote-option",
-  VOTE_LOCKED: "vote-locked", 
+  VOTE_LOCKED: "vote-locked",
 
-    // Member
-    UPDATE_MEMBER_NAME: "update-member-name",
+  // Member
+  UPDATE_MEMBER_NAME: "update-member-name",
+
+  // Channel
+  NEW_CHANNEL: "new-channel",
+  DELETE_CHANNEL: "delete-channel",
+  UPDATE_CHANNEL: "update-channel",
 };
