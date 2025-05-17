@@ -22,7 +22,7 @@ import UserService from '../api/userService';
 const bgImage    = require('../Images/bground.png');
 const messIcon   = require('../icons/mess.png');
 const memberIcon = require('../icons/member.png');
-const homeIcon   = require('../icons/Home.png');
+const homeIcon   = require('../icons/QR.png');
 const friendIcon = require('../icons/friend.png');
 const userIcon   = require('../Images/avt.png');
 const checkIcon = require('../icons/check.png');
@@ -386,7 +386,7 @@ const renderFriend = ({ item }) => (
               >
                 <Image source={memberIcon} style={styles.iconfooter} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.btnTags}>
+              <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
                 <Image source={homeIcon} style={styles.iconfooter} />
               </TouchableOpacity>
               <TouchableOpacity

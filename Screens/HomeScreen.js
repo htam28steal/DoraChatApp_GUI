@@ -120,7 +120,7 @@ const HomeScreen = () => {
         <View style={styles.option}>
           <Image source={require('../icons/mess.png')} style={styles.icon} />
           <Image source={require('../icons/searchicon.png')} style={styles.icon} />
-          <Image source={require('../icons/Home.png')} style={styles.icon} />
+          <Image source={require('../icons/QR.png')} style={styles.icon} />
           <Image source={require('../icons/friends.png')} style={styles.icon} />
           <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen', { userInfo, token })}>
             {avatar ? (

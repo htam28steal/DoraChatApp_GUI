@@ -37,6 +37,7 @@ import Media from './Screens/MediaScreen'
 
 import CheckMail from './Screens/CheckMailScreen'
 import FullScreenImage from './Screens/FullSreenImage';
+import QR from './Screens/QRScreen'
 const Stack = createStackNavigator();
 
 // Component con để sử dụng các hook Redux (ví dụ useDispatch)
@@ -120,6 +121,12 @@ function AppContainer() {
         <Stack.Screen
           name="GroupsScreen"
           component={Groups}
+          options={{ headerShown: false }}
+
+        />
+                <Stack.Screen
+          name="QRScreen"
+          component={QR}
           options={{ headerShown: false }}
 
         />

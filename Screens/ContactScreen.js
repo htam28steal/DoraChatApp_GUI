@@ -380,9 +380,9 @@ export default function ContactScreen({ navigation }) {
             style={styles.iconfooter}
           />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnTags}>
+        <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
           <Image
-            source={require('../icons/Home.png')}
+            source={require('../icons/QR.png')}
             style={styles.iconfooter}
           />
         </TouchableOpacity>
