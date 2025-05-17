@@ -17,6 +17,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import * as Contacts from 'expo-contacts';
+import FriendService from '../api/friendService'; // adjust path if needed
+
+
+const addFrIcon = require("../icons/addFriend.png");
 
 
 
@@ -36,6 +40,45 @@ export default function ContactScreen({ navigation }) {
 const [phoneBookUsers, setPhoneBookUsers] = useState([]);
 const [filteredContacts, setFilteredContacts] = useState([]);
 const [lookupLoading, setLookupLoading] = useState(true);
+const [sentRequests, setSentRequests] = useState([]);
+useEffect(() => {
+  const fetchSentInvites = async () => {
+    try {
+      // this hits your router.get('/invites/me', ...) handler
+      const { data } = await axios.get('/api/friends/invites/me');
+      // data is already an array of user objects you’ve invited
+      setSentRequests(data.map(u => u._id));
+    } catch (error) {
+      console.error('❌ Failed to fetch sent invites:', error);
+    }
+  };
+
+  fetchSentInvites();
+}, []);
+
+
+
+
+
+
+
+useEffect(() => {
+  const fetchFriends = async () => {
+    try {
+      const friendList = await FriendService.getListFriends();
+      setFriends(friendList); // You already have this state
+    } catch (error) {
+      console.error('Error loading friends:', error);
+    }
+  };
+
+  fetchFriends();
+}, []);
+
+const isAlreadyFriend = useCallback(
+  (userId) => friends.some(f => f._id === userId || f.userId === userId),
+  [friends]
+);
 
 
 
@@ -160,32 +203,63 @@ useEffect(() => {
 
 const renderContactItem = useCallback(
   ({ item: user }) => {
-    console.log('📱 Contact user:', user); // Add this line for debugging
+    const alreadyFriend = isAlreadyFriend(user._id);
+const isRequestSent = sentRequests.includes(user._id);
+
+
+    const handleAddFriend = async () => {
+  try {
+    await FriendService.sendFriendInvite(user._id);
+    setSentRequests(prev => [...prev, user._id]);
+
+    socket.emit(SOCKET_EVENTS.SEND_FRIEND_INVITE, {
+      senderId: currentUser._id,
+      receiverId: user._id,
+    });
+
+    Alert.alert('Success', `Friend request sent to ${user.name}`);
+  } catch (error) {
+    Alert.alert('Error', 'Could not send friend request.');
+    console.error(error);
+  }
+};
+
 
     return (
-      <TouchableOpacity>
-        <View style={styles.fMessage}>
-          <Image
-            source={
-              user.avatar
-                ? { uri: user.avatar }
-                : require('../Images/avt.png')
-            }
-            style={styles.imgAG}
-          />
-          <View style={styles.fInfor}>
-            <Text style={styles.name}>{user.name}</Text>
-            <Text style={styles.phoneNumber} numberOfLines={1}>
-  {user.username || 'No phone number'}
-</Text>
-
-          </View>
+      <View style={styles.fMessage}>
+        <Image
+          source={
+            user.avatar
+              ? { uri: user.avatar }
+              : require('../Images/avt.png')
+          }
+          style={styles.imgAG}
+        />
+        <View style={styles.fInfor}>
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.phoneNumber} numberOfLines={1}>
+            {user.username || 'No phone'}
+          </Text>
         </View>
-      </TouchableOpacity>
+
+{!alreadyFriend && (
+  isRequestSent ? (
+    <View style={styles.requestSent}>
+      <Text style={styles.requestSentText}>Request Sent</Text>
+    </View>
+  ) : (
+    <TouchableOpacity onPress={handleAddFriend} style={styles.addFriendBtn}>
+      <Image source={addFrIcon} style={styles.addFrIcon} />
+    </TouchableOpacity>
+  )
+)}
+
+      </View>
     );
   },
-  [navigation, userId]
+  [friends, sentRequests, currentUser] // ✅ make sure dependencies are correct
 );
+
 
 
   return (
@@ -681,6 +755,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: 'white',
         paddingHorizontal: 5,
+        width:'100%'
 
       },
             favatarGroup: { width: 65, justifyContent: 'center' },
@@ -702,5 +777,32 @@ const styles = StyleSheet.create({
         marginTop: 4,
         marginLeft:5
         },
+     fInfor: {
+  flex: 1,
+  justifyContent: 'center',
+  marginLeft: 10,
+},
+addFriendBtn: {
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+},
+addFrIcon:{
+    width:18,
+    height:18
+},
+requestSent: {
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+
+  borderRadius: 5,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+requestSentText: {
+  fontSize: 15,
+  color: '#888',
+  fontStyle: 'italic',
+},
+
 
 });
