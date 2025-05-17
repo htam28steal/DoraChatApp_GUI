@@ -12,7 +12,6 @@ import {
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { updatePassword } from '../api/meSevice';
-import { launchImageLibrary } from 'react-native-image-picker';
 import { updateAvatarUser } from '../api/meSevice';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -69,7 +68,7 @@ export default function Screen_04({ navigation, route }) {
   const [timestamp, setTimestamp] = useState(Date.now());
 
   const handleChooseAvatar = () => {
-    launchImageLibrary({ mediaType: 'photo', includeBase64: true }, async (response) => {
+    ({ mediaType: 'photo', includeBase64: true }, async (response) => {
       const asset = response.assets?.[0];
       if (!asset) {
         console.error('Không có ảnh nào được chọn');

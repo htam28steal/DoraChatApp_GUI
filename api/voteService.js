@@ -7,7 +7,11 @@ const voteService = {
                 `/api/votes/option/select/${voteId}/${optionId}`,
                 {
                     memberId,
-                    memberInfo,
+                    memberInfo: {
+                        name: memberInfo.name,
+                        avatar: memberInfo.avatar,
+                        avatarColor: memberInfo.avatarColor
+                    }
                 }
             );
             return response.data;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, use } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
     View,
     Text,
@@ -13,7 +13,11 @@ import {
     Modal,
     Linking,
     FlatList,
+    KeyboardAvoidingView
 } from "react-native";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+
+
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -41,22 +45,16 @@ const SendIcon = require("../icons/send.png");
 const Return = require("../icons/back.png");
 
 
-
-
-const sampleReacts = [
-    { userId: '1', name: 'Alice', avatar: '👩', type: '❤️' },
-    { userId: '2', name: 'Bob', avatar: '🧔', type: '❤️' },
-    { userId: '3', name: 'Charlie', avatar: '👨', type: '😂' },
-];
-
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) {
+const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) => {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
     console.log(msg.content);
     const MAX_TEXT_LENGTH = 350;
+    const centerAlignedTypes = ["VOTE", "NOTIFY"];
+    const isCenterAligned = centerAlignedTypes.includes(msg.type);
     const Container = onLongPress ? TouchableOpacity : View;
     const emojiMap = {
         1: '❤️',
@@ -109,10 +107,15 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
     useEffect(() => {
         let isMounted = true;
         const checkPinned = async () => {
-            const result = await isPinned(msg);
-            if (isMounted) {
-                setPinned(result);
+            try {
+                const result = await isPinned(msg);
+                if (isMounted) {
+                    setPinned(result);
+                }
+            } catch (err) {
+                console.log(err);
             }
+
         };
         checkPinned();
         return () => {
@@ -120,6 +123,15 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
         };
     }, [msg]);
 
+    if (msg.type === "NOTIFY") {
+        return (
+            <View style={[messageItemStyles.container, messageItemStyles.centerAlign]}>
+                <Text style={messageItemStyles.notifyText}>
+                    {msg.content}
+                </Text>
+            </View>
+        );
+    }
     return (
         <Container
             onLongPress={onLongPress}
@@ -133,12 +145,11 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
                         : messageItemStyles.leftAlign,
             ]}
         >
-            {showAvatar ? (
+            {!isCenterAligned && (showAvatar ? (
                 <Image source={AvatarImage} style={messageItemStyles.avatar} />
             ) : (
                 <View style={messageItemStyles.avatarPlaceholder} />
-            )}
-
+            ))}
 
             <View style={messageItemStyles.contentContainer}>
                 {pinned && (
@@ -151,94 +162,113 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
                         📌 Đã ghim
                     </Text>
                 )}
-                {msg.type === "IMAGE" ? (
-                    <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
-                ) : msg.type === "VIDEO" ? (
-                    <Video
-                        source={{ uri: content }}
-                        style={messageItemStyles.videoContent}
-                        useNativeControls
-                        resizeMode="cover"
-                        isLooping={false}
-                    />
-                ) : msg.type === "VOTE" ? (
-                    <View style={messageItemStyles.fVotes}>
-                        <View style={messageItemStyles.fVotesRow}>
-                            <Text style={messageItemStyles.txtContent}>{msg.content}</Text>
-                        </View>
+                {msg.type === "NOTIFY" ? (
+                    <Text style={messageItemStyles.notifyText}>
+                        {content}
+                    </Text>
+                ) :
+                    msg.type === "IMAGE" ? (
+                        <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
+                    ) : msg.type === "VIDEO" ? (
+                        <Video
+                            source={{ uri: content }}
+                            style={messageItemStyles.videoContent}
+                            useNativeControls
+                            resizeMode="cover"
+                            isLooping={false}
+                        />
+                    ) : msg.type === "VOTE" ? (
+                        <View style={messageItemStyles.fVotes}>
+                            <View style={messageItemStyles.fVotesRow}>
+                                <Text style={messageItemStyles.txtContent}>{msg.content}</Text>
+                            </View>
 
-                        <View style={messageItemStyles.optionsContainer}>
-                            {msg.options.map((opt, index) => (
-                                <View key={opt._id || index} style={{ position: 'relative', marginBottom: 10 }}>
-                                    <TouchableOpacity
-                                        style={messageItemStyles.optionButton}
-                                        activeOpacity={0.7}
-                                        onPress={() => console.log("Voted option:", opt.name)}
-                                    >
-                                        <Text style={messageItemStyles.optionText}>{opt.name}</Text>
-                                    </TouchableOpacity>
+                            <View style={messageItemStyles.optionsContainer}>
+                                {msg.options.map((opt, index) => (
+                                    <View key={opt._id || index} style={{ position: 'relative', marginBottom: 10 }}>
+                                        <TouchableOpacity
+                                            style={messageItemStyles.optionButton}
+                                            activeOpacity={0.7}
+                                            onPress={() => console.log("Voted option:", opt.name)}
+                                        >
+                                            <Text style={messageItemStyles.optionText}>{opt.name}</Text>
+                                        </TouchableOpacity>
 
-                                    {/* Avatars của các member đã vote vào option này */}
-                                    {opt.members?.length > 0 && (
-                                        <View style={{ flexDirection: 'row', position: 'absolute', right: 10, top: 8 }}>
-                                            {opt.members.slice(0, 3).map((member, i) => (
-                                                <View
-                                                    key={i}
-                                                    style={{
+                                        {/* Avatars của các member đã vote vào option này */}
+                                        {opt.members?.length > 0 && (
+                                            <View style={{ flexDirection: 'row', position: 'absolute', right: 10, top: 8 }}>
+                                                {/* Hiển thị tối đa 2 người đầu tiên */}
+                                                {opt.members.slice(0, 2).map((member, i) => (
+                                                    <Image
+                                                        key={member._id}
+                                                        source={{ uri: member.avatar || DEFAULT_AVATAR }}
+                                                        style={{
+                                                            width: 25,
+                                                            height: 25,
+                                                            borderRadius: 15,
+                                                            borderWidth: 1,
+                                                            borderColor: '#fff',
+                                                            marginLeft: i === 0 ? 0 : -10,
+                                                            zIndex: 10 - i
+                                                        }}
+                                                    />
+                                                ))}
+
+                                                {/* Hiển thị số lượng còn lại nếu có */}
+                                                {opt.members.length > 2 && (
+                                                    <View style={{
                                                         width: 25,
                                                         height: 25,
-                                                        borderRadius: 50,
+                                                        borderRadius: 15,
+                                                        backgroundColor: '#e0e0e0',
+                                                        justifyContent: 'center',
+                                                        alignItems: 'center',
+                                                        marginLeft: -10,
                                                         borderWidth: 1,
-                                                        marginLeft: i === 0 ? 0 : -10,
-                                                        overflow: 'hidden',
-                                                        backgroundColor: '#fff',
-                                                        zIndex: 10 - i,
-                                                    }}
-                                                >
-                                                    <Image
-                                                        source={{ uri: member.avatar || 'https://i.pravatar.cc/300' }}
-                                                        style={{ width: '100%', height: '100%' }}
-                                                    />
-                                                </View>
-                                            ))}
-                                        </View>
-                                    )}
-                                </View>
-                            ))}
-                        </View>
+                                                        borderColor: '#fff',
+                                                        zIndex: 8
+                                                    }}>
+                                                        <Text style={{ fontSize: 10 }}>+{opt.members.length - 2}</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+                                    </View>
+                                ))}
+                            </View>
 
-                        <View style={messageItemStyles.fVotesRow}>
-                            <TouchableOpacity style={messageItemStyles.btnVote} onPress={() => handleOpenVoteModal(msg)}>
-                                <Text>Bình chọn</Text>
-                            </TouchableOpacity>
+                            <View style={messageItemStyles.fVotesRow}>
+                                <TouchableOpacity style={messageItemStyles.btnVote} onPress={() => handleOpenVoteModal(msg)}>
+                                    <Text>Bình chọn</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
-                ) : msg.type === "FILE" ? (
-                    <TouchableOpacity
-                        style={messageItemStyles.fileContainer}
-                        onLongPress={onLongPress}
-                        activeOpacity={0.7}
-                    >
-                        <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
-                        <Text style={messageItemStyles.fileText}>
-                            {msg.fileName || "Open File"}
+                    ) : msg.type === "FILE" ? (
+                        <TouchableOpacity
+                            style={messageItemStyles.fileContainer}
+                            onLongPress={onLongPress}
+                            activeOpacity={0.7}
+                        >
+                            <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
+                            <Text style={messageItemStyles.fileText}>
+                                {msg.fileName || "Open File"}
+                            </Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <Text
+                            style={[
+                                messageItemStyles.textContent,
+                                isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
+                                msg.type === "RECALL" && { fontStyle: "italic", color: "#999" },
+                            ]}
+                        >
+                            {msg.type === "RECALL"
+                                ? "Message has been recalled"
+                                : content.length > MAX_TEXT_LENGTH
+                                    ? content.slice(0, MAX_TEXT_LENGTH) + "..."
+                                    : content}
                         </Text>
-                    </TouchableOpacity>
-                ) : (
-                    <Text
-                        style={[
-                            messageItemStyles.textContent,
-                            isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
-                            msg.type === "RECALL" && { fontStyle: "italic", color: "#999" },
-                        ]}
-                    >
-                        {msg.type === "RECALL"
-                            ? "Message has been recalled"
-                            : content.length > MAX_TEXT_LENGTH
-                                ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-                                : content}
-                    </Text>
-                )}
+                    )}
 
 
                 {msg.reacts && msg.reacts.length > 0 && (
@@ -268,7 +298,7 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, ha
         </Container>
 
     );
-}
+})
 
 
 const messageItemStyles = StyleSheet.create({
@@ -378,7 +408,7 @@ const messageItemStyles = StyleSheet.create({
     fVotes: {
         alignSelf: 'center',
         flexWrap: 'wrap',
-        width: 350,
+        width: 250,
         height: 'auto',
         backgroundColor: 'white',
         borderWidth: 1,
@@ -425,8 +455,16 @@ const messageItemStyles = StyleSheet.create({
         marginTop: 10,
         justifyContent: 'center',
         alignItems: 'center'
-    }
-
+    },
+    notifyText: {
+        fontSize: 12,
+        color: '#999',
+        fontStyle: 'italic',
+        textAlign: 'center',
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        marginVertical: 8,
+    },
 });
 
 /**
@@ -434,10 +472,19 @@ const messageItemStyles = StyleSheet.create({
  */
 function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) {
     const scrollViewRef = useRef(null);
+    const scrollPosition = useRef(0);
+
+    const handleScroll = (event) => {
+        scrollPosition.current = event.nativeEvent.contentOffset.y;
+    };
 
     useEffect(() => {
-        if (scrollViewRef.current)
-            scrollViewRef.current.scrollToEnd({ animated: true });
+        if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({
+                y: scrollPosition.current,
+                animated: false,
+            });
+        }
     }, [messages]);
 
     return (
@@ -445,6 +492,14 @@ function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji
             ref={scrollViewRef}
             style={chatBoxStyles.container}
             contentContainerStyle={chatBoxStyles.contentContainer}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={() => {
+                // Chỉ tự động scroll xuống dưới khi mới vào trang
+                if (scrollPosition.current === 0) {
+                    scrollViewRef.current.scrollToEnd({ animated: true });
+                }
+            }}
         >
             {messages.map((msg, index) => {
                 const userId = msg.memberId?.userId || "";
@@ -521,6 +576,7 @@ const messageInputStyles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         padding: 10,
+        paddingBottom: 20,
         borderTopWidth: 1,
         borderColor: "#ccc",
         backgroundColor: "#fff",
@@ -667,10 +723,10 @@ export default function ChatScreen({ route, navigation }) {
     const firstChannelId = channels.length > 0 ? channels[0]._id : null;
     console.log("First Channel ID:", firstChannelId);
 
-    const handleMessageLongPress = (message) => {
+    const handleMessageLongPress = useCallback((message) => {
         setSelectedMessage(message);
         setModalVisible(true);
-    };
+    }, []);
 
 
     const handleRecallAction = () => {
@@ -705,7 +761,6 @@ export default function ChatScreen({ route, navigation }) {
             const response = await axios.get(`/api/pin-messages/${conversationId}`);
 
             const listPinMess = response.data;
-            console.log(`HAHAHAHAHA`, listPinMess);
             return listPinMess.some(p => p.messageId === msg._id);
         } catch (err) {
             console.log(err)
@@ -737,39 +792,36 @@ export default function ChatScreen({ route, navigation }) {
 
 
     const handlePinMessages = async (message) => {
-        if (!message) {
-            console.log("No message selected");
-            return;
-        }
+        if (!message) return;
 
         try {
-            const isPinned = isMessagePinned(message?._id);
+            const isPinned = isMessagePinned(message._id);
 
             if (isPinned) {
-                await handleUnpinMessage(message?._id);
-            } else {
-                const response = await axios.post('/api/pin-messages', {
-                    messageId: message._id,
-                    conversationId: message.conversationId,
-                    pinnedBy: message.memberId._id,
-                });
-
-                const newPinnedMessage = response.data;
-
-                setMessages(prevMessages =>
-                    prevMessages.map(msg =>
-                        msg._id === newPinnedMessage.messageId
-                            ? { ...msg, isPinned: true }
-                            : msg
-                    )
-                );
-
-                setPinnedMessages(prevPinnedMessages => [...prevPinnedMessages, newPinnedMessage]);
-                setModalVisible(false);
+                await handleUnpinMessage(message._id);
+                return;
             }
+
+            const response = await axios.post('/api/pin-messages', {
+                messageId: message._id,
+                conversationId: message.conversationId,
+                pinnedBy: message.memberId._id,
+            });
+
+            // Chỉ cập nhật trạng thái pin cho message cụ thể
+            setMessages(prevMessages =>
+                prevMessages.map(msg =>
+                    msg._id === message._id
+                        ? { ...msg, isPinned: true }
+                        : msg
+                )
+            );
+
+            // Cập nhật danh sách pinned messages
+            setPinnedMessages(prev => [...prev, response.data]);
+
         } catch (err) {
-            console.error(' Lỗi khi thao tác ghim:', err.message);
-            Alert.alert('Lỗi', 'Không thể thực hiện thao tác ghim tin nhắn');
+            console.error('Lỗi khi thao tác ghim:', err.message);
         }
     };
 
@@ -836,7 +888,7 @@ export default function ChatScreen({ route, navigation }) {
     const pinnedMessageStyles = StyleSheet.create({
         container: {
             width: '100%',
-            minHeight: 40,
+            minHeight: 60,
             backgroundColor: 'white',
             borderBottomWidth: 1,
             borderColor: '#ccc',
@@ -938,7 +990,7 @@ export default function ChatScreen({ route, navigation }) {
                         </TouchableOpacity>
                     ))}
                 </View>
-                <TouchableOpacity style={[{ width: '100%', height: 40 }]}>
+                <TouchableOpacity style={[{ width: '100%' }]}>
                     <PinnedMessagesSection pinnedMessages={lastMessage} />
                 </TouchableOpacity>
 
@@ -954,6 +1006,7 @@ export default function ChatScreen({ route, navigation }) {
             borderBottomWidth: 1,
             borderColor: "#ccc",
             marginTop: 10,
+            height: 'auto'
         },
         headerContent: {
             flexDirection: 'row',
@@ -1294,33 +1347,44 @@ export default function ChatScreen({ route, navigation }) {
     };
 
     const handleOpenVoteModal = async (msg) => {
-        setSelectedMessage(msg);
-        setVotedModal(true)
+        try {
+            setSelectedMessage(msg);
+            setVotedModal(true)
 
+        } catch (error) {
+
+        }
 
     }
 
     const handlePressEmoji = async (msg) => {
+        try {
+            const reactors = await Promise.all(
+                msg.reacts.map(async (react) => {
+                    const member = await handleGetMember(react.memberId);
+                    console.log(`MemberId: `, react.memberId)
+                    return {
+                        ...member,
+                        type: react.type,
+                    };
+                })
+            );
 
-        const reactors = await Promise.all(
-            msg.reacts.map(async (react) => {
-                const member = await handleGetMember(react.memberId);
-                return {
-                    ...member,
-                    type: react.type,
-                };
-            })
-        );
+            setSelectedReactors(reactors);
+            setReactDetailModalVisible(true);
+        } catch (err) {
+            console.log(err);
+        }
 
-        setSelectedReactors(reactors);
-        setReactDetailModalVisible(true);
     };
 
 
     const handleGetMember = async (memberId) => {
 
         try {
-            const response = await axios.get(`/api/members/member/${memberId}`);
+            console.log(`MemberId La : `, memberId)
+            const response = await axios.get(`/api/members/member/${memberId._id}`);
+
             return response.data.data;
         } catch (error) {
             console.error('Failed to get member:', error);
@@ -1336,15 +1400,14 @@ export default function ChatScreen({ route, navigation }) {
                 reactType: reactType,
             });
 
-            const updatedMessage = response.data;
-            console.log('React sent successfully:', updatedMessage);
-
+            // Chỉ cập nhật message được react
             setMessages(prevMessages =>
-                prevMessages.map(msg =>
-                    msg._id === updatedMessage._id ? updatedMessage : msg
+                prevMessages.map(m =>
+                    m._id === message._id
+                        ? { ...m, reacts: response.data?.reacts || m.reacts }
+                        : m
                 )
             );
-
         } catch (error) {
             console.error('Failed to send react:', error.response?.data || error.message);
         }
@@ -1385,26 +1448,33 @@ export default function ChatScreen({ route, navigation }) {
 
     useEffect(() => {
         if (!socket || !conversationId) return;
+
         const receiveHandler = (message) => {
-            setMessages((prev) => {
+            setMessages(prev => {
+                // Nếu là message của user hiện tại
                 if (message.memberId?.userId === userId) {
-                    const index = prev.findIndex(
-                        (m) => m.pending && m.content === message.content
+                    return prev.map(m =>
+                        m.pending && m.content === message.content
+                            ? message
+                            : m
                     );
-                    if (index !== -1) {
-                        const updatedMessages = [...prev];
-                        updatedMessages[index] = message;
-                        return updatedMessages;
-                    }
                 }
-                const exists = prev.some((m) => m._id === message._id);
-                if (exists) return prev;
+
+                // Nếu message đã tồn tại thì cập nhật, không thì thêm mới
+                const existingIndex = prev.findIndex(m => m._id === message._id);
+                if (existingIndex !== -1) {
+                    const newMessages = [...prev];
+                    newMessages[existingIndex] = message;
+                    return newMessages;
+                }
+
                 return [...prev, message];
             });
         };
-        socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
+
         socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
         socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+
         return () => {
             socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
             socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
@@ -1416,11 +1486,21 @@ export default function ChatScreen({ route, navigation }) {
         fetchAllMessages();
         setVoteShowModal(false);
     };
+    const handleVoteSubmit = (updatedVoteMessage) => {
+        console.log("Dữ liệu nhận được từ VoteModal:", updatedVoteMessage);
 
-    const handleVoteSubmit = (selectedOptionId) => {
-        console.log('Đã chọn:', selectedOptionId);
-        fetchAllMessages();
-        setVotedModal(false); //
+        if (!updatedVoteMessage) {
+            console.error("Không nhận được dữ liệu vote cập nhật");
+            return;
+        }
+        setMessages(prevMessages =>
+            prevMessages.map(msg =>
+                msg._id === updatedVoteMessage._id ? {
+                    ...msg,
+                    options: updatedVoteMessage.options || msg.options,
+                } : msg
+            )
+        );
     };
 
     useEffect(() => {
@@ -1429,7 +1509,7 @@ export default function ChatScreen({ route, navigation }) {
                 try {
                     const res = await axios.get(`/api/members/${conversationId}/${userId}`);
                     const member = res.data.data;
-                    setMemberId(member._id); // Resolve xong rồi set
+                    setMemberId(member._id);
                 } catch (err) {
                     console.error("Lỗi lấy memberId:", err);
                 }
@@ -1440,155 +1520,163 @@ export default function ChatScreen({ route, navigation }) {
     }, [conversationId, userId]);
 
     return (
+
         <View style={chatScreenStyles.container}>
-            <HeaderSingleChat />
-            <View style={chatScreenStyles.chatContainer}>
-                <ChatBox
-                    messages={messages}
-                    currentUserId={userId}
-                    onMessageLongPress={handleMessageLongPress}
-                    handlePressEmoji={handlePressEmoji}
-                    isPinned={isPinned}
-                    handleOpenVoteModal={handleOpenVoteModal}
-                />
-            </View>
-            <MessageInput
-                input={input}
-                setInput={setInput}
-                onSend={handleSendMessage}
-                onPickMedia={pickMedia}
-                onPickFile={pickDocument}
-                onEmojiPress={() => setEmojiOpen(true)}
-                onModalReact={handlePressEmoji}
-                onVotePress={() => setVoteShowModal(true)}
-
-            />
-            <EmojiPicker
-                onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
-                open={emojiOpen}
-                onClose={() => setEmojiOpen(false)}
-            />
-            <CreateVoteModal
-                visible={showVoteModal}
-                channelId={currentChannelId}
-                conversationId={conversationId}
-                memberId={memberId}
-                onClose={() => setVoteShowModal(false)}
-                onCreate={handleCreatePoll}
-            />
-            <VotedModal
-                visible={showVotedModal}
-                onClose={() => setVotedModal(false)}
-                message={selectedMessage}
-                onSubmit={handleVoteSubmit}
-            />
-
-
-
-            <Modal
-                visible={modalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setModalVisible(false)}
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
-                <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPressOut={() => setModalVisible(false)}
+                <HeaderSingleChat />
+                <View style={chatScreenStyles.chatContainer}>
+                    <ChatBox
+                        messages={messages}
+                        currentUserId={userId}
+                        onMessageLongPress={handleMessageLongPress}
+                        handlePressEmoji={handlePressEmoji}
+                        isPinned={isPinned}
+                        handleOpenVoteModal={handleOpenVoteModal}
+                    />
+                </View>
+                <MessageInput
+                    input={input}
+                    setInput={setInput}
+                    onSend={handleSendMessage}
+                    onPickMedia={pickMedia}
+                    onPickFile={pickDocument}
+                    onEmojiPress={() => setEmojiOpen(true)}
+                    onModalReact={handlePressEmoji}
+                    onVotePress={() => setVoteShowModal(true)}
+
+                />
+                <EmojiPicker
+                    onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
+                    open={emojiOpen}
+                    onClose={() => setEmojiOpen(false)}
+                />
+                <CreateVoteModal
+                    visible={showVoteModal}
+                    channelId={currentChannelId}
+                    conversationId={conversationId}
+                    memberId={memberId}
+                    onClose={() => setVoteShowModal(false)}
+                    onCreate={handleCreatePoll}
+                />
+                <VotedModal
+                    visible={showVotedModal}
+                    onClose={() => setVotedModal(false)}
+                    message={selectedMessage}
+                    memberId={memberId}
+                    onSubmit={handleVoteSubmit}
+                />
+
+
+
+                <Modal
+                    visible={modalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setModalVisible(false)}
                 >
-                    <View style={styles.modalContainer}>
-                        <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
-                            <Text style={styles.modalButtonText}>Thu hồi</Text>
-                        </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.modalOverlay}
+                        activeOpacity={1}
+                        onPressOut={() => setModalVisible(false)}
+                    >
+                        <View style={styles.modalContainer}>
+                            <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
+                                <Text style={styles.modalButtonText}>Thu hồi</Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
-                            <Text style={styles.modalButtonText}>Xoá</Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
+                                <Text style={styles.modalButtonText}>Xoá</Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
-                            <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.modalButton}
-                            onPress={() => {
-                                if (selectedMessage && isMessagePinned(selectedMessage._id)) {
-                                    handleUnpinMessage(selectedMessage);
-                                } else {
-                                    handlePinMessages(selectedMessage);
-                                }
-                            }}
-                        >
-                            <Text style={styles.modalButtonText}>
-                                {selectedMessage && isMessagePinned(selectedMessage?._id) ? "Gỡ ghim" : "Ghim"}
-                            </Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
+                                <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalButton}
+                                onPress={() => {
+                                    if (selectedMessage && isMessagePinned(selectedMessage._id)) {
+                                        handleUnpinMessage(selectedMessage);
+                                    } else {
+                                        handlePinMessages(selectedMessage);
+                                    }
+                                }}
+                            >
+                                <Text style={styles.modalButtonText}>
+                                    {selectedMessage && isMessagePinned(selectedMessage?._id) ? "Gỡ ghim" : "Ghim"}
+                                </Text>
+                            </TouchableOpacity>
 
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }}>
-                            {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
-                                <TouchableOpacity
-                                    key={emoji}
-                                    onPress={() => {
-                                        const type = emojiToType[emoji];
-                                        handleReact(selectedMessage, type);
-                                        setModalVisible(false);
-                                    }}
-                                >
-                                    <Text style={{ fontSize: 24 }}>{emoji}</Text>
-                                </TouchableOpacity>
-                            ))}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }}>
+                                {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
+                                    <TouchableOpacity
+                                        key={emoji}
+                                        onPress={() => {
+                                            const type = emojiToType[emoji];
+                                            handleReact(selectedMessage, type);
+                                            setModalVisible(false);
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+
+                <Modal visible={reactDetailModalVisible} transparent animationType="slide" onRequestClose={() => setReactDetailModalVisible(false)}>
+                    <View style={styles.modalBackground}>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>Người đã thả:</Text>
+
+                            <FlatList
+                                data={selectedReactors}
+                                keyExtractor={(item) => item.userId}
+                                renderItem={({ item }) => {
+                                    const emojiMap = {
+                                        1: '❤️',
+                                        2: '😂',
+                                        3: '😢',
+                                        4: '👍',
+                                        5: '👎',
+                                        6: '😮',
+                                    };
+
+                                    const emoji = emojiMap[item.type];
+
+                                    return (
+                                        <View style={styles.reactorItem}>
+                                            {item.avatar && (
+                                                <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                                            )}
+                                            <Text style={styles.reactorName}>
+                                                {item.name} đã thả {emoji}
+                                            </Text>
+                                        </View>
+                                    );
+                                }}
+                            />
+
+                            <TouchableOpacity onPress={() => setReactDetailModalVisible(false)} style={styles.closeButton}>
+                                <Text style={styles.closeText}>Đóng</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
-                </TouchableOpacity>
-            </Modal>
+                </Modal>
 
-            <Modal visible={reactDetailModalVisible} transparent animationType="slide" onRequestClose={() => setReactDetailModalVisible(false)}>
-                <View style={styles.modalBackground}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Người đã thả:</Text>
-
-                        <FlatList
-                            data={selectedReactors}
-                            keyExtractor={(item) => item.userId}
-                            renderItem={({ item }) => {
-                                const emojiMap = {
-                                    1: '❤️',
-                                    2: '😂',
-                                    3: '😢',
-                                    4: '👍',
-                                    5: '👎',
-                                    6: '😮',
-                                };
-
-                                const emoji = emojiMap[item.type];
-
-                                return (
-                                    <View style={styles.reactorItem}>
-                                        {item.avatar && (
-                                            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-                                        )}
-                                        <Text style={styles.reactorName}>
-                                            {item.name} đã thả {emoji}
-                                        </Text>
-                                    </View>
-                                );
-                            }}
-                        />
-
-                        <TouchableOpacity onPress={() => setReactDetailModalVisible(false)} style={styles.closeButton}>
-                            <Text style={styles.closeText}>Đóng</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-
+            </KeyboardAvoidingView>
 
         </View >
+
     );
 }
 
 const chatScreenStyles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#D8EDFF" },
+    container: { flex: 1, backgroundColor: "#D8EDFF", height: 10, },
     chatContainer: { flex: 1 },
 });
 

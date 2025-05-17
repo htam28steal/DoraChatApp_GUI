@@ -15,15 +15,35 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import voteService from '../api/voteService';
 import userService from '../api/userService';
 
-const VoteModal = ({ visible, onClose, message, onSubmit }) => {
+const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
 
     const [selectedOptions, setSelectedOptions] = useState([]);
     const [msg, setMsg] = useState(null);
     const [user, setUser] = useState(null);
     const [dynamicOptions, setDynamicOptions] = useState([]);
     const [newOptionText, setNewOptionText] = useState('');
+    const [member, setMember] = useState(memberId);
 
-    console.log(msg);
+    useEffect(() => {
+        if (memberId) {
+            setMember(memberId);
+        } else {
+            // Fallback: Tự lấy memberId nếu props không có
+            const fetchMemberId = async () => {
+                try {
+                    const storedUserId = await AsyncStorage.getItem("userId");
+                    if (storedUserId) {
+                        setMember(storedUserId);
+                    }
+                } catch (error) {
+                    console.error("Lỗi khi lấy memberId từ AsyncStorage:", error);
+                }
+            };
+            fetchMemberId();
+        }
+    }, [memberId]);
+
+    console.log(`Member is: `, member);
     console.log(`User Vote là : `, user);
     useEffect(() => {
         const fetchUserId = async () => {
@@ -64,25 +84,62 @@ const VoteModal = ({ visible, onClose, message, onSubmit }) => {
             return;
         }
 
-        try {
-            await Promise.all(selectedOptions.map((optionId) =>
-                voteService.selectOption({
-                    voteId: msg._id,
-                    optionId: optionId,
-                    memberId: msg.memberId._id,
-                    memberInfo: {
-                        name: user.name,
-                        avatar: user.avatar,
-                        avatarColor: user.avatarColor,
-                    },
-                })
-            ));
+        if (!member) {
+            Alert.alert('Lỗi', 'Không xác định được người dùng');
+            return;
+        }
 
-            Alert.alert("Thành công", "Bạn đã bình chọn thành công.");
-            onSubmit();
+        try {
+            const optimisticUpdate = {
+                ...msg,
+                options: msg.options.map(opt => {
+                    if (selectedOptions.includes(opt._id)) {
+                        const isAlreadyVoted = opt.members?.some(m => m._id === member);
+                        if (!isAlreadyVoted) {
+                            return {
+                                ...opt,
+                                members: [
+                                    ...(opt.members || []),
+                                    {
+                                        _id: member,
+                                        name: user.name,
+                                        avatar: user.avatar,
+                                        avatarColor: user.avatarColor
+                                    }
+                                ]
+                            };
+                        }
+                    }
+                    return opt;
+                })
+            };
+            onSubmit(optimisticUpdate);
+
+            const results = await Promise.all(
+                selectedOptions.map(optionId =>
+                    voteService.selectOption({
+                        voteId: msg._id,    // Thêm voteId
+                        optionId: optionId, // Thêm optionId
+                        memberId: member,
+                        memberInfo: {
+                            name: user.name,
+                            avatar: user.avatar,
+                            avatarColor: user.avatarColor
+                        }
+                    })
+                )
+            );
+
+            const serverUpdatedVote = results[0]?.data || results[0];
+            if (serverUpdatedVote) {
+                onSubmit(serverUpdatedVote);
+                Alert.alert("Thành công", "Bình chọn thành công!");
+                onClose();
+            }
         } catch (error) {
             console.error('Lỗi khi bình chọn:', error);
-            Alert.alert("Lỗi", "Không thể gửi bình chọn.");
+            Alert.alert("Lỗi", error.response?.data?.message || "Bình chọn thất bại");
+            onSubmit(msg);
         }
     };
 

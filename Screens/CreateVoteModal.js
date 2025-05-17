@@ -24,6 +24,8 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
         setOptions(updated);
     };
 
+    console.log(`Member là : `, memberId);
+
     const handleAddOption = () => {
         setOptions([...options, '']);
     };
@@ -44,7 +46,6 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
             return;
         }
 
-        console.log(`Fillter Option`, filteredOptions);
         const payload = {
             content: question.trim(),
             options: filteredOptions,
@@ -54,17 +55,18 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
             channelId,
             conversationId,
         };
-        console.log(`Payload`, payload)
 
         try {
             const result = await voteService.createVote(payload);
-            onCreate?.(result);
-            onClose();
 
             setQuestion('');
             setOptions(['', '']);
             setAllowMultiple(false);
             setIsAnonymous(false);
+
+            onCreate?.(result);
+
+            onClose();
 
         } catch (error) {
             Alert.alert("Lỗi", "Không thể tạo bình chọn");
@@ -142,6 +144,7 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
 
 const styles = StyleSheet.create({
     modalContainer: {
+        paddingTop: 40,
         padding: 20,
         flex: 1,
         backgroundColor: '#fff',
