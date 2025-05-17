@@ -28,7 +28,7 @@ const LoginScreen = () => {
         await AsyncStorage.setItem('userToken', accessToken);
         await AsyncStorage.setItem('userId', id);
         console.log('Logged in userId:', id);
-        navigation.navigate("GroupsScreen", { token: accessToken, uID: id });
+        navigation.navigate("ConversationScreen", { token: accessToken, uID: id });
       }
     } catch (error) {
       console.log('Login error:', error);
@@ -89,10 +89,7 @@ const LoginScreen = () => {
             <Text style={styles.signUpText}>Sign up</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.googleSignInBtn}>
-          <Image source={require('../icons/google_icon.png')} style={styles.googleIcon} />
-          <Text style={styles.googleSignInText}>Sign in with Google</Text>
-        </TouchableOpacity>
+
       </ImageBackground>
     </SafeAreaView>
   );

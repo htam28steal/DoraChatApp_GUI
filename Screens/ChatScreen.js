@@ -870,7 +870,8 @@ export default function ChatScreen({ route, navigation }) {
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
-        onPickMedia={pickMedia}
+        onPickMedia={pickImage}
+
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
       />

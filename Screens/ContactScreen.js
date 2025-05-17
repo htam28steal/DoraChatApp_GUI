@@ -1,405 +1,706 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    View,
-    FlatList,
-    StyleSheet,
-    Text,
-    StatusBar,
-    TextInput,
-    TouchableOpacity,
-    Image,
-    Alert
+  View,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  Alert,
+  Modal,
+
 } from 'react-native';
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import FriendService from "../api/friendService";
-
-export default function ListFirendScreen({ navigation }) {
-    const [userId, setUserId] = useState(null);
-    const [sendRequest, setSendRequest] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [listInvitesWasSend, setListInvitesWasSend] = useState(null);
-    const [showOptions, setShowOptions] = useState(false);
-
-    useEffect(() => {
-        const loadUserId = async () => {
-            const id = await AsyncStorage.getItem("userId");
-            setUserId(id);
-        };
-        loadUserId();
-    }, []);
+import axios from '../api/apiConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
+import * as Contacts from 'expo-contacts';
 
 
-    useEffect(() => {
-        const fetchInvites = async () => {
-            try {
-                const data = await FriendService.getListFriendInviteMe();
-                setListInvitesWasSend(data);
-            } catch (err) {
-                console.error('Failed to fetch invites', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchInvites();
-    }, []);
 
-    const handleThuHoi = async (userId) => {
-        try {
-            await FriendService.deleteInviteWasSend(userId);
-            setListInvitesWasSend((prev) => prev.filter((invite) => invite._id !== userId));
-        } catch (error) {
-            console.error('Lỗi khi thu hồi lời mời:', error);
-            Alert.alert('Lỗi', 'Không thể thu hồi lời mời. Vui lòng thử lại.');
-        }
-    };
+export default function ContactScreen({ navigation }) {
 
-    const renderFriend = ({ item }) => (
-        <TouchableOpacity style={styles.fMessage}>
-            <Image
-                source={item.avatar ? { uri: item.avatar } : null}
-                style={styles.avatar}
-            />
-            {!item.avatar && item.avatarColor ? (
-                <View style={[styles.avatar, { backgroundColor: item.avatarColor }, { justifyContent: 'center', alignItems: 'center' }]}>
-                    <Text style={styles.avatarText}>{item.name?.charAt(0)}</Text>
-                </View>
-            ) : null}
-            <View style={styles.fInfor}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.email}>{item.username}</Text>
+  const [filtered, setFiltered] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [userId, setUserId] = useState(null);
 
-                <View style={styles.fbtn}>
-                    <TouchableOpacity style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }} onPress={() => { handleThuHoi(item._id) }}><Text style={{ color: 'white', fontWeight: 400 }}>Chờ xác nhận</Text></TouchableOpacity>
-                </View>
-            </View>
+  const [currentUser, setCurrentUser] = useState(null);
 
-        </TouchableOpacity>
+      const [friends, setFriends] = useState([]);
+    const [showContacts, setShowContacts] = useState(false);
+
+
+const [phoneBookUsers, setPhoneBookUsers] = useState([]);
+const [filteredContacts, setFilteredContacts] = useState([]);
+const [lookupLoading, setLookupLoading] = useState(true);
+
+
+
+     useEffect(() => {
+  const fetchUserInfo = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Missing token', 'Cannot fetch profile without authentication.');
+        return;
+      }
+
+      const { data } = await axios.get('/api/me/profile', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setCurrentUser(data);
+    } catch (err) {
+      console.error('❌ Failed to load current user info', err);
+    }
+  };
+
+  fetchUserInfo();
+}, []);
+// when query or phoneBookUsers changes, re‐filter contacts
+useEffect(() => {
+  if (!showContacts) return;        // only run when in contacts mode
+  if (!query) {
+    setFilteredContacts(phoneBookUsers);
+  } else {
+    const q = query.toLowerCase();
+    setFilteredContacts(
+      phoneBookUsers.filter(u =>
+        u.name.toLowerCase().includes(q)
+      )
     );
+  }
+}, [query, phoneBookUsers, showContacts]);
+
+// you can keep your existing convos‐filter hook, but use filteredConvs there
+
+
+useEffect(() => {
+  (async () => {
+    // 1) ask permission
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission denied', 'Cannot load contacts without permission.');
+      setLookupLoading(false);
+      return;
+    }
+
+    // 2) fetch contacts with phone numbers
+    const { data: rawContacts } = await Contacts.getContactsAsync({
+      fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name]
+    });
+    if (!rawContacts.length) {
+      setLookupLoading(false);
+      return;
+    }
+
+    // 3) flatten all phone numbers, normalize them
+    const numbers = rawContacts
+      .flatMap(c => (c.phoneNumbers || []).map(p => p.number))
+      .map(num => num.replace(/\D/g, ''))       // strip non-digits
+      .filter((num, i, arr) => num && arr.indexOf(num) === i);  // unique, non-empty
+
+    // 4) lookup each number on your API
+    const lookups = numbers.map(number =>
+      axios
+        .get(`/api/users/search/phone-number/${number}`)
+        .then(res => res.data)
+        .catch(() => null)
+    );
+
+    const results = await Promise.all(lookups);
+
+    // 5) keep only those that exist
+    const foundUsers = results.filter(u => u && u._id);
+    setPhoneBookUsers(foundUsers);
+    setLookupLoading(false);
+  })();
+}, []);
+
+
+ 
+
+      
+
+     
+
+      useEffect(() => {
+        (async () => {
+          const token = await AsyncStorage.getItem('userToken');
+          console.log("🔍 Retrieved token in ConversationScreen:", token);
+        })();
+      }, []);
+      
+      const friendsById = useMemo(() => {
+        const map = {};
+        friends.forEach(f => {
+          const key = f.userId ? f.userId : f._id;
+          map[key] = f;
+        });
+        return map;
+      }, [friends]);
+    
+ 
+      
+        const toggleFilter = useCallback(id => {
+          setSelectedFilters(prev =>
+            prev.includes(id)
+              ? prev.filter(x => x !== id)
+              : [...prev, id]
+          );
+        }, []);
+      
+     
+       
+
+const renderContactItem = useCallback(
+  ({ item: user }) => {
+    console.log('📱 Contact user:', user); // Add this line for debugging
 
     return (
-        <View style={styles.container}>
-            <View style={styles.fbg}>
-                <Image
-                    source={require('../Images/bground.png')}
-                    style={styles.bg}
-                />
-            </View>
+      <TouchableOpacity>
+        <View style={styles.fMessage}>
+          <Image
+            source={
+              user.avatar
+                ? { uri: user.avatar }
+                : require('../Images/avt.png')
+            }
+            style={styles.imgAG}
+          />
+          <View style={styles.fInfor}>
+            <Text style={styles.name}>{user.name}</Text>
+            <Text style={styles.phoneNumber} numberOfLines={1}>
+  {user.username || 'No phone number'}
+</Text>
 
-            <View style={styles.fcontent}>
-                <View style={styles.fcontrol}>
-                    <TouchableOpacity style={styles.fFriendList} onPress={() => { navigation.navigate("FriendList_Screen") }}>
-                        <Image
-                            source={require('../icons/friend.png')}
-                            style={styles.icons}
-                        />
-                        <Text style={styles.txtfriendlist}>Friend list</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.fRequest} onPress={() => navigation.navigate("ListRequestFriend")}>
-                        <Image
-                            source={require('../icons/friendrequest.png')}
-                            style={styles.icons}
-                        />
-                        <Text style={styles.txtRequest}>Friend request</Text>
-                        <Text style={styles.txtRequest}>(1)</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.fContact} onPress={() => { navigation.navigate("ContactScreen") }}>
-                        <Image
-                            source={require('../icons/contact.png')}
-                            style={styles.icons}
-                        />
-                        <Text style={styles.txtRequest}>Contact</Text>
-                    </TouchableOpacity>
-                </View>
-                <TouchableOpacity style={styles.btnAdd} onPress={() => navigation.navigate('FindUserScreen')}>
-                    <View>
-                        <Image
-                            source={require('../icons/addFriend.png')}
-                            style={styles.iconAdd}
-                        />
-                    </View>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.fListFriend}>
-                <FlatList
-                    data={listInvitesWasSend}
-                    renderItem={renderFriend}
-                    keyExtractor={(item) => item._id}
-                    ListEmptyComponent={<Text>No friends found.</Text>}
-                />
-            </View>
-
-            <View style={styles.fFooter}>
-                <TouchableOpacity style={styles.btnTags}>
-                    <Image
-                        source={require('../icons/mess.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnTags}>
-                    <Image
-                        source={require('../icons/searchicon.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnTags}>
-                    <Image
-                        source={require('../icons/Home.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.btnTag}>
-                    <Image
-                        source={require('../icons/calen.png')}
-                        style={styles.iconfooter}
-                    />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.avatarFooter}>
-                    <View style={styles.fImaFooter}>
-                        <Image
-                            source={require('../Images/nike.png')}
-                            style={styles.imgAva}
-                        />
-                    </View>
-                </TouchableOpacity>
-            </View>
-        </View >
+          </View>
+        </View>
+      </TouchableOpacity>
     );
+  },
+  [navigation, userId]
+);
+
+
+  return (
+    <View style={styles.container}>
+      {/* full-screen background */}
+      <Image
+        source={require('../Images/bground.png')}
+        style={styles.bg}
+      />
+
+      {/* header with search + add */}
+      <View style={styles.header}>
+        <Image
+          source={require('../icons/searchicon.png')}
+          style={styles.icon}
+        />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search"
+          placeholderTextColor="#aaa"
+          style={styles.searchInput}
+        />
+
+      </View>
+
+          <View style={styles.fFillter}>
+
+          <TouchableOpacity style={styles.btnFillter}>
+    <Text style={styles.txtFillter}>Classify</Text>
+   </TouchableOpacity>
+
+        </View>
+      {/* optionally, filter tabs could go here */}
+      {/* <View style={styles.filterRow}>…</View> */}
+
+       {lookupLoading ? (
+       <ActivityIndicator
+         size="large"
+         color="#086DC0"
+         style={{ marginTop: 150 }}
+       />
+     ) : phoneBookUsers.length === 0 ? (
+       <Text style={styles.placeholderText}>
+         No contacts found on the app.
+       </Text>
+     ) : (
+       <FlatList
+         contentContainerStyle={styles.list}
+         data={phoneBookUsers}
+         keyExtractor={item => item._id.toString()}
+         renderItem={renderContactItem}
+ 
+      />
+     )}
+
+
+        {/* FOOTER */}
+        <View style={styles.fFooter}>
+          <TouchableOpacity 
+            style={styles.btnTags}
+
+          >
+            <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}
+           onPress={() => navigation.navigate('GroupsScreen')}>
+            <Image source={require('../icons/member.png')} style={styles.iconfooter}  />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}>
+            <Image source={require('../icons/Home.png')} style={styles.iconfooter} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
+            <Image source={require('../icons/friend.png')} style={styles.iconfooter} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.btnTags}>
+          {currentUser?.avatar ? (
+          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+        ) : (
+          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
+        )}
+          </TouchableOpacity>
+
+</View>
+     
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        marginTop: 30,
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+  container: {
+    flex: 1,
+    backgroundColor: '#D8EDFF',
+  },
+  bg: { position: 'absolute', width: '100%', height: '100%' },
+  header: {
+    marginTop:15,
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    height: 45,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    zIndex: 2,
+  },
+  icon: {
+    width: 18,
+    height: 18,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 16,
+  },
+  addBtn: {
+    marginLeft: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4F9DDD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addIcon: {
+    width: 16,
+    height: 16,
+  },
+  list: {
+    paddingTop: 130,      // make room for header
+    paddingHorizontal: 10,
+    paddingBottom: 20,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 6,
+    // subtle shadow
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  avatar: {
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
+    marginRight: 12,
+  },
+  info: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  name: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#086DC0',
+    marginLeft:5
+  },
+  snippet: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  placeholderText: {
+    textAlign: 'center',
+    marginTop: 150,
+    fontSize: 16,
+    color: '#555',
+  },
+  fFillter: {
+    position: 'absolute',
+    top: 70,
+    left: 10,
+    right:10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop:15,
+    zIndex:3
+  },
+  btnFillter: {
+    width: 85,
+    height: 30,
+    borderRadius: 30,
+    backgroundColor: '#FFEED4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  txtFillter: { fontSize: 16, fontWeight: '600', color: '#F49300' },
+
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#086DC0',
+    marginLeft: 'auto',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#086DC0' },
+
+  modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
+  modalCloseButton: {
+    flex: 1,
+    marginRight: 5,
+    padding: 10,
+    backgroundColor: '#aaa',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  modalCreateButton: {
+    flex: 1,
+    marginLeft: 5,
+    padding: 10,
+    backgroundColor: '#086DC0',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  groupNameInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+    fontSize: 16,
+    color: '#000',
+  },
+  
+  modalCloseText: { color: 'white', fontWeight: 'bold' },
+  modalCreateText: { color: 'white', fontWeight: 'bold' },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    paddingVertical: 10,
+    width: '80%',
+  },
+  optionsModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 20,
+    width: '90%',
+    maxHeight: '70%',
+  },
+  menuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  menuText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
+  },
+  optionLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  classifyModal: {
+    backgroundColor: 'white',
+    width: '80%',
+    borderRadius: 8,
+    paddingVertical: 12,
+    // push it toward the top (optional):
+    paddingHorizontal: 16,
+    maxHeight: '60%', 
+    alignSelf: 'center',
+    marginTop: 80,
+  },
+  classifyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  colorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
+  },
+  classifyLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#EEE',
+    marginVertical: 6,
+  },
+  manageButton: {
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  manageText: {
+    fontSize: 16,
+    color: '#086DC0',
+    fontWeight: '600',
+  },
+  manageModal: {
+    backgroundColor: 'white',
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 8,
+    padding: 16,
+  },
+  manageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  manageTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  closeIcon: {
+    width: 20,
+    height: 20,
+  },
+  manageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  manageActions: {
+    flexDirection: 'row',
+    marginLeft: 'auto',
+  },
+  actionIcon: {
+    width: 20,
+    height: 20,
+    marginLeft: 16,
+  },
+  addTagButton: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  addTagText: {
+    color: '#086DC0',
+    fontWeight: '600',
+  },
+  addTagModal: {
+    backgroundColor: 'white',
+    width: '90%',
+    borderRadius: 8,
+    padding: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    padding: 8,
+    marginTop: 4,
+  },
+  colorOption: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  colorOptionSelected: {
+    borderColor: '#333',
+    borderWidth: 2,
+  },
+  assignSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cancelButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  confirmButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#086DC0',
+    borderRadius: 4,
+  },
+  pickerModal: {
+    backgroundColor: 'white',
+    width: '90%',
+    maxHeight: '70%',
+    borderRadius: 8,
+    padding: 16,
+  },
+  confirmButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#086DC0',
+    borderRadius: 4,
+    alignSelf: 'flex-end',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  checkboxChecked: {
+    backgroundColor: '#333',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: { width: '80%', height: '60%', backgroundColor: 'white', borderRadius: 10, padding: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+  friendItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  friendAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
+  friendName: { fontSize: 16 },
+
+
+  fFooter: {
+    position: 'absolute',
+    bottom: 10,
+    width: '90%',
+    height: 54,
+    backgroundColor: 'white',
+    borderRadius: 30,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    alignSelf:'center'
+  },
+  btnTags: {
+    width: 66,
+    height: 45,
+    backgroundColor: 'white',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  btnTag: {
+    width: 66,
+    height: 45,
+    backgroundColor: '#086DC0',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconfooter: { width: 25, height: 25 },
+  avatarFooter: { width: 40, height: 40, borderRadius: 100 },
+      imgAG: {
+      width: 55,
+      height: 55,
+      borderRadius: 27.5,
     },
-    fbg: {
-        width: '100%',
-        height: '100%',
-    },
-    bg: {
-        width: '100%',
-        height: '100%',
-    },
-    fcontent: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-        padding: 5,
+      fMessage: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    fcontrol: {
-        width: '90%',
-        height: 35,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    fFriendList: {
-        width: 100,
-        height: '100%',
-        backgroundColor: '#086DC0',
-        borderRadius: 16.5,
-        justifyContent: 'space-around',
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 5,
-    },
-    icons: {
-        width: 14,
-        height: 14,
-    },
-    txtfriendlist: {
-        fontSize: 13,
-        color: 'white',
-        fontWeight: 'bold',
-    },
-    fRequest: {
-        width: 150,
-        height: '100%',
-        backgroundColor: 'white',
-        borderRadius: 16.5,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        padding: 5,
-    },
-    txtRequest: {
-        fontSize: 13,
-        color: '#086DC0',
-        fontWeight: 'bold',
-    },
-    fContact: {
-        width: 94,
-        height: '100%',
-        backgroundColor: 'white',
-        borderRadius: 16.5,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        padding: 5,
-    },
-    btnAdd: {
-        width: 33,
-        height: 33,
-        backgroundColor: 'white',
-        borderRadius: '50%',
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    iconAdd: {
-        width: 16,
-        height: 16,
-    },
-    fListFriend: {
-        position: 'absolute',
-        width: '100%',
-        height: '80%',
-        padding: 5,
-    },
-    fMessage: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 15,
+        alignItems:'center',
+        height: 65,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        borderBottomColor: 'white',
+        paddingHorizontal: 5,
 
-    },
-    avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        marginRight: 15,
-        backgroundColor: '#ccc',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    avatarPlaceholder: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    avatarText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: 'white',
-    },
-
-    fInfor: {
-        flex: 1,
-        justifyContent: 'center',
-    },
-    name: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    email: {
-        fontSize: 13,
-        color: '#666',
-    },
-    fbtn: {
-        position: 'absolute',
-        width: 120,
-        height: 30,
-        justifyContent: 'center',
-        right: 0,
-        top: 5,
-        alignItems: 'center',
-        borderRadius: 30,
-        backgroundColor: 'grey',
-        borderWidth: 1
-    },
-    btnDetail: {
-        width: 8,
-        height: 30,
-        padding: 8,
-    },
-    fFooter: {
-        position: 'absolute',
-        width: 386,
-        height: 54,
-        bottom: 10,
-        backgroundColor: 'white',
-        borderRadius: 30,
+      },
+            favatarGroup: { width: 65, justifyContent: 'center' },
+      fRowOne: {
         flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-around',
-    },
-    btnTag: {
-        width: 66,
-        height: 45,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 30,
-        backgroundColor: '#086DC0',
-    },
-    btnTags: {
-        width: 66,
-        height: 45,
-        borderRadius: 30,
-        backgroundColor: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    iconfooter: {
-        width: 25,
         height: 25,
-    },
-    avatarFooter: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
+        justifyContent: 'space-around',
+      },
+      fRowTwo: {
+        flexDirection: 'row',
+        height: 25,
+        justifyContent: 'space-around',
         alignItems: 'center',
-        borderRadius: '50%',
-    },
-    imgAva: {
-        display: 'flex',
-        width: '100%',
-        height: '100%',
-    },
-    fImaFooter: {
-        display: 'flex',
-        overflow: 'hidden',
-        width: '100%',
-        height: '100%',
-        borderRadius: '50%',
-    },
+      },
+      favatarG: { width: 25, height: 25, borderRadius: 12.5 },    
+     phoneNumber: {
+        fontSize: 14,
+        color: '#444',
+        marginTop: 4,
+        marginLeft:5
+        },
 
-    avatarText: {
-        fontSize: 25,
-        fontWeight: 'bold',
-        color: 'white',
-    },
-
-    iconDetail: {
-        width: 8,
-        height: 30,
-        tintColor: '#086DC0',
-    },
-    popupContainer: {
-        position: 'absolute',
-        right: 20,
-        backgroundColor: 'white',
-        padding: 10,
-        borderRadius: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
-        zIndex: 999,
-    },
-    popupItem: {
-        paddingVertical: 10,
-    },
-    popupText: {
-        fontSize: 16,
-        color: '#086DC0',
-    },
 });
