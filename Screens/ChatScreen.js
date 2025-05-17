@@ -46,7 +46,8 @@ const screenWidth = Dimensions.get("window").width;
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) {
+function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress, currentUserAvatar }) {
+
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
@@ -113,11 +114,21 @@ function MessageItem({ msg, showAvatar, showTime, currentUserId, onLongPress }) 
         isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
       ]}
     >
-      {showAvatar ? (
-        <Image source={AvatarImage} style={messageItemStyles.avatar} />
-      ) : (
-        <View style={messageItemStyles.avatarPlaceholder} />
-      )}
+{showAvatar ? (
+  <Image
+    source={
+      isMe
+        ? currentUserAvatar
+          ? { uri: currentUserAvatar }
+          : AvatarImage
+        : AvatarImage
+    }
+    style={messageItemStyles.avatar}
+  />
+) : (
+  <View style={messageItemStyles.avatarPlaceholder} />
+)}
+
       <View style={messageItemStyles.contentContainer}>
         {msg.type === "IMAGE" ? (
           <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
@@ -238,8 +249,10 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress }) {
+function ChatBox({ messages, currentUserId, currentUserAvatar, onMessageLongPress }) {
+
   const scrollViewRef = useRef(null);
+  
 
   useEffect(() => {
     if (scrollViewRef.current)
@@ -262,18 +275,20 @@ function ChatBox({ messages, currentUserId, onMessageLongPress }) {
         const key = `${msg._id}-${index}`;
 
         return (
-          <MessageItem
-            key={key}
-            msg={msg}
-            showAvatar={isFirstInGroup}
-            showTime={isLastInGroup}
-            currentUserId={currentUserId}
-            onLongPress={
-              msg.memberId?.userId === currentUserId
-                ? () => onMessageLongPress(msg)
-                : null
-            }
-          />
+         <MessageItem
+  key={key}
+  msg={msg}
+  showAvatar={isFirstInGroup}
+  showTime={isLastInGroup}
+  currentUserId={currentUserId}
+  currentUserAvatar={currentUserAvatar}
+  onLongPress={
+    msg.memberId?.userId === currentUserId
+      ? () => onMessageLongPress(msg)
+      : null
+  }
+/>
+
         );
       })}
     </ScrollView>
@@ -435,6 +450,25 @@ const [userId, setUserId] = useState(null);
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
 const [friends, setFriends] = useState([]);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
+const [currentUser, setCurrentUser] = useState(null);
+
+
+useEffect(() => {
+  const fetchMe = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) return;
+      const { data } = await axios.get('/api/me/profile', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setCurrentUser(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  fetchMe();
+}, []);
+
 
 
 
@@ -901,16 +935,17 @@ useEffect(() => {
     }
     try {
       // Create an optimistic message with a pending flag.
-      const newMessage = {
-        _id: String(Date.now()), // temporary id
-        memberId: { userId: userId },
-        type: "TEXT",
-        content: message,
-        createdAt: new Date().toISOString(),
-        pending: true,
-      };
-      // Update local state immediately (optimistic UI update)
-      setMessages((prev) => [...prev, newMessage]);
+     const newMessage = {
+  _id: String(Date.now()),
+  memberId: { userId },
+  type: "TEXT",
+  content: message,
+  createdAt: new Date().toISOString(),
+  pending: true, // <== important
+};
+
+setMessages((prev) => [...prev, newMessage]);
+
 
       await axios.post("/api/messages/text", {
         conversationId: conversationId,
@@ -930,25 +965,28 @@ useEffect(() => {
   // Listen for incoming messages from the socket.
   useEffect(() => {
     if (!socket || !conversationId) return;
-    const receiveHandler = (message) => {
-      setMessages((prev) => {
-        // If the message is from the current user, try to update the pending message.
-        if (message.memberId?.userId === userId) {
-          const index = prev.findIndex(
-            (m) => m.pending && m.content === message.content
-          );
-          if (index !== -1) {
-            const updatedMessages = [...prev];
-            updatedMessages[index] = message;
-            return updatedMessages;
-          }
-        }
-        // If the message already exists (by _id), don't add it again.
-        const exists = prev.some((m) => m._id === message._id);
-        if (exists) return prev;
-        return [...prev, message];
-      });
-    };
+const receiveHandler = (message) => {
+  setMessages((prev) => {
+    // If it's from the current user, replace the optimistic one
+    if (message.memberId?.userId === userId) {
+      const index = prev.findIndex(
+        (m) => m.pending && m.content === message.content
+      );
+      if (index !== -1) {
+        const updated = [...prev];
+        updated[index] = message;
+        return updated;
+      }
+    }
+
+    // If it already exists by ID, don't add
+    if (prev.some((m) => m._id === message._id)) return prev;
+
+    // Otherwise, add the new message
+    return [...prev, message];
+  });
+};
+
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
 
@@ -971,11 +1009,13 @@ useEffect(() => {
          conversationId={conversationId}
          currentUserId={userId}/>
       <View style={chatScreenStyles.chatContainer}>
-        <ChatBox
-          messages={messages}
-          currentUserId={userId}
-          onMessageLongPress={handleMessageLongPress}
-        />
+<ChatBox
+  messages={messages}
+  currentUserId={userId}
+  currentUserAvatar={currentUser?.avatar}
+  onMessageLongPress={handleMessageLongPress}
+/>
+
       </View>
       <MessageInput
         input={input}
