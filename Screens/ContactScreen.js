@@ -36,6 +36,23 @@ export default function ContactScreen({ navigation }) {
   const [lookupLoading, setLookupLoading] = useState(true);
   const [sentRequests, setSentRequests] = useState([]);
 
+    const handleOpenChat = async (contactUser) => {
+    try {
+      const resp = await axios.post(
+        `/api/conversations/individuals/${contactUser._id}`
+      );
+      const conversation = resp.data;
+
+      navigation.navigate('ChatScreen', {
+        conversation,
+        userId,
+      });
+    } catch (err) {
+      console.error('Error opening chat:', err);
+      Alert.alert('Không thể mở trò chuyện', err.message);
+    }
+  };
+
   useEffect(() => {
     if (!currentUser?._id) return;
 
@@ -260,7 +277,10 @@ export default function ContactScreen({ navigation }) {
     };
 
     return (
-      <View style={styles.fMessage}>
+      <TouchableOpacity style={styles.fMessage}
+        activeOpacity={0.7}
+        onPress={() => handleOpenChat(user)}
+      >
         <Image
           source={
             user.avatar ? { uri: user.avatar } : require('../Images/avt.png')
@@ -308,7 +328,7 @@ export default function ContactScreen({ navigation }) {
               <Image source={addFrIcon} style={styles.addFrIcon} />
             </TouchableOpacity>
           ))}
-      </View>
+      </TouchableOpacity>
     );
   };
 

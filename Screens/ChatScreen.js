@@ -32,13 +32,13 @@ import UserService from "../api/userService";
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
-const CallIcon = require("../assets/Call.png");
-const VideoCallIcon = require("../assets/VideoCall.png");
-const DetailChatIcon = require("../icons/userdetail.png");
+const CallIcon = require("../icons/call.png");
+const VideoCallIcon = require("../icons/video_call.png");
+const DetailChatIcon = require("../icons/detail_chat.png");
 const FileIcon = require("../icons/paperclip.png");
 const PictureIcon = require("../icons/picture.png");
 const EmojiIcon = require("../icons/emoji.png");
-const SendIcon = require("../icons/send.png");
+const SendIcon = require("../icons/send_icon.png");
 const FileSent = require("../icons/filesent.png");
 const Return = require("../icons/back.png");
 
