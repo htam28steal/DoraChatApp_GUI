@@ -221,9 +221,7 @@ const renderFriend = ({ item }) => (
                       <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('ContactScreen')}> 
                       <Text style={styles.txtFillter}>Address Book</Text>
                     </TouchableOpacity>
-                     <TouchableOpacity style={styles.btnFillter}  onPress={()=>navigation.navigate('FindUserScreen')}>
-                      <Text style={styles.txtFillter}>Add Friend</Text>
-                    </TouchableOpacity>
+
       
                   </View>
 

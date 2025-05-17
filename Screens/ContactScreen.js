@@ -339,9 +339,7 @@ export default function ContactScreen({ navigation }) {
         <TouchableOpacity style={styles.btnFillterChosen}>
           <Text style={styles.txtFillterChosen}>Address Book</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('FindUserScreen')}>
-        <Text style={styles.txtFillter}>Add Friend</Text>
-      </TouchableOpacity>
+
 
       </View>
       {/* optionally, filter tabs could go here */}
