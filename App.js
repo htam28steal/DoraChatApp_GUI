@@ -56,7 +56,7 @@ function AppContainer() {
         <Stack.Screen name="ProfileScreen" component={ProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AddFriendScreen" component={AddFriendScreen} options={{ headerShown: false }} />
         <Stack.Screen name="YourFriendScreen" component={YourFriendScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="ListRequestFriend" component={ListRequestFriend} options={{ headerShown: false }} />
+        <Stack.Screen name="ListRequestFriendScreen" component={ListRequestFriend} options={{ headerShown: false }} />
         <Stack.Screen name="FindUserScreen" component={FindUser} options={{ headerShown: false }} />
         <Stack.Screen name="ContactScreen" component={Contact} options={{ headerShown: false }} />
         <Stack.Screen name="ChatGroup" component={ChatGroup} options={{ headerShown: false }} />

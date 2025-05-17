@@ -336,12 +336,13 @@ export default function ContactScreen({ navigation }) {
         <TouchableOpacity style={styles.btnFillter}>
           <Text style={styles.txtFillter}>Requests</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.btnFillterChosen}>
+          <Text style={styles.txtFillterChosen}>Address Book</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.btnFillter}>
         <Text style={styles.txtFillter}>Add Friend</Text>
       </TouchableOpacity>
-        <TouchableOpacity style={styles.btnFillterChosen}>
-          <Text style={styles.txtFillterChosen}>Contacts</Text>
-        </TouchableOpacity>
+
       </View>
       {/* optionally, filter tabs could go here */}
       {/* <View style={styles.filterRow}>…</View> */}
@@ -513,7 +514,7 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   btnFillter: {
-    width: 85,
+    width: 115,
     height: 30,
     borderRadius: 30,
     backgroundColor: '#FFEED4',
@@ -521,7 +522,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
     btnFillterChosen: {
-    width: 85,
+    width: 115,
     height: 30,
     borderRadius: 30,
     backgroundColor: '#AFDDFF',

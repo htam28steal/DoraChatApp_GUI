@@ -166,15 +166,16 @@ useEffect(() => {
         />
       </View>
        <View style={styles.fFillter}>
-              <TouchableOpacity style={styles.btnFillter}>
+              <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('ListRequestFriendScreen')}> 
                 <Text style={styles.txtFillter}>Requests</Text>
               </TouchableOpacity>
-               <TouchableOpacity style={styles.btnFillter}>
+                <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('ContactScreen')}> 
+                <Text style={styles.txtFillter}>Address Book</Text>
+              </TouchableOpacity>
+               <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('FindUserScreen')}>
                 <Text style={styles.txtFillter}>Add Friend</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('ContactScreen')}> 
-                <Text style={styles.txtFillter}>Contacts</Text>
-              </TouchableOpacity>
+
             </View>
 
       {loading ? (
@@ -315,7 +316,7 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   btnFillter: {
-    width: 85,
+    width: 115,
     height: 30,
     borderRadius: 30,
     backgroundColor: '#FFEED4',
