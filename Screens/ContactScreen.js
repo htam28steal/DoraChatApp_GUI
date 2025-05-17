@@ -333,13 +333,13 @@ export default function ContactScreen({ navigation }) {
       </View>
 
       <View style={styles.fFillter}>
-        <TouchableOpacity style={styles.btnFillter}>
+        <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('ListRequestFriendScreen')}>
           <Text style={styles.txtFillter}>Requests</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnFillterChosen}>
           <Text style={styles.txtFillterChosen}>Address Book</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnFillter}>
+        <TouchableOpacity style={styles.btnFillter} onPress={()=>navigation.navigate('FindUserScreen')}>
         <Text style={styles.txtFillter}>Add Friend</Text>
       </TouchableOpacity>
 
