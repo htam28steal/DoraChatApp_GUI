@@ -42,39 +42,54 @@
     const [lookupLoading, setLookupLoading] = useState(true);
     const [sentRequests, setSentRequests] = useState([]);
 
-    useEffect(() => {
-    if (!currentUser?._id) return;
+useEffect(() => {
+  if (!currentUser?._id) return;
 
-    console.log('[SOCKET] JOIN_USER →', currentUser._id);
-    socket.emit(SOCKET_EVENTS.JOIN_USER, currentUser._id);
+  console.log('[SOCKET] JOIN_USER →', currentUser._id);
+  socket.emit(SOCKET_EVENTS.JOIN_USER, currentUser._id);
 
-    const onFriendAccepted = (data) => {
-        console.log('[SOCKET] ACCEPT_FRIEND received:', data);
-        const senderId = typeof data === 'object' ? data.senderId : data;
-        const receiverId = typeof data === 'object' ? data.receiverId : currentUser._id;
-        if (receiverId !== currentUser._id) return;
+ const onFriendAccepted = (data) => {
+  console.log('[SOCKET] ACCEPT_FRIEND received:', data);
 
-        setSentRequests(prev => prev.filter(id => id !== senderId));
-        FriendService.getListFriends().then(setFriends);
-    };
+  // The server sends the user object that was accepted (i.e. receiver/sender)
+  const acceptedUserId = data?._id;
+  if (!acceptedUserId) return;
 
-    const onFriendInviteDeleted = (data) => {
-        console.log('[SOCKET] DELETED_FRIEND_INVITE received:', data);
-        // if server is only sending the other user’s ID as a string:
-        const declinerId = typeof data === 'string' ? data : data.receiverId;
-        if (!declinerId) return;
+  console.log('[SOCKET] CurrentUser:', currentUser._id, 'AcceptedUserId:', acceptedUserId);
 
-        setSentRequests(prev => prev.filter(id => id !== declinerId));
-    };
+  // Remove from sentRequests if we had sent to this person
+  setSentRequests(prev => {
+    const next = prev.filter(id => id !== acceptedUserId);
+    console.log('[SOCKET] Updated sentRequests:', next);
+    return next;
+  });
 
-    socket.on(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
-    socket.on(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onFriendInviteDeleted);
+  // Refresh friend list to reflect the new friend
+  FriendService.getListFriends()
+    .then(friendsList => {
+      console.log('[SOCKET] New friends list:', friendsList);
+      setFriends(friendsList);
+    });
+};
 
-    return () => {
-        socket.off(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
-        socket.off(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onFriendInviteDeleted);
-    };
-    }, [currentUser]);
+
+
+  const onFriendInviteDeleted = (data) => {
+    console.log('[SOCKET] DELETED_FRIEND_INVITE received:', data);
+    const declinerId = typeof data === 'string' ? data : data.receiverId;
+    if (!declinerId) return;
+
+    setSentRequests(prev => prev.filter(id => id !== declinerId));
+  };
+
+  socket.on(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
+  socket.on(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onFriendInviteDeleted);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
+    socket.off(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onFriendInviteDeleted);
+  };
+}, [currentUser]);
 
 
 
@@ -222,76 +237,58 @@
         }, [friends]);
         
     
-        
-            const toggleFilter = useCallback(id => {
-            setSelectedFilters(prev =>
-                prev.includes(id)
-                ? prev.filter(x => x !== id)
-                : [...prev, id]
-            );
-            }, []);
-        
+      
         
         
 
-    const renderContactItem = useCallback(
-    ({ item: user }) => {
-        const alreadyFriend = isAlreadyFriend(user._id);
-    const isRequestSent = sentRequests.includes(user._id);
+  const renderContactItem = ({ item: user }) => {
+  const alreadyFriend = isAlreadyFriend(user._id);
+  const isRequestSent = sentRequests.includes(user._id);
 
-
-        const handleAddFriend = async () => {
+  const handleAddFriend = async () => {
     try {
-        await FriendService.sendFriendInvite(user._id);
-        setSentRequests(prev => [...prev, user._id]);
+      await FriendService.sendFriendInvite(user._id);
+      setSentRequests(prev => [...prev, user._id]);
 
-        socket.emit(SOCKET_EVENTS.SEND_FRIEND_INVITE, {
+      socket.emit(SOCKET_EVENTS.SEND_FRIEND_INVITE, {
         senderId: currentUser._id,
         receiverId: user._id,
-        });
+      });
 
-        Alert.alert('Success', `Friend request sent to ${user.name}`);
+      Alert.alert('Success', `Friend request sent to ${user.name}`);
     } catch (error) {
-        Alert.alert('Error', 'Could not send friend request.');
-        console.error(error);
+      Alert.alert('Error', 'Could not send friend request.');
+      console.error(error);
     }
-    };
+  };
 
+  return (
+    <View style={styles.fMessage}>
+      <Image
+        source={user.avatar ? { uri: user.avatar } : require('../Images/avt.png')}
+        style={styles.imgAG}
+      />
+      <View style={styles.fInfor}>
+        <Text style={styles.name}>{user.name}</Text>
+        <Text style={styles.phoneNumber} numberOfLines={1}>
+          {user.username || 'No phone'}
+        </Text>
+      </View>
 
-        return (
-        <View style={styles.fMessage}>
-            <Image
-            source={
-                user.avatar
-                ? { uri: user.avatar }
-                : require('../Images/avt.png')
-            }
-            style={styles.imgAG}
-            />
-            <View style={styles.fInfor}>
-            <Text style={styles.name}>{user.name}</Text>
-            <Text style={styles.phoneNumber} numberOfLines={1}>
-                {user.username || 'No phone'}
-            </Text>
-            </View>
-
-    {!alreadyFriend && (
-    isRequestSent ? (
-        <View style={styles.requestSent}>
-        <Text style={styles.requestSentText}>Request Sent</Text>
-        </View>
-    ) : (
-        <TouchableOpacity onPress={handleAddFriend} style={styles.addFriendBtn}>
-        <Image source={addFrIcon} style={styles.addFrIcon} />
-        </TouchableOpacity>
-    )
-    )}
-
-        </View>
-        );
-    },
-    [friends, sentRequests, currentUser] // ✅ make sure dependencies are correct
-    );
+      {!alreadyFriend && (
+        isRequestSent ? (
+          <View style={styles.requestSent}>
+            <Text style={styles.requestSentText}>Request Sent</Text>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={handleAddFriend} style={styles.addFriendBtn}>
+            <Image source={addFrIcon} style={styles.addFrIcon} />
+          </TouchableOpacity>
+        )
+      )}
+    </View>
+  );
+};
 
 
 
