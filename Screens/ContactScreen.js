@@ -336,6 +336,9 @@ export default function ContactScreen({ navigation }) {
         <TouchableOpacity style={styles.btnFillter}>
           <Text style={styles.txtFillter}>Requests</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.btnFillter}>
+        <Text style={styles.txtFillter}>Add Friend</Text>
+      </TouchableOpacity>
         <TouchableOpacity style={styles.btnFillterChosen}>
           <Text style={styles.txtFillterChosen}>Contacts</Text>
         </TouchableOpacity>
