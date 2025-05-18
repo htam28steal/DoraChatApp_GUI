@@ -93,6 +93,15 @@ function MessageItem({
 
     return '';
   };
+    if (msg.type === "NOTIFY") {
+    return (
+      <View style={messageItemStyles.notifyContainer}>
+        <Text style={messageItemStyles.notifyText}>
+          {msg.content}
+        </Text>
+      </View>
+    );
+  }
 
   const getFileIcon = (fileNameOrUrl = "") => {
     const extension = getFileExtension(fileNameOrUrl);
@@ -357,7 +366,21 @@ replySnippet: {
 replyTextContainer: {
   flex: 1,
 },
-
+  notifyContainer: {
+    alignSelf: "center",        // push it into the middle
+    backgroundColor: "#ECECEC", // light grey pill
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginVertical: 10,
+    maxWidth: "80%",
+  },
+  notifyText: {
+    fontSize: 13,
+    color: "#555",
+    textAlign: "center",
+    fontStyle:'italic'
+  },
 });
 
 /**
@@ -393,7 +416,6 @@ const scrollToMessage = useCallback((messageId) => {
   return (
     
     <ScrollView
-      ref={scrollViewRef}
       style={chatBoxStyles.container}
       contentContainerStyle={chatBoxStyles.contentContainer}
     >
@@ -408,7 +430,6 @@ const scrollToMessage = useCallback((messageId) => {
         return (
         <MessageItem
           key={key}
-              ref={ref => { messageRefs.current[msg._id] = ref; }}
           msg={msg}
             allMessages={messages}
           showAvatar={isFirstInGroup}
