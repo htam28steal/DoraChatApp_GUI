@@ -25,7 +25,7 @@ import ResetPasswordStep2 from './Screens/ResetPasswordStep2';
 import useSocketListeners from './hooks/useSocketListeners';
 import Conversations from './Screens/ConversationScreen'
 
-import ListRequestFriend from './Screens/ListRequestFriendScreen';
+import ListRequestFriend from './Screens/ListRequestFriendSCreen';
 import FindUser from './Screens/FindUserScreen';
 import Contact from './Screens/ContactScreen';
 
@@ -124,7 +124,7 @@ function AppContainer() {
           options={{ headerShown: false }}
 
         />
-                <Stack.Screen
+        <Stack.Screen
           name="QRScreen"
           component={QR}
           options={{ headerShown: false }}
