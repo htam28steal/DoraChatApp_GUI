@@ -285,7 +285,7 @@ const messageItemStyles = StyleSheet.create({
   rightAlign: { flexDirection: "row-reverse" },
   avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarPlaceholder: { width: 40, height: 40 },
-  contentContainer: { maxWidth: 468, marginHorizontal: 8 },
+  contentContainer: {  maxWidth: screenWidth * 0.8, marginHorizontal: 8 },
   imageContent: {
     width: 250,
     height: 250,
@@ -319,13 +319,16 @@ const messageItemStyles = StyleSheet.create({
     marginTop: 4,
     flexWrap: "wrap",
   },
-  textContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderRadius: 12,
-    fontSize: 14,
-    color: "#000",
-  },
+textContent: {
+  paddingHorizontal: 12,
+  paddingVertical: 14,
+  borderRadius: 12,
+  fontSize: 14,
+  color: "#000",
+  flexWrap: "wrap",
+  flexShrink: 1,       // <-- this lets it shrink rather than overflow
+},
+
   videoContainer: {
     width: 250,
     height: 250,
@@ -421,11 +424,16 @@ const scrollToMessage = useCallback((messageId) => {
     >
       {messages.map((msg, index) => {
         const userId = msg.memberId?.userId || "";
-        const prevId = messages[index - 1]?.memberId?.userId || "";
+        const prevMsg = messages[index - 1];
+        const prevId = prevMsg?.memberId?.userId || "";
         const nextId = messages[index + 1]?.memberId?.userId || "";
-        const isFirstInGroup = index === 0 || prevId !== userId;
         const isLastInGroup = index === messages.length - 1 || nextId !== userId;
         const key = `${msg._id}-${index}`;
+
+        const isFirstInGroup =
+  index === 0 ||
+  prevId !== userId ||
+  prevMsg?.type === "NOTIFY";
 
         return (
         <MessageItem
@@ -729,47 +737,7 @@ const recallHandler = useCallback((data) => {
 }, []);
 
 
-useEffect(() => {
-  if (!socket || !conversationId) return;
 
-  const receiveHandler = (message) => {
-    setMessages((prev) => {
-  if (message.memberId?.userId === userId) {
-      const index = prev.findIndex(
-        (m) => m.pending && m.content === message.content
-      );
-      if (index !== -1) {
-        const updated = [...prev];
-        updated[index] = message;
-        return updated;
-      }
-    }
-
-    // ❌ Fix: check for duplicate `message._id`
-    if (prev.some((m) => m._id === message._id)) {
-      console.log("⚠️ Duplicate message skipped:", message._id);
-      return prev;
-    }
-
-    console.log("📥 New message received:", message);
-    return [...prev, message];
-  });
-  };
-
-  socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-  socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-
-  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-  socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-
-  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
-
-  return () => {
-    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-    socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-    socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
-  };
-}, [socket, conversationId, recallHandler]);
 
 
   const handleSelectFriendToForward = async (friend) => {
@@ -960,77 +928,68 @@ const handleSelectConversationToForward = async (convId) => {
     }
   };
 
-  const pickImage = async () => {
-    const formData = new FormData();
-    if (!userId) {
+      const pickMedia = async () => {
+
+            if (!userId) {
   Alert.alert("Vui lòng chờ", "Đang tải thông tin người dùng...");
   return;
 }
+        const formData = new FormData();
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Permission denied", "Gallery access needed.");
-      return;
-    }
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+            Alert.alert("Permission denied", "Gallery access needed.");
+            return;
+        }
 
-    // Mở thư viện hình ảnh
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All, // Cho phép chọn cả Images và Videos
-      quality: 1,
-      allowsEditing: false, // Bạn có thể bật chế độ chỉnh sửa nếu cần
-    });
-
-    if (!result.canceled && result.assets.length > 0) {
-      const selectedImage = result.assets[0];
-      console.log(selectedImage); // Kiểm tra thông tin của hình ảnh được chọn
-
-      // Lấy URI hình ảnh
-      const imageUri = selectedImage.uri;
-      const fileName = selectedImage.uri.split('/').pop(); // Lấy tên file từ URI
-      const mimeType = selectedImage.mimeType;
-
-      // Tạo một đối tượng `File` cho FormData
-      const file = {
-        uri: imageUri,
-        name: fileName,
-        type: mimeType,
-      };
-
-      formData.append('id', userId);
-      formData.append('image', file);
-      formData.append('conversationId', conversationId);
-
-      setUploading(true);
-      try {
-        // Gửi tệp lên server
-        const response = await axios.post('/api/messages/images', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 20000,
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All, // Cho phép chọn cả Images và Videos
+            quality: 1,
+            allowsEditing: false,
         });
 
-        // Nhận URL hình ảnh từ phản hồi và tạo thông điệp mới
-        const imageUrl = response.data?.file?.url;
-        const newMsg = {
-          _id: String(Date.now()),
-          memberId: { userId: userId || "" },
-          type: "IMAGE",
-          content: imageUrl,
-          createdAt: new Date().toISOString(),
-        };
+        if (!result.canceled && result.assets.length > 0) {
+            const selectedMedia = result.assets[0];
+            const mediaUri = selectedMedia.uri;
+            const fileName = selectedMedia.uri.split('/').pop();
+            const mimeType = selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg');
 
-        // Cập nhật danh sách tin nhắn với ảnh mới
-        setMessages((prev) => [...prev, newMsg]);
-        console.log('Image uploaded successfully:', imageUrl);
+            const file = {
+                uri: mediaUri,
+                name: fileName,
+                type: mimeType,
+            };
 
-} catch (err) {
-  Alert.alert("Error", "Failed to upload image");
-} finally {
-  setUploading(false);
-}
-    }
-  };
+            formData.append('id', userId);
+            formData.append(selectedMedia.type === 'video' ? 'video' : 'image', file);
+            formData.append('conversationId', conversationId);
+
+            try {
+                const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
+                const response = await axios.post(endpoint, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                    timeout: selectedMedia.type === 'video' ? 30000 : 20000,
+                });
+
+                const mediaUrl = response.data?.file?.url;
+                const newMsg = {
+                    _id: String(Date.now()),
+                    memberId: { userId: userId || "" },
+                    type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
+                    content: mediaUrl,
+                    createdAt: new Date().toISOString(),
+                };
+
+                setMessages((prev) => [...prev, newMsg]);
+                console.log(`${selectedMedia.type} uploaded successfully:`, mediaUrl);
+            } catch (err) {
+                console.error(`Error uploading ${selectedMedia.type}:`, err);
+                Alert.alert('Error', `Failed to upload ${selectedMedia.type}`);
+            }
+        }
+    };
 
   // const pickVideo = async () => {
   //   const formData = new FormData();
@@ -1168,104 +1127,60 @@ const handleSelectConversationToForward = async (convId) => {
   }
 };
 
+const handleSendMessage = async (text) => {
+  if (!text.trim()) return;
 
-  // Handle sending a text message.
-  const handleSendMessage = async (message) => {
+  // optimistic
+  const tempId = String(Date.now());
+  setMessages(prev => [
+    ...prev,
+    { _id: tempId, memberId: { userId }, type: "TEXT", content: text, pending: true }
+  ]);
 
-    if (uploading) {
-  Alert.alert("Vui lòng đợi", "Đang tải lên, vui lòng chờ.");
-  return;
-}
-
-    if (!message.trim()) return;
-
-
-      if (replyTo) {
-    try {
-const res = await axios.post("/api/messages/reply", {
-  conversationId,
-  content: message,
-  replyMessageId: replyTo._id,
-  type: "TEXT",
-});
-    } catch (err) {
-      Alert.alert("Reply failed", err.message);
-    } finally {
-      setReplyTo(null);
-      setInput("");
-    }
-    return;
+  try {
+    await axios.post("/api/messages/text", {
+      conversationId,
+      content: text
+    });
+    // NO socket.emit here!
+  } catch (err) {
+    Alert.alert("Cannot send message", err.message);
   }
-    if (!userId) {
-      Alert.alert("User not loaded", "Unable to send message without a valid user.");
-      return;
-    }
-    try {
-      // Create an optimistic message with a pending flag.
-     const newMessage = {
-  _id: String(Date.now()),
-  memberId: { userId },
-  type: "TEXT",
-  content: message,
-  createdAt: new Date().toISOString(),
-  pending: true, // <== important
 };
 
-setMessages((prev) => [...prev, newMessage]);
 
+useEffect(() => {
+  if (!socket || !conversationId) return;
 
-      await axios.post("/api/messages/text", {
-        conversationId: conversationId,
-        content: message,
-      });
-
-      // Emit the message over socket; your server should broadcast it back
-      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
-        conversationId: conversationId,
-        content: message,
-      });
-    } catch (err) {
-      Alert.alert("Cannot send message", err.response?.data?.message || err.message);
-    }
+  const receiveHandler = (message) => {
+    setMessages((prev) => {
+      // replace the optimistic placeholder if it matches
+      if (message.memberId?.userId === userId) {
+        const idx = prev.findIndex(
+          m => m.pending && m.content === message.content
+        );
+        if (idx !== -1) {
+          const updated = [...prev];
+          updated[idx] = message;
+          return updated;
+        }
+      }
+      // otherwise skip if it’s already there by server _id
+      if (prev.some(m => m._id === message._id)) return prev;
+      return [...prev, message];
+    });
   };
 
-  // Listen for incoming messages from the socket.
-  useEffect(() => {
-    if (!socket || !conversationId) return;
-const receiveHandler = (message) => {
-  setMessages((prev) => {
-    // If it's from the current user, replace the optimistic one
-    if (message.memberId?.userId === userId) {
-      const index = prev.findIndex(
-        (m) => m.pending && m.content === message.content
-      );
-      if (index !== -1) {
-        const updated = [...prev];
-        updated[index] = message;
-        return updated;
-      }
-    }
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+  socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
 
-    // If it already exists by ID, don't add
-    if (prev.some((m) => m._id === message._id)) return prev;
-
-    // Otherwise, add the new message
-    return [...prev, message];
-  });
-};
-
-    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
-    socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
-
-    return () => {
-      socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-      socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
-    };
-  }, [socket, conversationId]);
-
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+    socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+  };
+}, [socket, conversationId, userId, recallHandler]);
 
 
 
@@ -1292,11 +1207,7 @@ const receiveHandler = (message) => {
 
       </View>
 
-      {uploading && (
-  <View style={chatScreenStyles.loadingOverlay}>
-    <ActivityIndicator size="large" color="#086DC0" />
-  </View>
-)}
+
   {replyTo && (
   <View style={styles.replyPreview}>
     <View style={styles.replyLeftAccent} />
@@ -1322,7 +1233,7 @@ const receiveHandler = (message) => {
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
-        onPickMedia={pickImage}
+        onPickMedia={pickMedia}
 
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
