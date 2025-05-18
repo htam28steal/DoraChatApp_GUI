@@ -58,6 +58,7 @@ function MessageItem({
   onLongPress,
   currentUserAvatar,
   otherUserAvatar, 
+    allMessages,
 }) {
 
  const [imgLoading, setImgLoading] = useState(false);
@@ -65,6 +66,12 @@ function MessageItem({
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
   const Container = onLongPress ? TouchableOpacity : View;
+
+
+  const repliedMsg = msg.replyMessageId
+  ? allMessages.find(m => m._id === msg.replyMessageId)
+  : null;
+
 
   const getFileExtension = (url) => {
     if (!url) return '';
@@ -148,6 +155,42 @@ function MessageItem({
 
 
       <View style={messageItemStyles.contentContainer}>
+        {repliedMsg && (
+  <View style={messageItemStyles.replyContainer}>
+    <Text style={messageItemStyles.replyAuthor}>
+      {repliedMsg.memberId?.name || "Unknown"}
+    </Text>
+    <Text
+      numberOfLines={1}
+      ellipsizeMode="tail"
+      style={messageItemStyles.replySnippet}
+    >
+      {repliedMsg.content}
+    </Text>
+  </View>
+)}
+
+{msg.replyTo && (
+  <View style={messageItemStyles.replyContainer}>
+    {/* optional arrow icon */}
+    <Image
+      source={require("../icons/arrow.png")}
+      style={messageItemStyles.replyIcon}
+    />
+    <View style={messageItemStyles.replyTextContainer}>
+      <Text style={messageItemStyles.replyAuthor}>
+        {msg.replyTo.memberId.userName || "Unknown"}
+      </Text>
+      <Text
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        style={messageItemStyles.replySnippet}
+      >
+        {msg.replyTo.content}
+      </Text>
+    </View>
+  </View>
+)}
 
         
         {msg.type === "IMAGE" ? (
@@ -280,6 +323,31 @@ const messageItemStyles = StyleSheet.create({
   myMessage: { backgroundColor: "#EFF8FF", alignSelf: "flex-end" },
   theirMessage: { backgroundColor: "#F5F5F5" },
   timeText: { fontSize: 10, color: "#959595", marginTop: 4 },
+  replyContainer: {
+  backgroundColor: "#E6E6FA",
+  padding: 8,
+  borderLeftWidth: 4,
+  borderLeftColor: "#086DC0",
+  borderRadius: 6,
+  marginBottom: 4,
+},
+
+replyAuthor: {
+  fontSize: 12,
+  fontWeight: "bold",
+  color: "#086DC0",
+  marginBottom: 2,
+},
+
+replySnippet: {
+  fontSize: 13,
+  color: "#333",
+},
+
+replyTextContainer: {
+  flex: 1,
+},
+
 });
 
 /**
@@ -315,6 +383,7 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
         <MessageItem
           key={key}
           msg={msg}
+            allMessages={messages}
           showAvatar={isFirstInGroup}
           showTime={isLastInGroup}
           currentUserId={currentUserId}
@@ -480,6 +549,7 @@ const [conversationsList, setConversationsList] = useState([]);
 const [uploading, setUploading] = useState(false);
 
 const [userIdReady, setUserIdReady] = useState(false);
+const [replyTo, setReplyTo] = useState(null);
 
 
 
@@ -494,6 +564,13 @@ const [userIdReady, setUserIdReady] = useState(false);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
+
+const handleReplyAction = () => {
+  if (!selectedMessage || selectedMessage.memberId.userId === userId) return;
+  setReplyTo(selectedMessage);
+  setModalVisible(false);
+};
+
 
 // In ChatScreen component
 const handleReadMessage = async () => {
@@ -607,10 +684,26 @@ useEffect(() => {
 
   const receiveHandler = (message) => {
     setMessages((prev) => {
-      const exists = prev.some((m) => m._id === message._id);
-      if (exists) return prev;
-      return [...prev, message];
-    });
+  if (message.memberId?.userId === userId) {
+      const index = prev.findIndex(
+        (m) => m.pending && m.content === message.content
+      );
+      if (index !== -1) {
+        const updated = [...prev];
+        updated[index] = message;
+        return updated;
+      }
+    }
+
+    // ❌ Fix: check for duplicate `message._id`
+    if (prev.some((m) => m._id === message._id)) {
+      console.log("⚠️ Duplicate message skipped:", message._id);
+      return prev;
+    }
+
+    console.log("📥 New message received:", message);
+    return [...prev, message];
+  });
   };
 
   socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
@@ -1035,6 +1128,27 @@ const handleSelectConversationToForward = async (convId) => {
 }
 
     if (!message.trim()) return;
+
+
+      if (replyTo) {
+    try {
+const res = await axios.post("/api/messages/reply", {
+  conversationId,
+  content: message,
+  replyMessageId: replyTo._id,
+  type: "TEXT",
+});
+console.log("✅ Reply message sent:", res.data);
+      // append the server’s reply object
+      setMessages(prev => [...prev, res.data]);
+    } catch (err) {
+      Alert.alert("Reply failed", err.message);
+    } finally {
+      setReplyTo(null);
+      setInput("");
+    }
+    return;
+  }
     if (!userId) {
       Alert.alert("User not loaded", "Unable to send message without a valid user.");
       return;
@@ -1136,6 +1250,26 @@ const receiveHandler = (message) => {
     <ActivityIndicator size="large" color="#086DC0" />
   </View>
 )}
+  {replyTo && (
+  <View style={styles.replyPreview}>
+    <View style={styles.replyLeftAccent} />
+    <View style={styles.replyContent}>
+      <Text style={styles.replyTitle}>
+        Đang trả lời {replyTo.memberId.userName || otherUser?.name}
+      </Text>
+      <Text
+        style={styles.replySnippet}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {replyTo.content}
+      </Text>
+    </View>
+    <TouchableOpacity onPress={() => setReplyTo(null)} style={styles.replyClose}>
+      <Text style={styles.replyCloseText}>×</Text>
+    </TouchableOpacity>
+  </View>
+)}
 
       <MessageInput
         input={input}
@@ -1165,6 +1299,17 @@ const receiveHandler = (message) => {
     onPressOut={() => setModalVisible(false)}
   >
     <View style={styles.modalContainer}>
+
+      {/* Only for other users */}
+{selectedMessage?.memberId?.userId !== userId && (
+  <TouchableOpacity
+    style={styles.modalButton}
+    onPress={handleReplyAction}
+  >
+    <Text style={styles.modalButtonText}>Reply</Text>
+  </TouchableOpacity>
+)}
+
       {!selectedMessage?.isDeleted && selectedMessage?.type === "TEXT" && (
   <TouchableOpacity
     style={styles.modalButton}
@@ -1491,6 +1636,39 @@ const styles = StyleSheet.create({
     top: 0, left: 0,
     // imageContent already sets width/height/borderRadius
   },
-
+  replyPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f2f2f2",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  replyLeftAccent: {
+    width: 4,
+    height: "100%",
+    backgroundColor: "#086DC0",
+    marginRight: 8,
+    borderRadius: 2,
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#333",
+  },
+  replySnippet: {
+    fontSize: 14,
+    color: "#555",
+  },
+  replyClose: {
+    paddingHorizontal: 8,
+    justifyContent: "center",
+  },
+  replyCloseText: {
+    fontSize: 18,
+    color: "#777",
+  },
 
 });
