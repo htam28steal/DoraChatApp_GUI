@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import {
   View,
   Text,
@@ -59,7 +59,12 @@ function MessageItem({
   currentUserAvatar,
   otherUserAvatar, 
     allMessages,
+    onReplyPress
 }) {
+
+
+
+  
 
  const [imgLoading, setImgLoading] = useState(false);
   const isMe = msg.memberId?.userId === currentUserId;
@@ -156,19 +161,24 @@ function MessageItem({
 
       <View style={messageItemStyles.contentContainer}>
         {repliedMsg && (
-  <View style={messageItemStyles.replyContainer}>
-    <Text style={messageItemStyles.replyAuthor}>
-      {repliedMsg.memberId?.name || "Unknown"}
-    </Text>
-    <Text
-      numberOfLines={1}
-      ellipsizeMode="tail"
-      style={messageItemStyles.replySnippet}
-    >
-      {repliedMsg.content}
-    </Text>
-  </View>
-)}
+          // wrap the quote in its own TouchableOpacity
+          <TouchableOpacity
+            style={messageItemStyles.replyContainer}
+            onPress={() => onReplyPress(repliedMsg._id)}
+            onLongPress={() => { /* swallow longPress here */ }}
+          >
+            <Text style={messageItemStyles.replyAuthor}>
+              {repliedMsg.memberId.name || "Unknown"}
+            </Text>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={messageItemStyles.replySnippet}
+            >
+              {repliedMsg.content}
+            </Text>
+          </TouchableOpacity>
+        )}
 
 {msg.replyTo && (
   <View style={messageItemStyles.replyContainer}>
@@ -357,7 +367,23 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
 
 
   const scrollViewRef = useRef(null);
-  
+  const messageRefs = useRef({});
+
+// helper to jump:
+const scrollToMessage = useCallback((messageId) => {
+  const item = messageRefs.current[messageId];
+  if (!item || !scrollViewRef.current) return;
+
+  // measure its y offset relative to the ScrollView's inner view
+  item.measureLayout(
+    // on Android you might need `.getInnerViewNode()`
+    scrollViewRef.current.getInnerViewNode(),  
+    (x, y) => {
+      scrollViewRef.current.scrollTo({ y: y - 20, animated: true }); // -20 to give a bit of top padding
+    },
+    () => {}
+  );
+}, []);
 
   useEffect(() => {
     if (scrollViewRef.current)
@@ -382,6 +408,7 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
         return (
         <MessageItem
           key={key}
+              ref={ref => { messageRefs.current[msg._id] = ref; }}
           msg={msg}
             allMessages={messages}
           showAvatar={isFirstInGroup}
@@ -390,7 +417,9 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
           currentUserAvatar={currentUserAvatar}
            otherUserAvatar={otherUserAvatar}
 onLongPress={() => onMessageLongPress(msg)}
-
+        onReplyPress={scrollToMessage}
+        onMessageLongPress={() => onMessageLongPress(msg)}
+          
         />
 
         );
@@ -566,7 +595,7 @@ const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
 
 const handleReplyAction = () => {
-  if (!selectedMessage || selectedMessage.memberId.userId === userId) return;
+
   setReplyTo(selectedMessage);
   setModalVisible(false);
 };
@@ -1138,9 +1167,6 @@ const res = await axios.post("/api/messages/reply", {
   replyMessageId: replyTo._id,
   type: "TEXT",
 });
-console.log("✅ Reply message sent:", res.data);
-      // append the server’s reply object
-      setMessages(prev => [...prev, res.data]);
     } catch (err) {
       Alert.alert("Reply failed", err.message);
     } finally {
@@ -1300,15 +1326,7 @@ const receiveHandler = (message) => {
   >
     <View style={styles.modalContainer}>
 
-      {/* Only for other users */}
-{selectedMessage?.memberId?.userId !== userId && (
-  <TouchableOpacity
-    style={styles.modalButton}
-    onPress={handleReplyAction}
-  >
-    <Text style={styles.modalButtonText}>Reply</Text>
-  </TouchableOpacity>
-)}
+
 
       {!selectedMessage?.isDeleted && selectedMessage?.type === "TEXT" && (
   <TouchableOpacity
@@ -1342,16 +1360,14 @@ const receiveHandler = (message) => {
     >
       <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
     </TouchableOpacity>
+  <TouchableOpacity
+    style={styles.modalButton}
+    onPress={handleReplyAction}
+  >
+    <Text style={styles.modalButtonText}>Reply</Text>
+  </TouchableOpacity>
 
-    {/* Only show delete if it's user's own message */}
-    {selectedMessage?.memberId?.userId === userId && (
-      <TouchableOpacity
-        style={styles.modalButton}
-        onPress={handleDeleteAction}
-      >
-        <Text style={styles.modalButtonText}>Xoá</Text>
-      </TouchableOpacity>
-    )}
+
   </>
 )}
 
