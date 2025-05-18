@@ -30,6 +30,8 @@ import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
 import { Video } from "expo-av";
 import UserService from "../api/userService";  
+import { Audio } from "expo-av";
+
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
@@ -318,11 +320,8 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
           currentUserId={currentUserId}
           currentUserAvatar={currentUserAvatar}
            otherUserAvatar={otherUserAvatar}
-          onLongPress={
-            msg.memberId?.userId === currentUserId
-              ? () => onMessageLongPress(msg)
-              : null
-          }
+onLongPress={() => onMessageLongPress(msg)}
+
         />
 
         );
@@ -496,6 +495,44 @@ const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
 
+// In ChatScreen component
+const handleReadMessage = async () => {
+  if (!selectedMessage || selectedMessage.type !== "TEXT") return;
+
+  try {
+    console.log("✉️ Sending TTS request for text:", selectedMessage.content);
+    const res = await axios.post("/api/messages/tts", {
+      text: selectedMessage.content,
+    });
+    console.log("✅ TTS response:", res.data);
+
+    const { url } = res.data;
+    console.log("▶️ Playing audio from:", url);
+
+    // 1) Create a new Sound object
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: url },
+      { shouldPlay: true }  // auto-start playback
+    );
+
+    // 2) Optionally track when it’s done
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.didJustFinish) {
+        console.log("🔈 Finished playing TTS");
+        sound.unloadAsync();
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ TTS error:", err);
+    Alert.alert("Error", err.response?.data?.message || err.message);
+  } finally {
+    setModalVisible(false);
+  }
+};
+
+
+
 
 const openForwardModal = async () => {
   try {
@@ -606,7 +643,7 @@ useEffect(() => {
 
     await axios.post("/api/messages/text", messageToForward);
 
-    Alert.alert("Chuyển tiếp thành công!");
+   
     setForwardModalVisible(false);
   } catch (err) {
     Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
@@ -647,7 +684,7 @@ useEffect(() => {
   
               // Gửi message chuyển tiếp
               await axios.post("/api/messages/text", messageToForward);
-              Alert.alert("Chuyển tiếp thành công!");
+
             } catch (err) {
               Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
             }
@@ -744,7 +781,7 @@ const handleSelectConversationToForward = async (convId) => {
       type: selectedMessage.type,
       fileName: selectedMessage.fileName,
     });
-    Alert.alert("Chuyển tiếp thành công!");
+
   } catch (err) {
     Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
   } finally {
@@ -1128,37 +1165,51 @@ const receiveHandler = (message) => {
     onPressOut={() => setModalVisible(false)}
   >
     <View style={styles.modalContainer}>
-      {selectedMessage?.isDeleted ? (
-        // Already recalled/deleted → only allow permanent delete
-        <TouchableOpacity
-          style={styles.modalButton}
-          onPress={handleDeleteAction}
-        >
-          <Text style={styles.modalButtonText}>Xoá</Text>
-        </TouchableOpacity>
-      ) : (
-        // Normal message → all three actions
-        <>
-          <TouchableOpacity
-            style={styles.modalButton}
-            onPress={handleRecallAction}
-          >
-            <Text style={styles.modalButtonText}>Thu hồi</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.modalButton}
-            onPress={handleDeleteAction}
-          >
-            <Text style={styles.modalButtonText}>Xoá</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.modalButton}
-             onPress={openForwardModal}
-          >
-            <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-          </TouchableOpacity>
-        </>
-      )}
+      {!selectedMessage?.isDeleted && selectedMessage?.type === "TEXT" && (
+  <TouchableOpacity
+    style={styles.modalButton}
+    onPress={handleReadMessage}
+  >
+    <Text style={styles.modalButtonText}>Read message</Text>
+  </TouchableOpacity>
+)}
+
+{selectedMessage?.isDeleted ? (
+    <TouchableOpacity
+      style={styles.modalButton}
+      onPress={handleRecallAction}
+    >
+      <Text style={styles.modalButtonText}>Thu hồi</Text>
+    </TouchableOpacity>
+
+) : (
+  <>
+    <TouchableOpacity
+    style={styles.modalButton}
+    onPress={handleDeleteAction}
+  >
+    <Text style={styles.modalButtonText}>Xoá</Text>
+  </TouchableOpacity>
+
+    <TouchableOpacity
+      style={styles.modalButton}
+      onPress={openForwardModal}
+    >
+      <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+    </TouchableOpacity>
+
+    {/* Only show delete if it's user's own message */}
+    {selectedMessage?.memberId?.userId === userId && (
+      <TouchableOpacity
+        style={styles.modalButton}
+        onPress={handleDeleteAction}
+      >
+        <Text style={styles.modalButtonText}>Xoá</Text>
+      </TouchableOpacity>
+    )}
+  </>
+)}
+
     </View>
   </TouchableOpacity>
 </Modal>

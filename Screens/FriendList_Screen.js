@@ -253,7 +253,6 @@ socket.onAny((event, data) => {
           style={styles.btnAccept}
           onPress={() => handleAddFriend(item._id)}
         >
-          <Image source={addFriendIcon} style={styles.iconaddF}/>
           <Text style={styles.txtAccecpt}>Kết bạn</Text>
         </TouchableOpacity>
       )}
