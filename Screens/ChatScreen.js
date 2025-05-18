@@ -12,7 +12,8 @@ import {
   Platform,
   Modal,
   Linking,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -54,10 +55,10 @@ function MessageItem({
   currentUserId,
   onLongPress,
   currentUserAvatar,
-  otherUserAvatar, // ✅ ADD THIS
+  otherUserAvatar, 
 }) {
 
-
+ const [imgLoading, setImgLoading] = useState(false);
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
@@ -141,9 +142,26 @@ function MessageItem({
   <View style={messageItemStyles.avatarPlaceholder} />
 )}
 
+
+
+
       <View style={messageItemStyles.contentContainer}>
+
+        
         {msg.type === "IMAGE" ? (
-          <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
+           <View style={{ position: "relative" }}>
+      {imgLoading && (
+        <View style={[messageItemStyles.imageContent, styles.placeholder]}>
+          <ActivityIndicator size="small" color="#086DC0" />
+        </View>
+      )}
+      <Image
+        source={{ uri: msg.content }}
+        style={messageItemStyles.imageContent}
+        onLoadStart={() => setImgLoading(true)}
+        onLoadEnd={() => setImgLoading(false)}
+      />
+    </View>
         ) : msg.type === "VIDEO" ? (
           <Video
             source={{ uri: content }}
@@ -460,6 +478,10 @@ const [userId, setUserId] = useState(null);
   const { conversation } = route.params;
   const conversationId = conversation._id;
 const [conversationsList, setConversationsList] = useState([]);
+const [uploading, setUploading] = useState(false);
+
+const [userIdReady, setUserIdReady] = useState(false);
+
 
 
   const [messages, setMessages] = useState([]);
@@ -760,6 +782,10 @@ const handleSelectConversationToForward = async (convId) => {
 
   const pickImage = async () => {
     const formData = new FormData();
+    if (!userId) {
+  Alert.alert("Vui lòng chờ", "Đang tải thông tin người dùng...");
+  return;
+}
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -794,6 +820,7 @@ const handleSelectConversationToForward = async (convId) => {
       formData.append('image', file);
       formData.append('conversationId', conversationId);
 
+      setUploading(true);
       try {
         // Gửi tệp lên server
         const response = await axios.post('/api/messages/images', formData, {
@@ -817,10 +844,11 @@ const handleSelectConversationToForward = async (convId) => {
         setMessages((prev) => [...prev, newMsg]);
         console.log('Image uploaded successfully:', imageUrl);
 
-      } catch (err) {
-        console.log('Error uploading image:', err);
-        Alert.alert('Error', 'Failed to upload image');
-      }
+} catch (err) {
+  Alert.alert("Error", "Failed to upload image");
+} finally {
+  setUploading(false);
+}
     }
   };
 
@@ -901,106 +929,74 @@ const handleSelectConversationToForward = async (convId) => {
     return new Blob(byteArrays, { type: contentType });
   };
 
-  const pickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      console.log(result);
+ const pickDocument = async () => {
+  setUploading(true);
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "*/*",
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
 
-
-      if ((result.canceled === false && result.assets && result.assets.length > 0) || result.type === "success") {
-        let file, fileName, fileUri, mimeType;
-
-        if (result.assets && result.assets.length > 0) {
-          file = result.assets[0];
-          fileUri = file.uri;
-          fileName = file.name;
-          mimeType = file.mimeType || 'application/octet-stream';
-        } else if (result.type === "success") {
-          fileUri = result.uri;
-          fileName = result.name;
-          mimeType = 'application/octet-stream';
-        } else {
-          throw new Error("Không thể đọc thông tin file");
-        }
-
-        const fileInfo = await FileSystem.getInfoAsync(fileUri);
-        if (!fileInfo.exists) {
-          Alert.alert("Error", "File not found.");
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append('id', userId);
-        formData.append('conversationId', conversationId);
-        formData.append('file', {
-          uri: fileUri,
-          name: fileName,
-          type: mimeType,
-        });
-
-        // Chỉ upload file, không thêm tin nhắn vào state
-        // Tin nhắn sẽ được thêm tự động qua WebSocket
-        console.log(formData)
-        await axios.post('/api/messages/file', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-      }
-
-      const file = result.assets[0];
-      const fileUri = file.uri;
-      const fileName = file.name;
-      const mimeType = file.mimeType || 'application/octet-stream';
-
-      // Đọc file thành blob
-      const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      if (!fileInfo.exists) {
-        Alert.alert("Error", "File not found.");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('id', userId);
-      formData.append('conversationId', conversationId);
-      formData.append('file', {
-        uri: fileUri,
-        name: fileName,
-        type: mimeType,
-      });
-
-      const response = await axios.post('/api/messages/file', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const uploadedUrl = response.data?.file?.url;
-
-      const newFileMessage = {
-        _id: String(new Date().getTime()),
-        memberId: { userId },
-        type: "FILE",
-        fileName: fileName,
-        content: uploadedUrl,
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages(prev => [...prev, newFileMessage]);
-
-    } catch (error) {
-      console.error("Error uploading file:", error.message);
-      Alert.alert("Upload error", "Không thể upload file.");
+    if (result?.canceled || (!result.assets && result.type !== "success")) {
+      setUploading(false);
+      return;
     }
-  };
+
+    let fileUri, fileName, mimeType;
+
+    if (result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
+      fileUri = asset.uri;
+      fileName = asset.name;
+      mimeType = asset.mimeType || "application/octet-stream";
+    } else {
+      fileUri = result.uri;
+      fileName = result.name;
+      mimeType = "application/octet-stream";
+    }
+
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists) {
+      Alert.alert("Error", "File not found.");
+      setUploading(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("id", userId);
+    formData.append("conversationId", conversationId);
+    formData.append("file", {
+      uri: Platform.OS === "android" ? fileUri : fileUri.replace("file://", ""),
+      name: fileName,
+      type: mimeType,
+    });
+
+    await axios.post("/api/messages/file", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        
+      },
+       timeout: 30000,
+    });
+
+  } catch (error) {
+    console.error("Full Axios Error:", JSON.stringify(error, null, 2));
+    Alert.alert("Upload error", error.message || "Không thể upload file.");
+  } finally {
+    setUploading(false);
+  }
+};
+
 
   // Handle sending a text message.
   const handleSendMessage = async (message) => {
+
+    if (uploading) {
+  Alert.alert("Vui lòng đợi", "Đang tải lên, vui lòng chờ.");
+  return;
+}
+
     if (!message.trim()) return;
     if (!userId) {
       Alert.alert("User not loaded", "Unable to send message without a valid user.");
@@ -1097,6 +1093,13 @@ const receiveHandler = (message) => {
 
 
       </View>
+
+      {uploading && (
+  <View style={chatScreenStyles.loadingOverlay}>
+    <ActivityIndicator size="large" color="#086DC0" />
+  </View>
+)}
+
       <MessageInput
         input={input}
         setInput={setInput}
@@ -1424,5 +1427,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  loadingOverlay: {
+  position: "absolute",
+  alignItems: "center",
+  zIndex: 10,
+},
+  placeholder: {
+    backgroundColor: "#F0F0F0",  // or whatever matches your chat background
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    top: 0, left: 0,
+    // imageContent already sets width/height/borderRadius
+  },
+
 
 });

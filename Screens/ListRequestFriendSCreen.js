@@ -115,17 +115,15 @@ const renderSearchItem = ({ item }) => (
         </TouchableOpacity>
       )}
       {stateFriend === true && (
-        <View style={[styles.requestSent, { backgroundColor: '#999' }]}>
-          <Text style={styles.txtAccecpt}>Đã kết bạn</Text>
-        </View>
+         <View style={styles.btnDisabled}><Text style={styles.txtAccecpt}>Đã kết bạn</Text></View>
       )}
       {sentInvites === 'pending' && (
         <TouchableOpacity
-          style={[styles.requestSent, { backgroundColor: '#FFA500' }]}
+          style={styles.btnPending}
           onPress={() => handleThuHoi(item._id)}
         >
           <Text style={styles.txtAccecpt}>Đã gửi lời mời</Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
       )}
     </View>
   </View>
@@ -531,6 +529,10 @@ fFillter: {
     },
   txtFillter: { fontSize: 16, fontWeight: '600', color: '#F49300' },
 txtFillterChosen: { fontSize: 16, fontWeight: '600', color: '#F49300' },
-
+  btnAccept: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4CBB17', borderRadius: 30, paddingHorizontal: 10, paddingVertical: 5 },
+  btnDisabled: { backgroundColor: '#999', borderRadius: 30, paddingHorizontal: 10, paddingVertical: 5 },
+  btnPending: { backgroundColor: '#FFA500', borderRadius: 30, paddingHorizontal: 10, paddingVertical: 5 },
+  iconaddF: { width: 15, height: 15, marginRight: 5 },
+  txtAccecpt: { fontSize: 11, fontWeight: '500', color: 'white' },
 
 });
