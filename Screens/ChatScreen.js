@@ -225,24 +225,23 @@ const [imgLoading, setImgLoading] = useState(true);
 
         
 {msg.type === "IMAGE" ? (
-  <View style={{ position: "relative" }}>
-    {imgLoading && (
-      <View style={[messageItemStyles.imageContent, styles.placeholder]}>
-        <ActivityIndicator size="small" color="#086DC0" />
-      </View>
-    )}
-    <Image
-      source={{ uri: msg.content }}
-      style={messageItemStyles.imageContent}
-      onLoadStart={() => setImgLoading(true)}   // still useful for re-loading cases
-onLoadEnd={() => {
-  setImgLoading(false);
-  onMediaLoad?.();
-}}
+ <View style={{ position: "relative" }}>
+  <Image
+    source={{ uri: msg.content }}
+    style={messageItemStyles.imageContent}
+    onLoadStart={() => setImgLoading(true)}
+    onLoadEnd={() => {
+      setImgLoading(false);
+      onMediaLoad?.();
+    }}
+  />
+  {imgLoading && (
+    <View style={messageItemStyles.imageOverlay}>
+      <ActivityIndicator size="small" color="#086DC0" />
+    </View>
+  )}
+</View>
 
-      
-    />
-  </View>
         ) : msg.type === "VIDEO" ? (
           <Video
             source={{ uri: content }}
@@ -363,6 +362,13 @@ textContent: {
   color: "#000",
   flexWrap: "wrap",
   flexShrink: 1,       // <-- this lets it shrink rather than overflow
+},
+imageOverlay: {
+  ...StyleSheet.absoluteFillObject,
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "#F0F0F0",
+  borderRadius: 8,
 },
 
   videoContainer: {
@@ -672,9 +678,9 @@ const headerStyles = StyleSheet.create({
     marginTop: 10,
   },
   backBtn: { width: 25, height: 20, marginRight: 20 },
-  avatar: { width: 50, height: 50, borderRadius: 35 },
+  avatar: { width: 45, height: 45, borderRadius: 35 },
   infoContainer: { marginLeft: 12, flex: 1 },
-  name: { fontSize: 15, fontWeight: "600", color: "#086DC0" },
+  name: { fontSize: 16, fontWeight: "600", color: "#086DC0" },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -1115,88 +1121,96 @@ const handleSelectConversationToForward = async (convId) => {
     }
   };
 
-      const pickMedia = async () => {
+   const sendOptimisticMediaMessage = ({ type, url }) => {
+  if (!url) return;
 
-            if (!userId) {
-  Alert.alert("Vui lòng chờ", "Đang tải thông tin người dùng...");
-  return;
-}
-        const formData = new FormData();
+  const tempId = String(Date.now());
+  const optimisticMsg = {
+    _id: tempId,
+    memberId: {
+      _id: userId,
+      userId,
+      name: currentUser?.name,
+      avatar: currentUser?.avatar,
+    },
+    type,
+    content: url,
+    createdAt: new Date().toISOString(),
+    reacts: [],
+    pending: true,
+    replyMessageId: replyTo?._id || null,
+  };
 
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-            Alert.alert("Permission denied", "Gallery access needed.");
-            return;
-        }
+  setMessages(prev => [...prev, optimisticMsg]);
+};
 
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.All, // Cho phép chọn cả Images và Videos
-            quality: 1,
-            allowsEditing: false,
-        });
+const uploadMediaAndSendMessage = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert("Permission denied", "Gallery access needed.");
+    return;
+  }
 
-if (!result.canceled && result.assets.length > 0) {
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.All,
+    quality: 1,
+    allowsEditing: false,
+  });
+
+  if (result.canceled || !result.assets || result.assets.length === 0) return;
+
   const selectedMedia = result.assets[0];
   const mediaUri = selectedMedia.uri;
-  const fileName = selectedMedia.uri.split('/').pop();
-  const mimeType = selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg');
+  const fileName = mediaUri.split("/").pop();
+  const mimeType = selectedMedia.mimeType || (selectedMedia.type === "video" ? "video/mp4" : "image/jpeg");
 
-  const file = {
+  const formData = new FormData();
+  formData.append("id", userId);
+  formData.append("conversationId", conversationId);
+  formData.append(selectedMedia.type === "video" ? "video" : "image", {
     uri: mediaUri,
     name: fileName,
     type: mimeType,
-  };
+  });
 
-  formData.append('id', userId);
-  formData.append(selectedMedia.type === 'video' ? 'video' : 'image', file);
-  formData.append('conversationId', conversationId);
+ try {
+  const endpoint = selectedMedia.type === "video"
+    ? "/api/messages/video"
+    : "/api/messages/images";
 
-  try {
-    const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
-    const response = await axios.post(endpoint, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: selectedMedia.type === 'video' ? 30000 : 20000,
-    });
+  const response = await axios.post(endpoint, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: selectedMedia.type === "video" ? 30000 : 20000,
+  });
 
-    const mediaUrl = response.data?.file?.url;
+  const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
 
-    if (!mediaUrl) throw new Error("Server did not return a URL");
-
-    console.log(`${selectedMedia.type} uploaded successfully:`, mediaUrl);
+  const mediaUrl =
+    responseData?.file?.url ||
+    responseData?.url ||
+    responseData?.content ||
+    responseData?.message?.url ||
+    null;
 
   if (!mediaUrl) {
-  throw new Error("Server did not return a URL");
+    console.warn("⚠️ Unexpected upload response:", response.data);
+    throw new Error("Server did not return a URL");
+  }
+
+  sendOptimisticMediaMessage({
+    type: selectedMedia.type === "video" ? "VIDEO" : "IMAGE",
+    url: mediaUrl,
+  });
+
+} catch (err) {
+  console.error("Upload error:", err);
+  Alert.alert("Error", "Failed to upload media.");
 }
 
-// ✅ Only add the message now
-const newMsg = {
-  _id: String(Date.now()),
-  memberId: {
-    _id: userId,
-    userId,
-    name: currentUser?.name,
-    avatar: currentUser?.avatar,
-  },
-  type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
-  content: mediaUrl,
-  createdAt: new Date().toISOString(),
-  reacts: [],
 };
 
-setMessages((prev) => [...prev, newMsg]);
-
-
-  } catch (err) {
-    console.error(`Error uploading ${selectedMedia.type}:`, err);
-    Alert.alert('Error', `Failed to upload ${selectedMedia.type}`);
-  }
-}
-
-    };
-
-  
 
 
  const pickDocument = async () => {
@@ -1322,6 +1336,8 @@ useEffect(() => {
 
     if (!socket || !conversationId || !userId) return;
 
+    
+
   const receiveHandler = (message) => {
     setMessages((prev) => {
       // replace the optimistic placeholder if it matches
@@ -1342,6 +1358,7 @@ useEffect(() => {
       return [...prev, message];
     });
   };
+  
 
   socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
   socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
@@ -1420,7 +1437,7 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
-        onPickMedia={pickMedia}
+        onPickMedia={uploadMediaAndSendMessage}
 
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
