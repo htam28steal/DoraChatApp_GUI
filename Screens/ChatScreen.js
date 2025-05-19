@@ -312,7 +312,7 @@ const messageItemStyles = StyleSheet.create({
   rightAlign: { flexDirection: "row-reverse" },
   avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarPlaceholder: { width: 40, height: 40 },
-  contentContainer: {  maxWidth: screenWidth * 0.8, marginHorizontal: 8 },
+  contentContainer: {  maxWidth: screenWidth * 0.8, marginHorizontal: 8, },
   imageContent: {
     width: 250,
     height: 250,
@@ -440,7 +440,18 @@ replyTextContainer: {
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, onMessageLongPress,handlePressEmoji }) {
+function ChatBox({
+  messages,
+  currentUserId,
+  currentUserAvatar,
+  otherUserAvatar,
+  onMessageLongPress,
+  handlePressEmoji,
+  loadMoreMessages,
+  loadingMore  // ✅ Add this param
+}) {
+
+
 
 
   const scrollViewRef = useRef(null);
@@ -469,10 +480,25 @@ const scrollToMessage = useCallback((messageId) => {
 
   return (
     
-    <ScrollView
-      style={chatBoxStyles.container}
-      contentContainerStyle={chatBoxStyles.contentContainer}
-    >
+<ScrollView
+  style={chatBoxStyles.container}
+  contentContainerStyle={chatBoxStyles.contentContainer}
+  ref={scrollViewRef}
+  onScroll={({ nativeEvent }) => {
+    if (nativeEvent.contentOffset.y <= 50) {
+      loadMoreMessages();
+    }
+  }}
+  scrollEventThrottle={100}
+>
+    {loadingMore && (
+    <ActivityIndicator
+      size="small"
+      color="#086DC0"
+      style={{ marginBottom: 8 }}
+    />
+  )}
+
       {messages.map((msg, index) => {
         const userId = msg.memberId?.userId || "";
         const prevMsg = messages[index - 1];
@@ -676,6 +702,41 @@ const [replyTo, setReplyTo] = useState(null);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
+
+
+const [loadingMore, setLoadingMore] = useState(false);
+
+
+const [allMessages, setAllMessages] = useState([]);
+
+const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
+const [hasMore, setHasMore] = useState(true);
+
+
+
+const loadMoreMessages = async () => {
+  if (loadingMore || !hasMore) return;
+
+  setLoadingMore(true);
+  try {
+    // Use allMessages (which contains the full ordered list)
+    const newSkip = pagination.skip - pagination.limit;
+    const start = Math.max(0, newSkip);
+    const more = allMessages.slice(start, pagination.skip); // older chunk
+
+    if (more.length === 0) {
+      setHasMore(false);
+    } else {
+      setMessages(prev => [...more, ...prev]);
+      setPagination({ skip: start, limit: pagination.limit });
+    }
+  } catch (error) {
+    console.error("Error loading more messages:", error);
+  } finally {
+    setLoadingMore(false);
+  }
+};
+
 
     const emojiToType = {
         '❤️': 1,
@@ -925,24 +986,26 @@ const recallHandler = useCallback((data) => {
     fetchUserId();
   }, []);
 
-  // Fetch all messages for the conversation using conversationId.
-  useEffect(() => {
-    if (!conversationId) return;
-    const fetchAllMessages = async () => {
-      try {
-        const response = await axios.get("/api/messages/" + conversationId);
-        // Assuming response.data is an array of messages.
-        setMessages(response.data);
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-        Alert.alert(
-          "Error fetching messages",
-          error.response?.data?.message || error.message
-        );
-      }
-    };
-    fetchAllMessages();
-  }, [conversationId]);
+useEffect(() => {
+  const fetchAllMessages = async () => {
+    try {
+      const response = await axios.get(`/api/messages/${conversationId}`);
+      const all = response.data || [];
+
+      setAllMessages(all); // store full list
+      const last40 = all.slice(-40);
+      setMessages(last40);
+      setPagination({ skip: all.length - 40, limit: 20 }); // ready to load earlier ones
+      setHasMore(all.length > 40);
+    } catch (err) {
+      console.error("Failed to load messages", err);
+    }
+  };
+
+  if (conversationId) fetchAllMessages();
+}, [conversationId]);
+
+
 
   // Unified long press handler to show the custom modal with options.
   const handleMessageLongPress = (message) => {
@@ -1227,9 +1290,12 @@ useEffect(() => {
   currentUserId={userId}
   currentUserAvatar={currentUser?.avatar}
   otherUserAvatar={otherUser?.avatar}
-  handlePressEmoji={handlePressEmoji}  // ✅ Correct prop name
+  handlePressEmoji={handlePressEmoji}
   onMessageLongPress={handleMessageLongPress}
+  loadMoreMessages={loadMoreMessages}
+  loadingMore={loadingMore}  // ✅ Add this line
 />
+
 
   )}
 
@@ -1429,6 +1495,7 @@ useEffect(() => {
 <FlatList
   data={selectedReactors}
   keyExtractor={(item, index) => `${item.name}-${index}`}
+  
   renderItem={({ item }) => {
     const emojiMap = {
       1: '❤️',
@@ -1438,6 +1505,8 @@ useEffect(() => {
       5: '👎',
       6: '😮',
     };
+
+    
     const emoji = emojiMap[item.type];
 
     return (
