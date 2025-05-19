@@ -1121,28 +1121,7 @@ const handleSelectConversationToForward = async (convId) => {
     }
   };
 
-   const sendOptimisticMediaMessage = ({ type, url }) => {
-  if (!url) return;
 
-  const tempId = String(Date.now());
-  const optimisticMsg = {
-    _id: tempId,
-    memberId: {
-      _id: userId,
-      userId,
-      name: currentUser?.name,
-      avatar: currentUser?.avatar,
-    },
-    type,
-    content: url,
-    createdAt: new Date().toISOString(),
-    reacts: [],
-    pending: true,
-    replyMessageId: replyTo?._id || null,
-  };
-
-  setMessages(prev => [...prev, optimisticMsg]);
-};
 
 const uploadMediaAndSendMessage = async () => {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1199,10 +1178,10 @@ const uploadMediaAndSendMessage = async () => {
     throw new Error("Server did not return a URL");
   }
 
-  sendOptimisticMediaMessage({
-    type: selectedMedia.type === "video" ? "VIDEO" : "IMAGE",
-    url: mediaUrl,
-  });
+  // sendOptimisticMediaMessage({
+  //   type: selectedMedia.type === "video" ? "VIDEO" : "IMAGE",
+  //   url: mediaUrl,
+  // });
 
 } catch (err) {
   console.error("Upload error:", err);
@@ -1339,6 +1318,7 @@ useEffect(() => {
     
 
   const receiveHandler = (message) => {
+    if (message.conversationId !== conversationId) return;
     setMessages((prev) => {
       // replace the optimistic placeholder if it matches
       console.log("📨 Received message from server:", message);
