@@ -719,16 +719,15 @@ const loadMoreMessages = async () => {
 
   setLoadingMore(true);
   try {
-    // Use allMessages (which contains the full ordered list)
-    const newSkip = pagination.skip - pagination.limit;
-    const start = Math.max(0, newSkip);
-    const more = allMessages.slice(start, pagination.skip); // older chunk
+    const { skip, limit } = pagination;
+    const newSkip = Math.max(0, skip - limit);
+    const more = allMessages.slice(newSkip, skip); // fetch the older batch
 
     if (more.length === 0) {
       setHasMore(false);
     } else {
-      setMessages(prev => [...more, ...prev]);
-      setPagination({ skip: start, limit: pagination.limit });
+      setMessages((prev) => [...more, ...prev]);
+      setPagination({ skip: newSkip, limit });
     }
   } catch (error) {
     console.error("Error loading more messages:", error);
@@ -736,7 +735,6 @@ const loadMoreMessages = async () => {
     setLoadingMore(false);
   }
 };
-
 
     const emojiToType = {
         '❤️': 1,
@@ -992,11 +990,15 @@ useEffect(() => {
       const response = await axios.get(`/api/messages/${conversationId}`);
       const all = response.data || [];
 
-      setAllMessages(all); // store full list
-      const last40 = all.slice(-40);
-      setMessages(last40);
-      setPagination({ skip: all.length - 40, limit: 20 }); // ready to load earlier ones
-      setHasMore(all.length > 40);
+      setAllMessages(all);
+
+      const initialLimit = 40;
+      const skip = Math.max(0, all.length - initialLimit);
+      const lastMessages = all.slice(skip);
+
+      setMessages(lastMessages);
+      setPagination({ skip, limit: 20 });
+      setHasMore(skip > 0); // only if more messages exist before skip
     } catch (err) {
       console.error("Failed to load messages", err);
     }
