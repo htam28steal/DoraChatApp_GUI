@@ -271,6 +271,7 @@ useEffect(() => {
     {recentImages.length > 0 && (
   <FlatList
     data={recentImages}
+    
     keyExtractor={i => i._id}
     renderItem={({item}) => (
       <TouchableOpacity
@@ -280,7 +281,7 @@ useEffect(() => {
                style={styles.recentImage}/>
       </TouchableOpacity>
     )}
-    numColumns={numColumns}
+    numColumns={3}
     scrollEnabled={false}
    contentContainerStyle={styles.recentList}
   />
@@ -515,7 +516,7 @@ const styles = StyleSheet.create({
     
   },
 recentList: {
-  flexDirection: 'row',
+   justifyContent: 'flex-start',
 
   paddingHorizontal: 20, // ✅ add this line
 },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   Platform,
   Modal,
   Linking,
-  FlatList
+  FlatList,
+  ActivityIndicator
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -29,6 +30,8 @@ import * as FileSystem from 'expo-file-system';
 dayjs.extend(relativeTime);
 import { Video } from "expo-av";
 import UserService from "../api/userService";  
+import { Audio } from "expo-av";
+
 
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
@@ -54,14 +57,26 @@ function MessageItem({
   currentUserId,
   onLongPress,
   currentUserAvatar,
-  otherUserAvatar, // ✅ ADD THIS
+  otherUserAvatar, 
+    allMessages,
+    onReplyPress
 }) {
 
 
+
+  
+
+ const [imgLoading, setImgLoading] = useState(false);
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
   const Container = onLongPress ? TouchableOpacity : View;
+
+
+  const repliedMsg = msg.replyMessageId
+  ? allMessages.find(m => m._id === msg.replyMessageId)
+  : null;
+
 
   const getFileExtension = (url) => {
     if (!url) return '';
@@ -78,6 +93,15 @@ function MessageItem({
 
     return '';
   };
+    if (msg.type === "NOTIFY") {
+    return (
+      <View style={messageItemStyles.notifyContainer}>
+        <Text style={messageItemStyles.notifyText}>
+          {msg.content}
+        </Text>
+      </View>
+    );
+  }
 
   const getFileIcon = (fileNameOrUrl = "") => {
     const extension = getFileExtension(fileNameOrUrl);
@@ -141,9 +165,67 @@ function MessageItem({
   <View style={messageItemStyles.avatarPlaceholder} />
 )}
 
+
+
+
       <View style={messageItemStyles.contentContainer}>
+        {repliedMsg && (
+          // wrap the quote in its own TouchableOpacity
+          <TouchableOpacity
+            style={messageItemStyles.replyContainer}
+            onPress={() => onReplyPress(repliedMsg._id)}
+            onLongPress={() => { /* swallow longPress here */ }}
+          >
+            <Text style={messageItemStyles.replyAuthor}>
+              {repliedMsg.memberId.name || "Unknown"}
+            </Text>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={messageItemStyles.replySnippet}
+            >
+              {repliedMsg.content}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+{msg.replyTo && (
+  <View style={messageItemStyles.replyContainer}>
+    {/* optional arrow icon */}
+    <Image
+      source={require("../icons/arrow.png")}
+      style={messageItemStyles.replyIcon}
+    />
+    <View style={messageItemStyles.replyTextContainer}>
+      <Text style={messageItemStyles.replyAuthor}>
+        {msg.replyTo.memberId.userName || "Unknown"}
+      </Text>
+      <Text
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        style={messageItemStyles.replySnippet}
+      >
+        {msg.replyTo.content}
+      </Text>
+    </View>
+  </View>
+)}
+
+        
         {msg.type === "IMAGE" ? (
-          <Image source={{ uri: content }} style={messageItemStyles.imageContent} />
+           <View style={{ position: "relative" }}>
+      {imgLoading && (
+        <View style={[messageItemStyles.imageContent, styles.placeholder]}>
+          <ActivityIndicator size="small" color="#086DC0" />
+        </View>
+      )}
+      <Image
+        source={{ uri: msg.content }}
+        style={messageItemStyles.imageContent}
+        onLoadStart={() => setImgLoading(true)}
+        onLoadEnd={() => setImgLoading(false)}
+      />
+    </View>
         ) : msg.type === "VIDEO" ? (
           <Video
             source={{ uri: content }}
@@ -260,6 +342,45 @@ const messageItemStyles = StyleSheet.create({
   myMessage: { backgroundColor: "#EFF8FF", alignSelf: "flex-end" },
   theirMessage: { backgroundColor: "#F5F5F5" },
   timeText: { fontSize: 10, color: "#959595", marginTop: 4 },
+  replyContainer: {
+  backgroundColor: "#E6E6FA",
+  padding: 8,
+  borderLeftWidth: 4,
+  borderLeftColor: "#086DC0",
+  borderRadius: 6,
+  marginBottom: 4,
+},
+
+replyAuthor: {
+  fontSize: 12,
+  fontWeight: "bold",
+  color: "#086DC0",
+  marginBottom: 2,
+},
+
+replySnippet: {
+  fontSize: 13,
+  color: "#333",
+},
+
+replyTextContainer: {
+  flex: 1,
+},
+  notifyContainer: {
+    alignSelf: "center",        // push it into the middle
+    backgroundColor: "#ECECEC", // light grey pill
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginVertical: 10,
+    maxWidth: "80%",
+  },
+  notifyText: {
+    fontSize: 13,
+    color: "#555",
+    textAlign: "center",
+    fontStyle:'italic'
+  },
 });
 
 /**
@@ -269,7 +390,23 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
 
 
   const scrollViewRef = useRef(null);
-  
+  const messageRefs = useRef({});
+
+// helper to jump:
+const scrollToMessage = useCallback((messageId) => {
+  const item = messageRefs.current[messageId];
+  if (!item || !scrollViewRef.current) return;
+
+  // measure its y offset relative to the ScrollView's inner view
+  item.measureLayout(
+    // on Android you might need `.getInnerViewNode()`
+    scrollViewRef.current.getInnerViewNode(),  
+    (x, y) => {
+      scrollViewRef.current.scrollTo({ y: y - 20, animated: true }); // -20 to give a bit of top padding
+    },
+    () => {}
+  );
+}, []);
 
   useEffect(() => {
     if (scrollViewRef.current)
@@ -279,7 +416,6 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
   return (
     
     <ScrollView
-      ref={scrollViewRef}
       style={chatBoxStyles.container}
       contentContainerStyle={chatBoxStyles.contentContainer}
     >
@@ -295,16 +431,16 @@ function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, 
         <MessageItem
           key={key}
           msg={msg}
+            allMessages={messages}
           showAvatar={isFirstInGroup}
           showTime={isLastInGroup}
           currentUserId={currentUserId}
           currentUserAvatar={currentUserAvatar}
            otherUserAvatar={otherUserAvatar}
-          onLongPress={
-            msg.memberId?.userId === currentUserId
-              ? () => onMessageLongPress(msg)
-              : null
-          }
+onLongPress={() => onMessageLongPress(msg)}
+        onReplyPress={scrollToMessage}
+        onMessageLongPress={() => onMessageLongPress(msg)}
+          
         />
 
         );
@@ -460,6 +596,11 @@ const [userId, setUserId] = useState(null);
   const { conversation } = route.params;
   const conversationId = conversation._id;
 const [conversationsList, setConversationsList] = useState([]);
+const [uploading, setUploading] = useState(false);
+
+const [userIdReady, setUserIdReady] = useState(false);
+const [replyTo, setReplyTo] = useState(null);
+
 
 
   const [messages, setMessages] = useState([]);
@@ -473,6 +614,51 @@ const [conversationsList, setConversationsList] = useState([]);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
+
+const handleReplyAction = () => {
+
+  setReplyTo(selectedMessage);
+  setModalVisible(false);
+};
+
+
+// In ChatScreen component
+const handleReadMessage = async () => {
+  if (!selectedMessage || selectedMessage.type !== "TEXT") return;
+
+  try {
+    console.log("✉️ Sending TTS request for text:", selectedMessage.content);
+    const res = await axios.post("/api/messages/tts", {
+      text: selectedMessage.content,
+    });
+    console.log("✅ TTS response:", res.data);
+
+    const { url } = res.data;
+    console.log("▶️ Playing audio from:", url);
+
+    // 1) Create a new Sound object
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: url },
+      { shouldPlay: true }  // auto-start playback
+    );
+
+    // 2) Optionally track when it’s done
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.didJustFinish) {
+        console.log("🔈 Finished playing TTS");
+        sound.unloadAsync();
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ TTS error:", err);
+    Alert.alert("Error", err.response?.data?.message || err.message);
+  } finally {
+    setModalVisible(false);
+  }
+};
+
+
 
 
 const openForwardModal = async () => {
@@ -548,10 +734,26 @@ useEffect(() => {
 
   const receiveHandler = (message) => {
     setMessages((prev) => {
-      const exists = prev.some((m) => m._id === message._id);
-      if (exists) return prev;
-      return [...prev, message];
-    });
+  if (message.memberId?.userId === userId) {
+      const index = prev.findIndex(
+        (m) => m.pending && m.content === message.content
+      );
+      if (index !== -1) {
+        const updated = [...prev];
+        updated[index] = message;
+        return updated;
+      }
+    }
+
+    // ❌ Fix: check for duplicate `message._id`
+    if (prev.some((m) => m._id === message._id)) {
+      console.log("⚠️ Duplicate message skipped:", message._id);
+      return prev;
+    }
+
+    console.log("📥 New message received:", message);
+    return [...prev, message];
+  });
   };
 
   socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
@@ -584,7 +786,7 @@ useEffect(() => {
 
     await axios.post("/api/messages/text", messageToForward);
 
-    Alert.alert("Chuyển tiếp thành công!");
+   
     setForwardModalVisible(false);
   } catch (err) {
     Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
@@ -625,7 +827,7 @@ useEffect(() => {
   
               // Gửi message chuyển tiếp
               await axios.post("/api/messages/text", messageToForward);
-              Alert.alert("Chuyển tiếp thành công!");
+
             } catch (err) {
               Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
             }
@@ -722,7 +924,7 @@ const handleSelectConversationToForward = async (convId) => {
       type: selectedMessage.type,
       fileName: selectedMessage.fileName,
     });
-    Alert.alert("Chuyển tiếp thành công!");
+
   } catch (err) {
     Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
   } finally {
@@ -760,6 +962,10 @@ const handleSelectConversationToForward = async (convId) => {
 
   const pickImage = async () => {
     const formData = new FormData();
+    if (!userId) {
+  Alert.alert("Vui lòng chờ", "Đang tải thông tin người dùng...");
+  return;
+}
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -794,6 +1000,7 @@ const handleSelectConversationToForward = async (convId) => {
       formData.append('image', file);
       formData.append('conversationId', conversationId);
 
+      setUploading(true);
       try {
         // Gửi tệp lên server
         const response = await axios.post('/api/messages/images', formData, {
@@ -817,10 +1024,11 @@ const handleSelectConversationToForward = async (convId) => {
         setMessages((prev) => [...prev, newMsg]);
         console.log('Image uploaded successfully:', imageUrl);
 
-      } catch (err) {
-        console.log('Error uploading image:', err);
-        Alert.alert('Error', 'Failed to upload image');
-      }
+} catch (err) {
+  Alert.alert("Error", "Failed to upload image");
+} finally {
+  setUploading(false);
+}
     }
   };
 
@@ -901,107 +1109,93 @@ const handleSelectConversationToForward = async (convId) => {
     return new Blob(byteArrays, { type: contentType });
   };
 
-  const pickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: "*/*",
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-      console.log(result);
+ const pickDocument = async () => {
+  setUploading(true);
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "*/*",
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
 
-
-      if ((result.canceled === false && result.assets && result.assets.length > 0) || result.type === "success") {
-        let file, fileName, fileUri, mimeType;
-
-        if (result.assets && result.assets.length > 0) {
-          file = result.assets[0];
-          fileUri = file.uri;
-          fileName = file.name;
-          mimeType = file.mimeType || 'application/octet-stream';
-        } else if (result.type === "success") {
-          fileUri = result.uri;
-          fileName = result.name;
-          mimeType = 'application/octet-stream';
-        } else {
-          throw new Error("Không thể đọc thông tin file");
-        }
-
-        const fileInfo = await FileSystem.getInfoAsync(fileUri);
-        if (!fileInfo.exists) {
-          Alert.alert("Error", "File not found.");
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append('id', userId);
-        formData.append('conversationId', conversationId);
-        formData.append('file', {
-          uri: fileUri,
-          name: fileName,
-          type: mimeType,
-        });
-
-        // Chỉ upload file, không thêm tin nhắn vào state
-        // Tin nhắn sẽ được thêm tự động qua WebSocket
-        console.log(formData)
-        await axios.post('/api/messages/file', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-      }
-
-      const file = result.assets[0];
-      const fileUri = file.uri;
-      const fileName = file.name;
-      const mimeType = file.mimeType || 'application/octet-stream';
-
-      // Đọc file thành blob
-      const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      if (!fileInfo.exists) {
-        Alert.alert("Error", "File not found.");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('id', userId);
-      formData.append('conversationId', conversationId);
-      formData.append('file', {
-        uri: fileUri,
-        name: fileName,
-        type: mimeType,
-      });
-
-      const response = await axios.post('/api/messages/file', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const uploadedUrl = response.data?.file?.url;
-
-      const newFileMessage = {
-        _id: String(new Date().getTime()),
-        memberId: { userId },
-        type: "FILE",
-        fileName: fileName,
-        content: uploadedUrl,
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages(prev => [...prev, newFileMessage]);
-
-    } catch (error) {
-      console.error("Error uploading file:", error.message);
-      Alert.alert("Upload error", "Không thể upload file.");
+    if (result?.canceled || (!result.assets && result.type !== "success")) {
+      setUploading(false);
+      return;
     }
-  };
+
+    let fileUri, fileName, mimeType;
+
+    if (result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
+      fileUri = asset.uri;
+      fileName = asset.name;
+      mimeType = asset.mimeType || "application/octet-stream";
+    } else {
+      fileUri = result.uri;
+      fileName = result.name;
+      mimeType = "application/octet-stream";
+    }
+
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists) {
+      Alert.alert("Error", "File not found.");
+      setUploading(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("id", userId);
+    formData.append("conversationId", conversationId);
+    formData.append("file", {
+      uri: Platform.OS === "android" ? fileUri : fileUri.replace("file://", ""),
+      name: fileName,
+      type: mimeType,
+    });
+
+    await axios.post("/api/messages/file", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        
+      },
+       timeout: 30000,
+    });
+
+  } catch (error) {
+    console.error("Full Axios Error:", JSON.stringify(error, null, 2));
+    Alert.alert("Upload error", error.message || "Không thể upload file.");
+  } finally {
+    setUploading(false);
+  }
+};
+
 
   // Handle sending a text message.
   const handleSendMessage = async (message) => {
+
+    if (uploading) {
+  Alert.alert("Vui lòng đợi", "Đang tải lên, vui lòng chờ.");
+  return;
+}
+
     if (!message.trim()) return;
+
+
+      if (replyTo) {
+    try {
+const res = await axios.post("/api/messages/reply", {
+  conversationId,
+  content: message,
+  replyMessageId: replyTo._id,
+  type: "TEXT",
+});
+    } catch (err) {
+      Alert.alert("Reply failed", err.message);
+    } finally {
+      setReplyTo(null);
+      setInput("");
+    }
+    return;
+  }
     if (!userId) {
       Alert.alert("User not loaded", "Unable to send message without a valid user.");
       return;
@@ -1097,6 +1291,33 @@ const receiveHandler = (message) => {
 
 
       </View>
+
+      {uploading && (
+  <View style={chatScreenStyles.loadingOverlay}>
+    <ActivityIndicator size="large" color="#086DC0" />
+  </View>
+)}
+  {replyTo && (
+  <View style={styles.replyPreview}>
+    <View style={styles.replyLeftAccent} />
+    <View style={styles.replyContent}>
+      <Text style={styles.replyTitle}>
+        Đang trả lời {replyTo.memberId.userName || otherUser?.name}
+      </Text>
+      <Text
+        style={styles.replySnippet}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {replyTo.content}
+      </Text>
+    </View>
+    <TouchableOpacity onPress={() => setReplyTo(null)} style={styles.replyClose}>
+      <Text style={styles.replyCloseText}>×</Text>
+    </TouchableOpacity>
+  </View>
+)}
+
       <MessageInput
         input={input}
         setInput={setInput}
@@ -1125,37 +1346,52 @@ const receiveHandler = (message) => {
     onPressOut={() => setModalVisible(false)}
   >
     <View style={styles.modalContainer}>
-      {selectedMessage?.isDeleted ? (
-        // Already recalled/deleted → only allow permanent delete
-        <TouchableOpacity
-          style={styles.modalButton}
-          onPress={handleDeleteAction}
-        >
-          <Text style={styles.modalButtonText}>Xoá</Text>
-        </TouchableOpacity>
-      ) : (
-        // Normal message → all three actions
-        <>
-          <TouchableOpacity
-            style={styles.modalButton}
-            onPress={handleRecallAction}
-          >
-            <Text style={styles.modalButtonText}>Thu hồi</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.modalButton}
-            onPress={handleDeleteAction}
-          >
-            <Text style={styles.modalButtonText}>Xoá</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.modalButton}
-             onPress={openForwardModal}
-          >
-            <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-          </TouchableOpacity>
-        </>
-      )}
+
+
+
+      {!selectedMessage?.isDeleted && selectedMessage?.type === "TEXT" && (
+  <TouchableOpacity
+    style={styles.modalButton}
+    onPress={handleReadMessage}
+  >
+    <Text style={styles.modalButtonText}>Read message</Text>
+  </TouchableOpacity>
+)}
+
+{selectedMessage?.isDeleted ? (
+    <TouchableOpacity
+      style={styles.modalButton}
+      onPress={handleRecallAction}
+    >
+      <Text style={styles.modalButtonText}>Thu hồi</Text>
+    </TouchableOpacity>
+
+) : (
+  <>
+    <TouchableOpacity
+    style={styles.modalButton}
+    onPress={handleDeleteAction}
+  >
+    <Text style={styles.modalButtonText}>Xoá</Text>
+  </TouchableOpacity>
+
+    <TouchableOpacity
+      style={styles.modalButton}
+      onPress={openForwardModal}
+    >
+      <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+    </TouchableOpacity>
+  <TouchableOpacity
+    style={styles.modalButton}
+    onPress={handleReplyAction}
+  >
+    <Text style={styles.modalButtonText}>Reply</Text>
+  </TouchableOpacity>
+
+
+  </>
+)}
+
     </View>
   </TouchableOpacity>
 </Modal>
@@ -1423,6 +1659,53 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  loadingOverlay: {
+  position: "absolute",
+  alignItems: "center",
+  zIndex: 10,
+},
+  placeholder: {
+    backgroundColor: "#F0F0F0",  // or whatever matches your chat background
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    top: 0, left: 0,
+    // imageContent already sets width/height/borderRadius
+  },
+  replyPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f2f2f2",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  replyLeftAccent: {
+    width: 4,
+    height: "100%",
+    backgroundColor: "#086DC0",
+    marginRight: 8,
+    borderRadius: 2,
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#333",
+  },
+  replySnippet: {
+    fontSize: 14,
+    color: "#555",
+  },
+  replyClose: {
+    paddingHorizontal: 8,
+    justifyContent: "center",
+  },
+  replyCloseText: {
+    fontSize: 18,
+    color: "#777",
   },
 
 });

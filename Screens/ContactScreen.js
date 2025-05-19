@@ -318,14 +318,14 @@ export default function ContactScreen({ navigation }) {
                   Alert.alert('Error', 'Failed to cancel the friend request.');
                 }
               }}
-              style={styles.requestSent}>
-              <Text style={styles.requestSentText}>Request Sent</Text>
+          style={styles.btnPending}>
+              <Text style={styles.txtAccecpt}>Đã gửi lời mời</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               onPress={handleAddFriend}
-              style={styles.addFriendBtn}>
-              <Image source={addFrIcon} style={styles.addFrIcon} />
+             style={styles.btnAccept}>
+            <Text style={styles.txtAccecpt}>Kết bạn</Text>
             </TouchableOpacity>
           ))}
       </TouchableOpacity>
@@ -912,4 +912,9 @@ txtFillterChosen: { fontSize: 16, fontWeight: '600', color: '#F49300' },
     color: '#888',
     fontStyle: 'italic',
   },
+    btnAccept: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4CBB17', borderRadius: 30, paddingHorizontal: 10, paddingVertical: 5 },
+  btnDisabled: { backgroundColor: '#999', borderRadius: 30, paddingHorizontal: 10, paddingVertical: 5 },
+  btnPending: { backgroundColor: '#FFA500', borderRadius: 30, paddingHorizontal: 10, paddingVertical: 5 },
+  iconaddF: { width: 15, height: 15, marginRight: 5 },
+  txtAccecpt: { fontSize: 11, fontWeight: '500', color: 'white' },
 });
