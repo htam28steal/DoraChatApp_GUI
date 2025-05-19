@@ -1247,6 +1247,9 @@ const handleSendMessage = async (text) => {
       content: text,
       type: "TEXT",
       replyMessageId: replyTo?._id || null,
+      channelId: null,
+      tags: [],
+      tagPositions: [],
     });
 
     setMessages(prev =>
@@ -1254,10 +1257,8 @@ const handleSendMessage = async (text) => {
         m._id === tempId ? data : m
       )
     );
-    
-    // ✅ clear replyTo only after confirmation
-    setReplyTo(null);
 
+    setReplyTo(null); // ✅ clear after successful send
   } catch (error) {
     console.error("❌ Failed to send message:", error);
     Alert.alert("Error", "Không thể gửi tin nhắn.");
