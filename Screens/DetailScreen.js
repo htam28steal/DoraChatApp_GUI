@@ -35,33 +35,39 @@ const [pinModalVisible, setPinModalVisible] = useState(false);
 const fetchPinnedMessages = async () => {
   try {
     const [pinsRes, messagesRes] = await Promise.all([
-      axios.get(`/api/pin-messages/${conversationId}`),
+     axios.get(`/api/pin-messages/${conversationId}`),
       axios.get(`/api/messages/${conversationId}`)
     ]);
 
-    const pins = pinsRes.data;
-    const messages = messagesRes.data;
+  const pins = pinsRes.data;
+const messages = messagesRes.data;
 
-    // Map for quick lookup
-    const messageMap = {};
-    messages.forEach(m => {
-      messageMap[m._id] = m;
-    });
+const messageMap = {};
+messages.forEach(m => {
+  const id = m._id?.$oid || m._id; // Handle both { $oid: ... } and plain string
+  messageMap[id] = {
+    ...m,
+    createdAt: m.createdAt?.$date || m.createdAt,
+  };
+});
 
-    // Join pin with message content
-    const enrichedPins = pins.map(pin => ({
-      ...pin,
-      message: messageMap[pin.messageId] || null
-    }));
+// Merge pin with message
+const enrichedPins = pins.map(pin => {
+  const pinMsgId = pin.messageId?.$oid || pin.messageId;
+  return {
+    ...pin,
+    createdAt: pin.pinnedAt?.$date || pin.pinnedAt, // For date rendering
+    message: messageMap[pinMsgId] || null,
+  };
+});
 
-    setPinnedMessages(enrichedPins);
-    setPinModalVisible(true);
+setPinnedMessages(enrichedPins);
+setPinModalVisible(true);
   } catch (err) {
     console.error("❌ Failed to fetch pinned messages:", err);
     Alert.alert("Error", "Could not load pinned messages.");
   }
 };
-
   
   useEffect(() => {
     (async () => {
@@ -373,13 +379,12 @@ useEffect(() => {
                   style={styles.pinnedAvatar}
                 />
                 <Text style={styles.pinnedSender}>{sender}</Text>
-<Text style={styles.pinnedTime}>
-  {new Date(item.pinnedAt).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit'
-  })}
-</Text>
-
+                <Text style={styles.pinnedTime}>
+                  {new Date(item.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </Text>
               </View>
 
               {isImage ? (
@@ -400,6 +405,7 @@ useEffect(() => {
     </View>
   </View>
 </Modal>
+
 
 
 
@@ -655,16 +661,7 @@ closeIcon: {
   tintColor: '#999',
 },
 
-pinnedCard: {
-  backgroundColor: '#f8f8f8',
-  borderRadius: 12,
-  padding: 12,
-  marginBottom: 12,
-  shadowColor: '#000',
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 2,
-},
+
 cardHeader: {
   flexDirection: 'row',
   alignItems: 'center',
@@ -693,16 +690,45 @@ pinnedImage: {
   resizeMode: 'cover',
   backgroundColor: '#e0e0e0',
 },
-textBubble: {
-  backgroundColor: '#fff',
-  padding: 10,
-  borderRadius: 10,
-  borderColor: '#ddd',
-  borderWidth: 1,
-},
+
 textContent: {
   fontSize: 14,
   color: '#333',
+},
+textBubble: {
+  backgroundColor: '#F2F5F8',  // Light bubble
+  padding: 12,
+  borderRadius: 12,
+  borderColor: '#e0e0e0',
+  borderWidth: 1,
+},
+
+pinnedCard: {
+  backgroundColor: '#ffffff',  // Brighter card
+  borderRadius: 12,
+  padding: 12,
+  marginBottom: 12,
+  shadowColor: '#000',
+  shadowOpacity: 0.08,
+  shadowRadius: 3,
+  elevation: 1,
+},
+
+modalOverlay: {
+  flex: 1,
+  justifyContent: 'flex-end',
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+},
+
+pinModalContainer: {
+  backgroundColor: '#FDFEFF',  // Brighter color
+  width: '100%',
+  maxHeight: '80%',
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  paddingHorizontal: 16,
+  paddingTop: 16,
+  paddingBottom: 32,
 },
 
 });
