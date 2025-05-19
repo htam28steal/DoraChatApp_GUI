@@ -60,14 +60,17 @@ function MessageItem({
   otherUserAvatar, 
     allMessages,
     onReplyPress,
-    handlePressEmoji
+    handlePressEmoji,
+    onMediaLoad,
+
 }) {
 
 
 
   
 
- const [imgLoading, setImgLoading] = useState(false);
+const [imgLoading, setImgLoading] = useState(true);
+
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
@@ -221,20 +224,25 @@ function MessageItem({
 )}
 
         
-        {msg.type === "IMAGE" ? (
-           <View style={{ position: "relative" }}>
-      {imgLoading && (
-        <View style={[messageItemStyles.imageContent, styles.placeholder]}>
-          <ActivityIndicator size="small" color="#086DC0" />
-        </View>
-      )}
-      <Image
-        source={{ uri: msg.content }}
-        style={messageItemStyles.imageContent}
-        onLoadStart={() => setImgLoading(true)}
-        onLoadEnd={() => setImgLoading(false)}
-      />
-    </View>
+{msg.type === "IMAGE" ? (
+  <View style={{ position: "relative" }}>
+    {imgLoading && (
+      <View style={[messageItemStyles.imageContent, styles.placeholder]}>
+        <ActivityIndicator size="small" color="#086DC0" />
+      </View>
+    )}
+    <Image
+      source={{ uri: msg.content }}
+      style={messageItemStyles.imageContent}
+      onLoadStart={() => setImgLoading(true)}   // still useful for re-loading cases
+onLoadEnd={() => {
+  setImgLoading(false);
+  onMediaLoad?.();
+}}
+
+      
+    />
+  </View>
         ) : msg.type === "VIDEO" ? (
           <Video
             source={{ uri: content }}
@@ -242,6 +250,7 @@ function MessageItem({
             useNativeControls
             resizeMode="cover"
             isLooping={false}
+             onLoad={() => onMediaLoad?.()}
           />
         ) : msg.type === "FILE" ? (
           <TouchableOpacity
@@ -527,6 +536,11 @@ onLongPress={() => onMessageLongPress(msg)}
         onReplyPress={scrollToMessage}
 
         handlePressEmoji={handlePressEmoji}
+         onMediaLoad={() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100); // slight delay to allow layout to recalculate
+  }}
           
         />
 
@@ -1121,47 +1135,65 @@ const handleSelectConversationToForward = async (convId) => {
             allowsEditing: false,
         });
 
-        if (!result.canceled && result.assets.length > 0) {
-            const selectedMedia = result.assets[0];
-            const mediaUri = selectedMedia.uri;
-            const fileName = selectedMedia.uri.split('/').pop();
-            const mimeType = selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg');
+if (!result.canceled && result.assets.length > 0) {
+  const selectedMedia = result.assets[0];
+  const mediaUri = selectedMedia.uri;
+  const fileName = selectedMedia.uri.split('/').pop();
+  const mimeType = selectedMedia.mimeType || (selectedMedia.type === 'video' ? 'video/mp4' : 'image/jpeg');
 
-            const file = {
-                uri: mediaUri,
-                name: fileName,
-                type: mimeType,
-            };
+  const file = {
+    uri: mediaUri,
+    name: fileName,
+    type: mimeType,
+  };
 
-            formData.append('id', userId);
-            formData.append(selectedMedia.type === 'video' ? 'video' : 'image', file);
-            formData.append('conversationId', conversationId);
+  formData.append('id', userId);
+  formData.append(selectedMedia.type === 'video' ? 'video' : 'image', file);
+  formData.append('conversationId', conversationId);
 
-            try {
-                const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
-                const response = await axios.post(endpoint, formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                    timeout: selectedMedia.type === 'video' ? 30000 : 20000,
-                });
+  try {
+    const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
+    const response = await axios.post(endpoint, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: selectedMedia.type === 'video' ? 30000 : 20000,
+    });
 
-                const mediaUrl = response.data?.file?.url;
-                const newMsg = {
-                    _id: String(Date.now()),
-                    memberId: { userId: userId || "" },
-                    type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
-                    content: mediaUrl,
-                    createdAt: new Date().toISOString(),
-                };
+    const mediaUrl = response.data?.file?.url;
 
-                setMessages((prev) => [...prev, newMsg]);
-                console.log(`${selectedMedia.type} uploaded successfully:`, mediaUrl);
-            } catch (err) {
-                console.error(`Error uploading ${selectedMedia.type}:`, err);
-                Alert.alert('Error', `Failed to upload ${selectedMedia.type}`);
-            }
-        }
+    if (!mediaUrl) throw new Error("Server did not return a URL");
+
+    console.log(`${selectedMedia.type} uploaded successfully:`, mediaUrl);
+
+  if (!mediaUrl) {
+  throw new Error("Server did not return a URL");
+}
+
+// ✅ Only add the message now
+const newMsg = {
+  _id: String(Date.now()),
+  memberId: {
+    _id: userId,
+    userId,
+    name: currentUser?.name,
+    avatar: currentUser?.avatar,
+  },
+  type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
+  content: mediaUrl,
+  createdAt: new Date().toISOString(),
+  reacts: [],
+};
+
+setMessages((prev) => [...prev, newMsg]);
+
+
+  } catch (err) {
+    console.error(`Error uploading ${selectedMedia.type}:`, err);
+    Alert.alert('Error', `Failed to upload ${selectedMedia.type}`);
+  }
+}
+
     };
 
   
@@ -1287,7 +1319,8 @@ const reactUpdateHandler = (message) => {
 
 
 useEffect(() => {
-  if (!socket || !conversationId) return;
+
+    if (!socket || !conversationId || !userId) return;
 
   const receiveHandler = (message) => {
     setMessages((prev) => {
@@ -1312,7 +1345,14 @@ useEffect(() => {
 
   socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
   socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+  
+console.log("➡️ Joining conversation with userId:", userId, "conversationId:", conversationId);
+
+socket.emit(SOCKET_EVENTS.JOIN, userId);
+
+// 2. When entering a chat screen
+socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
+
     socket.on(SOCKET_EVENTS.REACT_TO_MESSAGE, reactUpdateHandler); 
 
   return () => {
