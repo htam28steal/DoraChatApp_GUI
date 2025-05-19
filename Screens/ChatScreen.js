@@ -907,73 +907,7 @@ const recallHandler = useCallback((data) => {
 
 
 
-  const handleSelectFriendToForward = async (friend) => {
-  try {
-    const convResponse = await axios.post(`/api/conversations/individuals/${friend._id}`);
-    const newConv = convResponse.data;
 
-    const messageToForward = {
-      conversationId: newConv._id,
-      content: selectedMessage.content,
-      type: selectedMessage.type,
-      fileName: selectedMessage.fileName,
-    };
-
-    await axios.post("/api/messages/text", messageToForward);
-
-   
-    setForwardModalVisible(false);
-  } catch (err) {
-    Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
-  }
-};
-
-
-  const handleForwardAction = async () => {
-    try {
-      const response = await axios.get("/api/friends");
-      const friends = response.data;
-  
-      if (!friends || friends.length === 0) {
-        Alert.alert("Không có bạn bè nào để chuyển tiếp.");
-        return;
-      }
-  
-      // Hiện danh sách bạn bè bằng Alert để chọn
-      Alert.alert(
-        "Chọn người nhận",
-        "Hãy chọn người để chuyển tiếp:",
-        friends.map((friend) => ({
-          text: friend.name || friend.username,
-          onPress: async () => {
-            try {
-              // Gọi API tạo cuộc trò chuyện nếu chưa có
-              const convResponse = await axios.post(
-                `/api/conversations/individuals/${friend._id}`
-              );
-  
-              const newConv = convResponse.data;
-              const messageToForward = {
-                conversationId: newConv._id,
-                content: selectedMessage.content,
-                type: selectedMessage.type,
-                fileName: selectedMessage.fileName,
-              };
-  
-              // Gửi message chuyển tiếp
-              await axios.post("/api/messages/text", messageToForward);
-
-            } catch (err) {
-              Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
-            }
-          },
-        }))
-      );
-    } catch (error) {
-      Alert.alert("Lỗi lấy danh sách bạn bè", error.response?.data?.message || error.message);
-    }
-    setModalVisible(false);
-  };
   // Retrieve userId from AsyncStorage.
   useEffect(() => {
     const fetchUserId = async () => {
@@ -1159,24 +1093,7 @@ const handleSelectConversationToForward = async (convId) => {
     };
 
   
-  const base64ToBlob = (base64Data, contentType = '', sliceSize = 512) => {
-    const byteCharacters = atob(base64Data); // decode base64
-    const byteArrays = [];
 
-    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-      const slice = byteCharacters.slice(offset, offset + sliceSize);
-
-      const byteNumbers = new Array(slice.length);
-      for (let i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i);
-      }
-
-      const byteArray = new Uint8Array(byteNumbers);
-      byteArrays.push(byteArray);
-    }
-
-    return new Blob(byteArrays, { type: contentType });
-  };
 
  const pickDocument = async () => {
   setUploading(true);
@@ -1371,18 +1288,19 @@ useEffect(() => {
     <View style={styles.modalContent}>
       {/* —————————————————————— */}
       {/* 1) Reaction bar */}
-      <View style={styles.reactionBar}>
-        {['❤️','👍','😂','😲','😭','😡'].map(emoji => (
-          <TouchableOpacity
-            key={emoji}
-            style={styles.reactionIcon}
-            onPress={() => {
-              handleReact(selectedMessage, emojiToType[emoji]);
-              setModalVisible(false);
-            }}
-          >
-            <Text style={styles.reactionEmoji}>{emoji}</Text>
-          </TouchableOpacity>
+
+                            <View style={styles.reactionBar}>
+                                {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
+                                    <TouchableOpacity
+                                        key={emoji}
+                                        onPress={() => {
+                                            const type = emojiToType[emoji];
+                                            handleReact(selectedMessage, type);
+                                            setModalVisible(false);
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                                    </TouchableOpacity>
         ))}
       </View>
 
@@ -1390,10 +1308,15 @@ useEffect(() => {
       {/* 2) Action grid */}
       <View style={styles.optionsGrid}>
         {[
+
+            ...(selectedMessage?.memberId?.userId === userId
+    ? [{ icon: require('../icons/undo.png'), label: 'Recall', onPress: handleRecallAction }]
+    : []
+  ),
+            { icon: require('../icons/forward.png'), label: 'Forward', onPress: openForwardModal },
           { icon: require('../icons/reply.png'),   label: 'Reply',    onPress: handleReplyAction },
-          { icon: require('../icons/forward.png'), label: 'Chuyển tiếp', onPress: openForwardModal },
-          { icon: require('../icons/undo.png'),   label: 'Forward',  onPress: handleRecallAction },
-          { icon: require('../icons/copy.png'),    label: 'Sao chép',   onPress: () => {} },
+          { icon: require('../icons/Delete.png'),   label: 'Delete',    onPress: handleDeleteAction },
+
           // { icon: require('../icons/pin.png'),     label: 'Ghim',       onPress: () => {} },
           { icon: require('../icons/mic.png'),label: 'Read Message',   onPress: handleReadMessage },
 
