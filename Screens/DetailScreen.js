@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import bg from '../Images/bground.png';
+                           
 
 
 import axios from '../api/apiConfig'; 
@@ -372,7 +373,15 @@ useEffect(() => {
           const avatar = item.pinnedBy?.avatar;
 
           return (
-            <View style={styles.pinnedCard}>
+            <TouchableOpacity style={styles.pinnedCard}
+             activeOpacity={0.7}
+  onPress={() => navigation.navigate('ChatScreen', {
+    conversation,
+    scrollToMessageId: item.message._id
+  })}
+
+            
+            >
               <View style={styles.cardHeader}>
                 <Image
                   source={avatar ? { uri: avatar } : require('../Images/avt.png')}
@@ -397,7 +406,7 @@ useEffect(() => {
                   <Text style={styles.textContent}>{content}</Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           );
         }}
         contentContainerStyle={{ paddingBottom: 20 }}

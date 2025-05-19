@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, forwardRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import {
   View,
   Text,
@@ -50,20 +50,23 @@ const screenWidth = Dimensions.get("window").width;
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({
-  msg,
-  showAvatar,
-  showTime,
-  currentUserId,
-  onLongPress,
-  currentUserAvatar,
-  otherUserAvatar, 
+const MessageItem = forwardRef(function MessageItem(
+  props,
+  ref
+) {
+  const {
+    msg,
+    showAvatar,
+    showTime,
+    currentUserId,
+    onLongPress,
+    currentUserAvatar,
+    otherUserAvatar,
     allMessages,
     onReplyPress,
     handlePressEmoji,
     onMediaLoad,
-
-}) {
+  } = props;
 
 
 
@@ -74,7 +77,6 @@ const [imgLoading, setImgLoading] = useState(true);
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
-  const Container = onLongPress ? TouchableOpacity : View;
       const emojiMap = {
         1: '❤️',
         2: '😂',
@@ -83,6 +85,15 @@ const [imgLoading, setImgLoading] = useState(true);
         5: '👎',
         6: '😮',
     };
+  const innerRef = useRef();
+
+  useImperativeHandle(ref, () => ({
+    measureLayout: (...args) => {
+      if (innerRef.current?.measureLayout) {
+        innerRef.current.measureLayout(...args);
+      }
+    },
+  }));
 
 
   const repliedMsg = msg.replyMessageId
@@ -151,15 +162,22 @@ const [imgLoading, setImgLoading] = useState(true);
     }
   };
 
+const Container = onLongPress ? TouchableOpacity : View;
+
   return (
-    <Container
-      onLongPress={onLongPress}
-      activeOpacity={0.7}
-      style={[
-        messageItemStyles.container,
-        isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
-      ]}
-    >
+     <Container
+       onLongPress={onLongPress}
+       activeOpacity={0.7}
+     >
+        <View
+        ref={innerRef}
+         style={[
+           messageItemStyles.container,
+           msg.memberId.userId === currentUserId
+             ? messageItemStyles.rightAlign
+             : messageItemStyles.leftAlign,
+         ]}
+       >
 {showAvatar ? (
   <Image
     source={
@@ -313,11 +331,12 @@ const [imgLoading, setImgLoading] = useState(true);
           </Text>
         )}
       </View>
+      </View>
     </Container>
   );
 }
 
-
+);
 const messageItemStyles = StyleSheet.create({
   container: {
     flexDirection: "row",
@@ -499,31 +518,40 @@ function ChatBox({
   handlePressEmoji,
   loadMoreMessages,
   loadingMore,
-  allMessages,  // ✅ Add this param
+  allMessages, 
+  scrollToMessageId
 }) {
 
 
 
 const prevLengthRef = useRef(0);
   const scrollViewRef = useRef(null);
-  const messageRefs = useRef({});
+  const messageRefs    = useRef({});
 
 // helper to jump:
 const scrollToMessage = useCallback((messageId) => {
   const item = messageRefs.current[messageId];
   if (!item || !scrollViewRef.current) return;
 
-  // measure its y offset relative to the ScrollView's inner view
-  item.measureLayout(
-    // on Android you might need `.getInnerViewNode()`
-    scrollViewRef.current.getInnerViewNode(),  
-    (x, y) => {
-      scrollViewRef.current.scrollTo({ y: y - 20, animated: true }); // -20 to give a bit of top padding
-    },
-    () => {}
-  );
+  if (item.measureLayout) {
+    item.measureLayout(
+      scrollViewRef.current, 
+      (x, y) => scrollViewRef.current.scrollTo({ y: y - 20, animated: true }),
+      () => {}
+    );
+  } else {
+    console.warn("Ref missing measureLayout for messageId:", messageId);
+  }
 }, []);
 
+
+   useEffect(() => {
+    if (scrollToMessageId && messages.length) {
+      // give the list a frame to render
+      setTimeout(() => scrollToMessage(scrollToMessageId), 50);
+    }
+  }, [scrollToMessageId, messages]);
+  
   useEffect(() => {
     if (scrollViewRef.current)
       scrollViewRef.current.scrollToEnd({ animated: true });
@@ -565,7 +593,8 @@ const scrollToMessage = useCallback((messageId) => {
 
         return (
         <MessageItem
-          key={key}
+            key={msg._id}
+          ref={ref => (messageRefs.current[msg._id] = ref)}
           msg={msg}
             allMessages={allMessages}
           showAvatar={isFirstInGroup}
@@ -738,10 +767,11 @@ const headerStyles = StyleSheet.create({
  */
 export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from route parameters.
+  
       const [selectedReactors, setSelectedReactors] = useState([]);
       const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
 const [userId, setUserId] = useState(null);
-  const { conversation } = route.params;
+  const { conversation, scrollToMessageId } = route.params;
   const conversationId = conversation._id;
 const [conversationsList, setConversationsList] = useState([]);
 const [uploading, setUploading] = useState(false);
@@ -1553,7 +1583,8 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
   handlePressEmoji={handlePressEmoji}
   onMessageLongPress={handleMessageLongPress}
   loadMoreMessages={loadMoreMessages}
-  loadingMore={loadingMore}  // ✅ Add this line
+  loadingMore={loadingMore} 
+   scrollToMessageId={scrollToMessageId}  
 />
 
 
