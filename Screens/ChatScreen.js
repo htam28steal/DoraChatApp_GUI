@@ -1242,20 +1242,20 @@ const handleSendMessage = async (text) => {
 
   // optimistic
   const tempId = String(Date.now());
-  setMessages(prev => [
-    ...prev,
-    { _id: tempId, memberId: { userId }, type: "TEXT", content: text, pending: true }
-  ]);
+  const newMsg = {
+    _id: tempId,
+    memberId: { userId },
+    type: "TEXT",
+    content: text,
+    pending: true,
+    // include the replied message’s ID (your backend might expect replyMessageId or replyTo)
+    replyMessageId: replyTo?._id,
+  };
 
-  try {
-    await axios.post("/api/messages/text", {
-      conversationId,
-      content: text
-    });
-    // NO socket.emit here!
-  } catch (err) {
-    Alert.alert("Cannot send message", err.message);
-  }
+  // show it immediately
+  setMessages(prev => [...prev, newMsg]);
+  // hide the “reply preview” UI
+  setReplyTo(null);
 };
 
 
@@ -1357,10 +1357,10 @@ useEffect(() => {
       />
 
       {/* Modal for message actions on long press */}
-     <Modal
+<Modal
   visible={modalVisible}
   transparent
-  animationType="fade"
+  animationType="slide"
   onRequestClose={() => setModalVisible(false)}
 >
   <TouchableOpacity
@@ -1368,66 +1368,49 @@ useEffect(() => {
     activeOpacity={1}
     onPressOut={() => setModalVisible(false)}
   >
-    <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      {/* —————————————————————— */}
+      {/* 1) Reaction bar */}
+      <View style={styles.reactionBar}>
+        {['❤️','👍','😂','😲','😭','😡'].map(emoji => (
+          <TouchableOpacity
+            key={emoji}
+            style={styles.reactionIcon}
+            onPress={() => {
+              handleReact(selectedMessage, emojiToType[emoji]);
+              setModalVisible(false);
+            }}
+          >
+            <Text style={styles.reactionEmoji}>{emoji}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
+      {/* —————————————————————— */}
+      {/* 2) Action grid */}
+      <View style={styles.optionsGrid}>
+        {[
+          { icon: require('../icons/reply.png'),   label: 'Reply',    onPress: handleReplyAction },
+          { icon: require('../icons/forward.png'), label: 'Chuyển tiếp', onPress: openForwardModal },
+          { icon: require('../icons/undo.png'),   label: 'Forward',  onPress: handleRecallAction },
+          { icon: require('../icons/copy.png'),    label: 'Sao chép',   onPress: () => {} },
+          // { icon: require('../icons/pin.png'),     label: 'Ghim',       onPress: () => {} },
+          { icon: require('../icons/mic.png'),label: 'Read Message',   onPress: handleReadMessage },
 
-
-      {!selectedMessage?.isDeleted && selectedMessage?.type === "TEXT" && (
-  <TouchableOpacity
-    style={styles.modalButton}
-    onPress={handleReadMessage}
-  >
-    <Text style={styles.modalButtonText}>Read message</Text>
-  </TouchableOpacity>
-)}
-
-{selectedMessage?.isDeleted ? (
-    <TouchableOpacity
-      style={styles.modalButton}
-      onPress={handleRecallAction}
-    >
-      <Text style={styles.modalButtonText}>Thu hồi</Text>
-    </TouchableOpacity>
-
-) : (
-  <>
-    <TouchableOpacity
-    style={styles.modalButton}
-    onPress={handleDeleteAction}
-  >
-    <Text style={styles.modalButtonText}>Xoá</Text>
-  </TouchableOpacity>
-
-    <TouchableOpacity
-      style={styles.modalButton}
-      onPress={openForwardModal}
-    >
-      <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-    </TouchableOpacity>
-  <TouchableOpacity
-    style={styles.modalButton}
-    onPress={handleReplyAction}
-  >
-    <Text style={styles.modalButtonText}>Reply</Text>
-  </TouchableOpacity>
- <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }}>
-                                {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
-                                    <TouchableOpacity
-                                        key={emoji}
-                                        onPress={() => {
-                                            const type = emojiToType[emoji];
-                                            handleReact(selectedMessage, type);
-                                            setModalVisible(false);
-                                        }}
-                                    >
-                                        <Text style={{ fontSize: 24 }}>{emoji}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-  </>
-)}
-
+        ].map((opt, i) => (
+          <TouchableOpacity
+            key={i}
+            style={styles.optionItem}
+            onPress={() => {
+              opt.onPress();
+              setModalVisible(false);
+            }}
+          >
+            <Image source={opt.icon} style={styles.optionIcon} />
+            <Text style={styles.optionLabel}>{opt.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   </TouchableOpacity>
 </Modal>
@@ -1535,17 +1518,17 @@ useEffect(() => {
     const emoji = emojiMap[item.type];
 
     return (
-      <TouchableOpacity style={styles.reactorRow}>
+      <View style={styles.reactorRow}>
         <Image
           source={item.avatar ? { uri: item.avatar } : AvatarImage}
           style={styles.reactorAvatar}
         />
         <View style={styles.reactorInfo}>
           <Text style={styles.reactorName}>{item.name || "Unknown"}</Text>
-          <Text style={styles.reactorSubtitle}>Nhấp để gỡ</Text>
+
         </View>
         <Text style={styles.reactorHeart}>{emoji}</Text>
-      </TouchableOpacity>
+      </View>
     );
   }}
 />
@@ -1926,5 +1909,64 @@ reactorHeart: {
   height: 24,
   tintColor: '#E0245E',
 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // white rounded container
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '90%',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+    elevation: 10,           // shadow on Android
+    shadowColor: '#000',     // shadow on iOS
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+
+  // —— Reaction bar ——
+  reactionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  reactionIcon: {
+    padding: 4,
+  },
+  reactionEmoji: {
+    fontSize: 28,
+  },
+
+  // —— Options grid ——
+  optionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    justifyContent: 'space-between',
+  },
+  optionItem: {
+    width: '25%',           // 4 items per row
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  optionIcon: {
+    width: 32,
+    height: 32,
+    marginBottom: 6,
+  },
+  optionLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#333',
+  },
 
 });
