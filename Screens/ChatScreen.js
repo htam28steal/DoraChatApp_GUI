@@ -181,6 +181,13 @@ const [imgLoading, setImgLoading] = useState(true);
 
 
       <View style={messageItemStyles.contentContainer}>
+        {msg.isPinned && (
+  <View style={messageItemStyles.pinnedContainer}>
+
+    <Text style={messageItemStyles.pinnedLabel}> 📌  Pinned</Text>
+  </View>
+)}
+
         {repliedMsg && (
           // wrap the quote in its own TouchableOpacity
           <TouchableOpacity
@@ -200,6 +207,7 @@ const [imgLoading, setImgLoading] = useState(true);
             </Text>
           </TouchableOpacity>
         )}
+
 
 {msg.replyTo && (
   <View style={messageItemStyles.replyContainer}>
@@ -450,6 +458,33 @@ replyTextContainer: {
         marginLeft: 4,
         color: '#666',
     },
+    pinnedLabel: {
+  fontSize: 12,
+  color: "#FF2D55",  // or any strong color
+  marginBottom: 4,
+  fontWeight: "bold",
+},
+pinnedContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 4,
+  gap: 4, // spacing between icon and text
+},
+
+pinIcon: {
+  width: 14,
+  height: 14,
+  resizeMode: 'contain',
+  tintColor: '#FF2D55', // optional: to match your UI theme
+},
+
+pinnedLabel: {
+  fontSize: 12,
+  color: "#FF2D55",
+  fontWeight: "bold",
+},
+
+
 });
 
 /**
@@ -634,7 +669,8 @@ const messageInputStyles = StyleSheet.create({
  */
 function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser     }) {
   const navigation = useNavigation();
-  const other = conversation.members.find(m => m.userId !== currentUserId);
+ const other = conversation.members.find(m => m.userId !== currentUserId);
+
   return (
     <View style={headerStyles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
@@ -645,7 +681,10 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser
         style={headerStyles.avatar}
       />
       <View style={headerStyles.infoContainer}>
-        <Text style={headerStyles.name} numberOfLines={1}>{otherUser?.name}</Text>
+        <Text style={headerStyles.name} numberOfLines={1}>
+  {other?.name}
+</Text>
+
         <View style={headerStyles.statusContainer}>
           <View style={headerStyles.statusDot} />
           <Text style={headerStyles.statusText}>Active</Text>
@@ -709,6 +748,7 @@ const [uploading, setUploading] = useState(false);
 
 const [userIdReady, setUserIdReady] = useState(false);
 const [replyTo, setReplyTo] = useState(null);
+const [pinnedMessages, setPinnedMessages] = useState([]);
 
 
 
@@ -733,7 +773,125 @@ const [allMessages, setAllMessages] = useState([]);
 const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
 const [hasMore, setHasMore] = useState(true);
 
+useEffect(() => {
+  const fetchPinnedMessages = async () => {
+    try {
+      const response = await axios.get(`/api/pin-messages/${conversationId}`);
+      const pinned = response.data || [];
 
+      setPinnedMessages(pinned);
+
+      setMessages((prev) =>
+        prev.map((msg) => ({
+          ...msg,
+          isPinned: pinned.some((pin) => pin.messageId === msg._id),
+        }))
+      );
+    } catch (err) {
+      console.error("❌ Failed to fetch pinned messages:", err);
+    }
+  };
+
+  if (conversationId) {
+    fetchPinnedMessages();
+  }
+}, [conversationId]);
+
+const handlePinMessages = async (message) => {
+  if (!message) return;
+
+  try {
+    console.log("📌 Attempting to pin message:", message);
+
+    // ✅ Get memberId from backend (to avoid relying on potentially stale UI state)
+    const memberRes = await axios.get(`/api/members/${conversationId}/${userId}`);
+    const memberId = memberRes.data.data?._id;
+
+    const payload = {
+      messageId: message._id,
+      conversationId: message.conversationId,
+       pinnedBy: message.memberId._id, // ✅ safest
+    };
+
+    console.log("📦 Sending pin payload:", payload);
+
+    await axios.post("/api/pin-messages", payload);
+
+    const refreshed = await handlePinnedMessages();
+    setPinnedMessages(refreshed);
+    // Update UI
+setMessages((prevMessages) =>
+  prevMessages.map((msg) =>
+    refreshed.some((p) => p.messageId === msg._id)
+      ? { ...msg, isPinned: true }
+      : msg
+  )
+);
+  } catch (err) {
+    console.error("❌ Error during pin request:", err);
+    Alert.alert("Lỗi", "Không thể ghim tin nhắn.");
+  }
+};
+const handleUnpinMessage = async (message) => {
+  if (!message || !message._id || !userId) {
+    Alert.alert("Lỗi", "Thiếu thông tin để bỏ ghim.");
+    return;
+  }
+
+  try {
+    // Step 1: Fetch memberId (_id) for current user
+    const res = await axios.get(`/api/members/${conversationId}/${userId}`);
+    const memberId = res.data?.data?._id;
+
+    
+
+    if (!memberId) throw new Error("Không tìm thấy thành viên.");
+
+    console.log("🔎 message.pinnedBy:", message.pinnedBy, "→ type:", typeof message.pinnedBy);
+console.log("🔎 Your memberId:", memberId);
+
+
+    // Step 2: Check if this user is the one who pinned the message
+const pinEntry = pinnedMessages.find((p) => p.messageId === message._id);
+const pinnedById = pinEntry?.pinnedBy?._id || pinEntry?.pinnedBy || null;
+
+if (!pinnedById || pinnedById !== memberId) {
+  Alert.alert("Không thể bỏ ghim", "Bạn không phải người đã ghim tin nhắn này.");
+  return;
+}
+
+
+    // Step 3: Proceed to unpin
+    await axios.delete(`/api/pin-messages/${message._id}/${memberId}`);
+
+    // Step 4: Refresh UI
+    const refreshed = await handlePinnedMessages();
+    setPinnedMessages(refreshed);
+    setMessages((prev) =>
+      prev.map((msg) =>
+        refreshed.some((p) => p.messageId === msg._id)
+          ? { ...msg, isPinned: true }
+          : { ...msg, isPinned: false }
+      )
+    );
+
+    Alert.alert("Thành công", "Đã bỏ ghim tin nhắn.");
+  } catch (err) {
+    console.error("❌ Error unpinning message:", err);
+    Alert.alert("Lỗi", err.response?.data?.message || "Không thể bỏ ghim.");
+  }
+};
+
+
+    const handlePinnedMessages = async () => {
+        try {
+            const response = await axios.get(`/api/pin-messages/${conversationId}`);
+            return response.data;
+        } catch (err) {
+            console.log(err);
+            return [];
+        }
+    };
 
 const loadMoreMessages = async () => {
   if (loadingMore || !hasMore) return;
@@ -1010,30 +1168,43 @@ const recallHandler = useCallback((data) => {
     };
     fetchUserId();
   }, []);
-
 useEffect(() => {
   const fetchAllMessages = async () => {
     try {
-      const response = await axios.get(`/api/messages/${conversationId}`);
-      const all = response.data || [];
+      const [msgRes, pinRes] = await Promise.all([
+        axios.get(`/api/messages/${conversationId}`),
+        axios.get(`/api/pin-messages/${conversationId}`),
+      ]);
+
+      const all = msgRes.data || [];
+      const pinned = pinRes.data || [];
 
       setAllMessages(all);
 
+      // Attach isPinned flag
+      const pinnedIds = new Set(pinned.map(p => p.messageId));
+      const decorated = all.map(msg =>
+        pinnedIds.has(msg._id)
+          ? { ...msg, isPinned: true }
+          : msg
+      );
+
       const initialLimit = 40;
-      const skip = Math.max(0, all.length - initialLimit);
-      const lastMessages = all.slice(skip);
+      const skip = Math.max(0, decorated.length - initialLimit);
+      const lastMessages = decorated.slice(skip);
 
       setMessages(lastMessages);
       setPagination({ skip, limit: 20 });
-      setHasMore(skip > 0); // only if more messages exist before skip
+      setHasMore(skip > 0);
+      setPinnedMessages(pinned);
+
     } catch (err) {
-      console.error("Failed to load messages", err);
+      console.error("Failed to load messages or pins", err);
     }
   };
 
   if (conversationId) fetchAllMessages();
 }, [conversationId]);
-
 
 
   // Unified long press handler to show the custom modal with options.
@@ -1471,8 +1642,19 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
             { icon: require('../icons/forward.png'), label: 'Forward', onPress: openForwardModal },
           { icon: require('../icons/reply.png'),   label: 'Reply',    onPress: handleReplyAction },
           { icon: require('../icons/Delete.png'),   label: 'Delete',    onPress: handleDeleteAction },
-
-          // { icon: require('../icons/pin.png'),     label: 'Ghim',       onPress: () => {} },
+selectedMessage?.isPinned
+  ? {
+      icon: require('../icons/Unpin.png'), 
+      label: 'Unpin message',
+      onPress: () => handleUnpinMessage(selectedMessage),
+    }
+  : {
+      icon: require('../icons/Pin_action.png'),
+      label: 'Pin message',
+      onPress: () => {
+        handlePinMessages(selectedMessage);
+      },
+    },
           { icon: require('../icons/mic.png'),label: 'Read Message',   onPress: handleReadMessage },
 
         ].map((opt, i) => (
@@ -2032,7 +2214,7 @@ reactorHeart: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 12,
-    justifyContent: 'space-between',
+
   },
   optionItem: {
     width: '25%',           // 4 items per row
