@@ -448,12 +448,13 @@ function ChatBox({
   onMessageLongPress,
   handlePressEmoji,
   loadMoreMessages,
-  loadingMore  // ✅ Add this param
+  loadingMore,
+  allMessages,  // ✅ Add this param
 }) {
 
 
 
-
+const prevLengthRef = useRef(0);
   const scrollViewRef = useRef(null);
   const messageRefs = useRef({});
 
@@ -516,7 +517,7 @@ const scrollToMessage = useCallback((messageId) => {
         <MessageItem
           key={key}
           msg={msg}
-            allMessages={messages}
+            allMessages={allMessages}
           showAvatar={isFirstInGroup}
           showTime={isLastInGroup}
           currentUserId={currentUserId}
@@ -843,6 +844,12 @@ const handlePressEmoji = async (msg) => {
                         : m
                 )
             );
+            socket.emit(SOCKET_EVENTS.REACT_TO_MESSAGE, {
+  conversationId: message.conversationId,
+  messageId: message._id,
+  reactType, // optional if server handles type logic
+});
+
         } catch (error) {
             console.error('Failed to send react:', error.response?.data || error.message);
         }
@@ -1218,27 +1225,64 @@ const handleSelectConversationToForward = async (convId) => {
     setUploading(false);
   }
 };
-
 const handleSendMessage = async (text) => {
   if (!text.trim()) return;
 
-  // optimistic
   const tempId = String(Date.now());
-  const newMsg = {
+  const optimisticMsg = {
     _id: tempId,
     memberId: { userId },
     type: "TEXT",
     content: text,
     pending: true,
-    // include the replied message’s ID (your backend might expect replyMessageId or replyTo)
     replyMessageId: replyTo?._id,
+    createdAt: new Date().toISOString(),
   };
 
-  // show it immediately
-  setMessages(prev => [...prev, newMsg]);
-  // hide the “reply preview” UI
-  setReplyTo(null);
+  setMessages(prev => [...prev, optimisticMsg]);
+
+  try {
+    const { data } = await axios.post("/api/messages/text", {
+      conversationId,
+      content: text,
+      type: "TEXT",
+      replyMessageId: replyTo?._id || null,
+    });
+
+    setMessages(prev =>
+      prev.map((m) =>
+        m._id === tempId ? data : m
+      )
+    );
+    
+    // ✅ clear replyTo only after confirmation
+    setReplyTo(null);
+
+  } catch (error) {
+    console.error("❌ Failed to send message:", error);
+    Alert.alert("Error", "Không thể gửi tin nhắn.");
+    setMessages(prev => prev.filter(m => m._id !== tempId));
+  }
 };
+
+const reactUpdateHandler = (message) => {
+  if (!message || !message._id || !message.reacts) {
+    console.warn("⚠️ Invalid reaction payload:", message);
+    return;
+  }
+
+  const messageId = message._id;
+  const reacts = message.reacts;
+
+  console.log("🆕 Updating message", messageId, "with reacts:", reacts);
+
+  setMessages((prev) =>
+    prev.map((msg) =>
+      msg._id === messageId ? { ...msg, reacts } : msg
+    )
+  );
+};
+
 
 
 useEffect(() => {
@@ -1247,6 +1291,8 @@ useEffect(() => {
   const receiveHandler = (message) => {
     setMessages((prev) => {
       // replace the optimistic placeholder if it matches
+      console.log("📨 Received message from server:", message);
+
       if (message.memberId?.userId === userId) {
         const idx = prev.findIndex(
           m => m.pending && m.content === message.content
@@ -1266,11 +1312,13 @@ useEffect(() => {
   socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
   socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
   socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+    socket.on(SOCKET_EVENTS.REACT_TO_MESSAGE, reactUpdateHandler); 
 
   return () => {
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
     socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
     socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+      socket.off(SOCKET_EVENTS.REACT_TO_MESSAGE, reactUpdateHandler); 
   };
 }, [socket, conversationId, userId, recallHandler]);
 
@@ -1289,6 +1337,7 @@ useEffect(() => {
 
 <ChatBox
   messages={messages}
+   allMessages={allMessages} 
   currentUserId={userId}
   currentUserAvatar={currentUser?.avatar}
   otherUserAvatar={otherUser?.avatar}
