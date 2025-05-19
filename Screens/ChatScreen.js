@@ -523,7 +523,7 @@ function ChatBox({
 }) {
 
 
-
+ const lastIdRef = useRef(messages[messages.length - 1]?._id);
 const prevLengthRef = useRef(0);
   const scrollViewRef = useRef(null);
   const messageRefs    = useRef({});
@@ -553,8 +553,14 @@ const scrollToMessage = useCallback((messageId) => {
   }, [scrollToMessageId, messages]);
   
   useEffect(() => {
-    if (scrollViewRef.current)
-      scrollViewRef.current.scrollToEnd({ animated: true });
+  const newLastId = messages[messages.length - 1]?._id;
+
+  // scroll only when a brand-new message is at the bottom
+  if (newLastId && newLastId !== lastIdRef.current) {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }
+
+  lastIdRef.current = newLastId;
   }, [messages]);
 
   return (
@@ -859,12 +865,12 @@ setMessages((prevMessages) =>
 );
   } catch (err) {
     console.error("❌ Error during pin request:", err);
-    Alert.alert("Lỗi", "Không thể ghim tin nhắn.");
+
   }
 };
 const handleUnpinMessage = async (message) => {
   if (!message || !message._id || !userId) {
-    Alert.alert("Lỗi", "Thiếu thông tin để bỏ ghim.");
+
     return;
   }
 
@@ -886,7 +892,7 @@ const pinEntry = pinnedMessages.find((p) => p.messageId === message._id);
 const pinnedById = pinEntry?.pinnedBy?._id || pinEntry?.pinnedBy || null;
 
 if (!pinnedById || pinnedById !== memberId) {
-  Alert.alert("Không thể bỏ ghim", "Bạn không phải người đã ghim tin nhắn này.");
+
   return;
 }
 
@@ -905,7 +911,7 @@ if (!pinnedById || pinnedById !== memberId) {
       )
     );
 
-    Alert.alert("Thành công", "Đã bỏ ghim tin nhắn.");
+
   } catch (err) {
     console.error("❌ Error unpinning message:", err);
     Alert.alert("Lỗi", err.response?.data?.message || "Không thể bỏ ghim.");
