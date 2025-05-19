@@ -33,6 +33,10 @@ dayjs.extend(relativeTime);
 import { Video } from "expo-av";
 import CreateVoteModal from "./CreateVoteModal";
 import VotedModal from './VotedModal';
+import VoiceRecordModal from "./VoiceRecordModal";
+import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+
 
 const AvatarImage = require("../Images/avt.png");
 const CallIcon = require("../assets/Call.png");
@@ -43,7 +47,7 @@ const PictureIcon = require("../icons/picture.png");
 const EmojiIcon = require("../icons/emoji.png");
 const SendIcon = require("../icons/send.png");
 const Return = require("../icons/back.png");
-
+const MicIcon = require("../icons/mic.png");
 
 /**
  * Message Bubble Component with support for onLongPress to show message options.
@@ -56,6 +60,8 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     const centerAlignedTypes = ["VOTE", "NOTIFY"];
     const isCenterAligned = centerAlignedTypes.includes(msg.type);
     const Container = onLongPress ? TouchableOpacity : View;
+    const [sound, setSound] = useState(null);
+    const [isPlaying, setIsPlaying] = useState(false);
     const emojiMap = {
         1: '❤️',
         2: '😂',
@@ -123,6 +129,8 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
         };
     }, [msg]);
 
+
+
     if (msg.type === "NOTIFY") {
         return (
             <View style={[messageItemStyles.container, messageItemStyles.centerAlign]}>
@@ -132,6 +140,65 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
             </View>
         );
     }
+
+
+    const lastDotIndex = msg.content.lastIndexOf('.');
+    const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
+    useEffect(() => {
+        if (ext !== 'm4a') return;  // chỉ chạy nếu ext là m4a
+
+        let isMounted = true;
+        let audioSound = null;
+
+        const loadSound = async () => {
+            try {
+                const { sound } = await Audio.Sound.createAsync(
+                    { uri: msg.content },
+                    { shouldPlay: false }
+                );
+                audioSound = sound;
+                if (isMounted) {
+                    setSound(sound);
+                    sound.setOnPlaybackStatusUpdate(status => {
+                        if (status.didJustFinish) {
+                            setIsPlaying(false);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Lỗi khi load audio:', error);
+            }
+        };
+
+        loadSound();
+
+        return () => {
+            isMounted = false;
+            if (audioSound) {
+                audioSound.unloadAsync();
+            }
+        };
+    }, [msg.content]);
+
+    const togglePlayback = async () => {
+        try {
+            if (sound) {
+                if (isPlaying) {
+                    await sound.pauseAsync();
+                } else {
+                    await sound.playAsync();
+                }
+                setIsPlaying(!isPlaying);
+            } else {
+                // Nếu chưa load audio thì load trước
+                await loadAudio();
+            }
+        } catch (error) {
+            console.error('Lỗi khi phát audio:', error);
+        }
+    };
+
+
     return (
         <Container
             onLongPress={onLongPress}
@@ -244,16 +311,34 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                             </View>
                         </View>
                     ) : msg.type === "FILE" ? (
-                        <TouchableOpacity
-                            style={messageItemStyles.fileContainer}
-                            onLongPress={onLongPress}
-                            activeOpacity={0.7}
-                        >
-                            <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
-                            <Text style={messageItemStyles.fileText}>
-                                {msg.fileName || "Open File"}
-                            </Text>
-                        </TouchableOpacity>
+                        (() => {
+                            const lastDotIndex = msg.content.lastIndexOf('.');
+                            const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
+                            if (ext === 'm4a') {
+                                return (
+                                    <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
+                                        <Ionicons
+                                            name={isPlaying ? 'pause' : 'play'}
+                                            size={24}
+                                            color="#086DC0"
+                                        />
+                                    </TouchableOpacity>
+                                );
+                            } else {
+                                return (
+                                    <TouchableOpacity
+                                        style={messageItemStyles.fileContainer}
+                                        onLongPress={onLongPress}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
+                                        <Text style={messageItemStyles.fileText}>
+                                            {msg.fileName || "Open File"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            }
+                        })()
                     ) : (
                         <Text
                             style={[
@@ -535,7 +620,7 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress }) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress, onRecord }) {
     const handleSend = () => {
         if (!input.trim()) return;
         onSend(input);
@@ -563,6 +648,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
                     <Image source={EmojiIcon} style={messageInputStyles.icon} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={onVotePress}  ><Text>Vote</Text></TouchableOpacity>
+                <TouchableOpacity onPress={onRecord}><Image source={MicIcon} style={messageInputStyles.icon} /></TouchableOpacity>
             </View>
             <TouchableOpacity style={messageInputStyles.sendButton} onPress={handleSend}>
                 <Image source={SendIcon} style={messageInputStyles.sendIcon} />
@@ -632,6 +718,9 @@ export default function ChatScreen({ route, navigation }) {
     const [showVotedModal, setVotedModal] = useState(false);
 
     const [memberId, setMemberId] = useState(null);
+
+    const [showRecordModal, setRecordModal] = useState(false);
+
 
     const emojiToType = {
         '❤️': 1,
@@ -1481,6 +1570,10 @@ export default function ChatScreen({ route, navigation }) {
         };
     }, [socket, conversationId, userId]);
 
+    const handleSendRecord = () => {
+        setRecordModal(false);
+    }
+
 
     const handleCreatePoll = () => {
         fetchAllMessages();
@@ -1547,6 +1640,7 @@ export default function ChatScreen({ route, navigation }) {
                     onEmojiPress={() => setEmojiOpen(true)}
                     onModalReact={handlePressEmoji}
                     onVotePress={() => setVoteShowModal(true)}
+                    onRecord={() => setRecordModal(true)}
 
                 />
                 <EmojiPicker
@@ -1570,7 +1664,13 @@ export default function ChatScreen({ route, navigation }) {
                     onSubmit={handleVoteSubmit}
                 />
 
-
+                <VoiceRecordModal
+                    isVisible={showRecordModal}
+                    onClose={() => setRecordModal(false)}
+                    conversationId={conversationId}
+                    channelId={currentChannelId}
+                    onSendRecord={(uri) => console.log('File ghi âm:', uri)}
+                />
 
                 <Modal
                     visible={modalVisible}
