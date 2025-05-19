@@ -59,7 +59,8 @@ function MessageItem({
   currentUserAvatar,
   otherUserAvatar, 
     allMessages,
-    onReplyPress
+    onReplyPress,
+    handlePressEmoji
 }) {
 
 
@@ -71,6 +72,14 @@ function MessageItem({
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
   const Container = onLongPress ? TouchableOpacity : View;
+      const emojiMap = {
+        1: '❤️',
+        2: '😂',
+        3: '😢',
+        4: '👍',
+        5: '👎',
+        6: '😮',
+    };
 
 
   const repliedMsg = msg.replyMessageId
@@ -264,6 +273,24 @@ function MessageItem({
     : content}
 </Text>
         )}
+         {msg.reacts && msg.reacts.length > 0 && (
+                            <TouchableOpacity
+                                style={messageItemStyles.reactContainer}
+                                onPress={() => handlePressEmoji(msg)}
+                            >
+                                {msg.reacts.map((react, idx) => {
+                                    const emoji = emojiMap[react.type];
+                                    return emoji ? (
+                                        <Text key={idx} style={messageItemStyles.emojiText}>
+                                            {emoji}
+                                        </Text>
+                                    ) : null;
+                                })}
+                                <Text style={messageItemStyles.reactCount}>
+                                    {msg.reacts.length}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
         {showTime && (
           <Text style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}>
             {dayjs(msg.createdAt).fromNow()}
@@ -384,12 +411,36 @@ replyTextContainer: {
     textAlign: "center",
     fontStyle:'italic'
   },
+      reactContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginTop: 5,
+        alignSelf: 'flex-start',
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1,
+        elevation: 2,
+    },
+    emojiText: {
+        fontSize: 16,
+        marginRight: 2,
+    },
+    reactCount: {
+        fontSize: 12,
+        marginLeft: 4,
+        color: '#666',
+    },
 });
 
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, onMessageLongPress }) {
+function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, onMessageLongPress,handlePressEmoji }) {
 
 
   const scrollViewRef = useRef(null);
@@ -447,7 +498,8 @@ const scrollToMessage = useCallback((messageId) => {
            otherUserAvatar={otherUserAvatar}
 onLongPress={() => onMessageLongPress(msg)}
         onReplyPress={scrollToMessage}
-        onMessageLongPress={() => onMessageLongPress(msg)}
+
+        handlePressEmoji={handlePressEmoji}
           
         />
 
@@ -600,6 +652,8 @@ const headerStyles = StyleSheet.create({
  */
 export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from route parameters.
+      const [selectedReactors, setSelectedReactors] = useState([]);
+      const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
 const [userId, setUserId] = useState(null);
   const { conversation } = route.params;
   const conversationId = conversation._id;
@@ -622,6 +676,90 @@ const [replyTo, setReplyTo] = useState(null);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
+
+    const emojiToType = {
+        '❤️': 1,
+        '😂': 2,
+        '😢': 3,
+        '👍': 4,
+        '👎': 5,
+        '😮': 6,
+    };
+const handleGetMember = async (memberId) => {
+  console.log("🔍 currentUser:", currentUser?._id, "otherUser:", otherUser?._id, "looking for:", memberId);
+
+  // 1) If it’s you
+  if (currentUser && currentUser._id === memberId) {
+    return { name: currentUser.name, avatar: currentUser.avatar };
+  }
+
+  // 2) If it’s the other chat partner
+  if (otherUser && otherUser._id === memberId) {
+    return { name: otherUser.name, avatar: otherUser.avatar };
+  }
+
+  // 3) Fallback: fetch any other user by their Mongo _id
+  try {
+    const data = await UserService.getUserById(memberId);
+    console.log("✅ Fetched fallback user:", data);
+    return { name: data.name, avatar: data.avatar };
+  } catch (err) {
+    console.error("❌ Failed to fetch fallback user:", err);
+    return { name: "Unknown", avatar: null };
+  }
+};
+
+
+
+
+    
+    const handlePressEmoji = async (msg) => {
+  console.log("💬 Message for reaction modal:", msg);
+
+  try {
+const reactors = msg.reacts.map(react => {
+     // react.memberId may be either the object or just an ID string
+     if (typeof react.memberId === 'object') {
+       return {
+         name: react.memberId.name,
+         avatar: react.memberId.avatar,
+         type: react.type
+       };
+     } else {
+       // fallback if it's just an ID (shouldn't happen here)
+       return { name: "Unknown", avatar: null, type: react.type };
+     }
+});
+    console.log("🎉 Final reactors:", reactors);
+    setSelectedReactors(reactors);
+    setReactDetailModalVisible(true);
+  } catch (err) {
+    console.error("❌ Failed in handlePressEmoji:", err);
+  }
+};
+
+
+    const handleReact = async (message, reactType) => {
+        try {
+            const response = await axios.post('/api/messages/react', {
+                conversationId: message.conversationId,
+                messageId: message._id,
+                reactType: reactType,
+            });
+
+            // Chỉ cập nhật message được react
+            setMessages(prevMessages =>
+                prevMessages.map(m =>
+                    m._id === message._id
+                        ? { ...m, reacts: response.data?.reacts || m.reacts }
+                        : m
+                )
+            );
+        } catch (error) {
+            console.error('Failed to send react:', error.response?.data || error.message);
+        }
+    };
+
 
 const handleReplyAction = () => {
 
@@ -991,64 +1129,7 @@ const handleSelectConversationToForward = async (convId) => {
         }
     };
 
-  // const pickVideo = async () => {
-  //   const formData = new FormData();
-
-  //   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  //   if (!permission.granted) {
-  //     Alert.alert("Permission denied", "Gallery access needed.");
-  //     return;
-  //   }
-  //   const result = await ImagePicker.launchImageLibraryAsync({
-  //     mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-  //     quality: 1,
-  //     allowsEditing: false,
-  //   });
-  //   if (!result.canceled && result.assets.length > 0) {
-  //     const selectedVideo = result.assets[0];
-  //     console.log(selectedVideo);
-  //     const videoUri = selectedVideo.uri;
-  //     const fileName = selectedVideo.uri.split('/').pop();
-  //     const mimeType = selectedVideo.mimeType || 'video/mp4';
-
-  //     const file = {
-  //       uri: videoUri,
-  //       name: fileName,
-  //       type: mimeType,
-  //     };
-
-  //     formData.append('id', userId);
-  //     formData.append('video', file);
-  //     formData.append('conversationId', conversationId);
-
-  //     try {
-  //       // Gửi tệp lên server
-  //       const response = await axios.post('/api/messages/videos', formData, {
-  //         headers: {
-  //           'Content-Type': 'multipart/form-data',
-  //         },
-  //         timeout: 30000,
-  //       });
-
-  //       const videoUrl = response.data?.file?.url;
-  //       const newMsg = {
-  //         _id: String(Date.now()),
-  //         memberId: { userId: userId || "" },
-  //         type: "VIDEO",
-  //         content: videoUrl,
-  //         createdAt: new Date().toISOString(),
-  //       };
-
-  //       setMessages((prev) => [...prev, newMsg]);
-  //       console.log('Video uploaded successfully:', videoUrl);
-
-  //     } catch (err) {
-  //       console.log('Error uploading video:', err);
-  //       Alert.alert('Error', 'Failed to upload video');
-  //     }
-  //   }
-  // };
-
+  
   const base64ToBlob = (base64Data, contentType = '', sliceSize = 512) => {
     const byteCharacters = atob(base64Data); // decode base64
     const byteArrays = [];
@@ -1199,9 +1280,11 @@ useEffect(() => {
   messages={messages}
   currentUserId={userId}
   currentUserAvatar={currentUser?.avatar}
-   otherUserAvatar={otherUser?.avatar}// ✅ this is fine
+  otherUserAvatar={otherUser?.avatar}
+  handlePressEmoji={handlePressEmoji}  // ✅ Correct prop name
   onMessageLongPress={handleMessageLongPress}
 />
+
   )}
 
 
@@ -1298,7 +1381,20 @@ useEffect(() => {
   >
     <Text style={styles.modalButtonText}>Reply</Text>
   </TouchableOpacity>
-
+ <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }}>
+                                {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
+                                    <TouchableOpacity
+                                        key={emoji}
+                                        onPress={() => {
+                                            const type = emojiToType[emoji];
+                                            handleReact(selectedMessage, type);
+                                            setModalVisible(false);
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
 
   </>
 )}
@@ -1379,7 +1475,56 @@ useEffect(() => {
 </Modal>
 
  
+<Modal
+  visible={reactDetailModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setReactDetailModalVisible(false)}
+>
+                   <View style={styles.reactModalBackground}>
+    <View style={styles.reactModalContainer}>
+      {/* Header */}
+      <View style={styles.reactModalHeader}>
+        <Text style={styles.reactModalTitle}>Cảm xúc về tin nhắn</Text>
+        <TouchableOpacity onPress={() => setReactDetailModalVisible(false)}>
+          <Image source={require('../icons/Close.png')} style={styles.reactModalClose} />
+        </TouchableOpacity>
+      </View>
+      
+<FlatList
+  data={selectedReactors}
+  keyExtractor={(item, index) => `${item.name}-${index}`}
+  renderItem={({ item }) => {
+    const emojiMap = {
+      1: '❤️',
+      2: '😂',
+      3: '😢',
+      4: '👍',
+      5: '👎',
+      6: '😮',
+    };
+    const emoji = emojiMap[item.type];
 
+    return (
+      <TouchableOpacity style={styles.reactorRow}>
+        <Image
+          source={item.avatar ? { uri: item.avatar } : AvatarImage}
+          style={styles.reactorAvatar}
+        />
+        <View style={styles.reactorInfo}>
+          <Text style={styles.reactorName}>{item.name || "Unknown"}</Text>
+          <Text style={styles.reactorSubtitle}>Nhấp để gỡ</Text>
+        </View>
+        <Text style={styles.reactorHeart}>{emoji}</Text>
+      </TouchableOpacity>
+    );
+  }}
+/>
+
+
+                        </View>
+                    </View>
+                </Modal>
     </View>
   );
 }
@@ -1618,5 +1763,139 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#777",
   },
+
+      reactModalContainer: {
+        backgroundColor: "#fff",
+        padding: 20,
+        borderRadius: 10,
+        width: "80%",
+        maxHeight: "70%",
+    },
+    reactModalTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        marginBottom: 15,
+        textAlign: "center",
+    },
+    reactorItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    reactorInfo: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    emojiLarge: {
+        fontSize: 24,
+        marginRight: 10,
+    },
+    reactorName: {
+        fontSize: 16,
+    },
+    removeButton: {
+        backgroundColor: "#f0f0f0",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+    },
+    removeButtonText: {
+        color: "#666",
+        fontSize: 14,
+    },
+    closeButton: {
+        backgroundColor: "#086DC0",
+        paddingVertical: 10,
+        borderRadius: 5,
+        marginTop: 15,
+        alignItems: "center",
+    },
+    closeButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+        modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { width: '80%', backgroundColor: 'white', padding: 20, borderRadius: 10 },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+    reactorItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+    reactModalBackground: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.4)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+reactModalContainer: {
+  width: '90%',
+  maxHeight: '70%',
+  backgroundColor: '#fff',
+  borderRadius: 10,
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+},
+reactModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+reactModalTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+},
+reactModalClose: {
+  width: 20,
+  height: 20,
+  tintColor: '#333',
+},
+reactTabs: {
+  flexDirection: 'row',
+  borderBottomWidth: 1,
+  borderBottomColor: '#eee',
+  marginBottom: 8,
+},
+reactTab: {
+  flex: 1,
+  alignItems: 'center',
+  paddingVertical: 8,
+},
+reactTabText: {
+  fontSize: 14,
+  color: '#086DC0',
+  fontWeight: '600',
+},
+reactorRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+reactorAvatar: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  marginRight: 12,
+},
+reactorInfo: {
+  flex: 1,
+},
+reactorName: {
+  fontSize: 16,
+  color: '#333',
+},
+reactorSubtitle: {
+  fontSize: 12,
+  color: '#888',
+  marginTop: 2,
+},
+reactorHeart: {
+  width: 24,
+  height: 24,
+  tintColor: '#E0245E',
+},
 
 });

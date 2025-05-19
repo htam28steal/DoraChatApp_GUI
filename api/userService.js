@@ -16,7 +16,7 @@ const UserService = {
             const response = await api.get(`/api/users/search/id/${userId}`);
             return response.data;
         } catch (error) {
-            console.error('Lỗi khi lấy user theo số điện thoại:', error);
+            console.error('Lỗi khi lấy user :', error);
             throw error;
         }
     }
