@@ -713,30 +713,59 @@ const handleGetMember = async (memberId) => {
 
 
     
-    const handlePressEmoji = async (msg) => {
-  console.log("💬 Message for reaction modal:", msg);
-
+const handlePressEmoji = async (msg) => {
   try {
-const reactors = msg.reacts.map(react => {
-     // react.memberId may be either the object or just an ID string
-     if (typeof react.memberId === 'object') {
-       return {
-         name: react.memberId.name,
-         avatar: react.memberId.avatar,
-         type: react.type
-       };
-     } else {
-       // fallback if it's just an ID (shouldn't happen here)
-       return { name: "Unknown", avatar: null, type: react.type };
-     }
-});
-    console.log("🎉 Final reactors:", reactors);
+    const reactors = await Promise.all(
+      msg.reacts.map(async (react) => {
+        // Step 1: Extract the memberId
+        const memberId = typeof react.memberId === "object"
+          ? react.memberId._id
+          : react.memberId;
+
+        // Step 2: Lookup in conversation.members to find userId
+        const matchedMember = conversation.members.find(
+          (m) => m._id === memberId
+        );
+
+        const userId = matchedMember?.userId;
+
+        if (!userId) {
+          console.warn("❌ Cannot find userId for memberId:", memberId);
+          return {
+            name: "Unknown",
+            avatar: null,
+            type: react.type,
+          };
+        }
+
+        // Step 3: Try fetching full user data from userId
+        try {
+          const user = await UserService.getUserById(userId);
+          return {
+            name: user.name,
+            avatar: user.avatar,
+            type: react.type,
+          };
+        } catch (err) {
+          console.warn("❌ Failed to fetch user info for userId:", userId);
+          return {
+            name: "Unknown",
+            avatar: null,
+            type: react.type,
+          };
+        }
+      })
+    );
+
+    console.log("✅ Final reactors:", reactors);
     setSelectedReactors(reactors);
     setReactDetailModalVisible(true);
   } catch (err) {
-    console.error("❌ Failed in handlePressEmoji:", err);
+    console.error("❌ handlePressEmoji failed:", err);
+    Alert.alert("Lỗi", "Không thể hiển thị chi tiết cảm xúc.");
   }
 };
+
 
 
     const handleReact = async (message, reactType) => {
