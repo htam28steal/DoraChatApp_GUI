@@ -773,6 +773,8 @@ const headerStyles = StyleSheet.create({
  */
 export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from route parameters.
+  const [channelsList, setChannelsList] = useState([]);
+
   
       const [selectedReactors, setSelectedReactors] = useState([]);
       const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
@@ -1155,19 +1157,80 @@ const handleReadMessage = async () => {
 
 
 
-
 const openForwardModal = async () => {
   try {
-    const { data } = await axios.get("/api/conversations");
-    console.log("🔍 all conversations:", data);
-    setConversationsList(data);
+    const { data: conversations } = await axios.get("/api/conversations");
+    console.log("Fetched all conversations:", conversations);
+
+    // split out groups vs. private
+    const groupConvs   = conversations.filter(c => c.type === true);
+    const privateConvs = conversations.filter(c => c.type !== true);
+
+    // 1️⃣ build group→channels list exactly as you had it
+    const channelPromises = groupConvs.map(async (conv) => {
+      try {
+        const { data: channels } = await axios.get(`/api/channels/${conv._id}`);
+        return channels.map(ch => ({
+          _id:         ch._id,
+          type:        "channel",
+          channelName: ch.name,
+          groupName:   conv.name,
+          groupAvatar: conv.avatar,
+        }));
+      } catch (err) {
+        console.error(`Failed to load channels for group ${conv._id}`, err);
+        return [];
+      }
+    });
+
+    // 2️⃣ build private chats list by fetching:
+    //   • the user’s actual profile (to get real name & avatar)
+    //   • the member-record (to get their conversation-alias)
+    const privatePromises = privateConvs.map(async (conv) => {
+      // find the “other” member
+      const otherM = conv.members.find(m => m.userId !== userId);
+      if (!otherM) return null;
+
+      // fetch their member record (alias)
+      const memberRes = await axios.get(`/api/members/${conv._id}/${otherM.userId}`);
+      const memberRec = memberRes.data.data;            // { name: "Tran Tam", ... }
+
+      // fetch the actual user record
+      const userRec   = await UserService.getUserById(otherM.userId);  
+      // { name: "Quang Hoang", avatar: "..." }
+
+      return {
+        _id:         conv._id,
+        type:        "private",
+        channelName: userRec.name,        // real name on top
+        groupName:   memberRec.name,      // alias below
+        groupAvatar: userRec.avatar,
+      };
+    });
+
+    const [allGroupChannels, allPrivate] = await Promise.all([
+      Promise.all(channelPromises),
+      Promise.all(privatePromises),
+    ]);
+
+    const fullList = [
+      // filter out any nulls
+      ...allPrivate.filter(Boolean),
+      ...allGroupChannels.flat(),
+    ];
+
+    console.log("Full forward list:", fullList);
+    setConversationsList(fullList);
     setModalVisible(false);
     setForwardModalVisible(true);
   } catch (err) {
-    console.error("Error fetching conversations:", err);
-    Alert.alert("Lỗi lấy cuộc trò chuyện", err.message);
+    console.error("Error fetching conversations/channels:", err);
+    Alert.alert("Lỗi", err.message);
   }
 };
+
+
+
 
 useEffect(() => {
   const fetchOther = async () => {
@@ -1788,51 +1851,39 @@ selectedMessage?.isPinned
 
 
       {/* Conversation list */}
-      <FlatList
-        data={conversationsList}   // filter by forwardQuery
-        keyExtractor={c => c._id}
-        style={styles.forwardList}
-        renderItem={({ item: conv }) => {
-          const isSelected = conv._id === selectedForwardId;
-          // determine title & subtitle...
-              // ── derive title & avatarUri ──
-    const isGroup = conv.type === true;
-    let title, avatarUri;
-    if (isGroup) {
-      title     = conv.name;
-      avatarUri = conv.avatar;
-    } else {
-      // private chat: find the “other” member
-      const other = conv.members.find(m => m.userId !== userId);
-      title     = other?.name   || "Unknown";
-      avatarUri = other?.avatar || null;
-    }
-
-          return (
-            <TouchableOpacity
+<FlatList
+  data={conversationsList}
+  keyExtractor={item => item._id}
+  style={styles.forwardList}
+  renderItem={({ item }) => {
+    const isSelected = item._id === selectedForwardId;
+    return (
+      <TouchableOpacity
         style={styles.forwardRow}
-        onPress={() => setSelectedForwardId(conv._id)}
+        onPress={() => setSelectedForwardId(item._id)}
       >
         <Image
-          source={avatarUri ? { uri: avatarUri } : AvatarImage}
+          source={item.groupAvatar ? { uri: item.groupAvatar } : AvatarImage}
           style={styles.forwardAvatar}
         />
         <View style={styles.forwardText}>
-          <Text style={styles.forwardName}>{title}</Text>
-          {isGroup && conv.description && (
-            <Text style={styles.forwardDesc}>{conv.description}</Text>
+          {/* top line: channelName (user name or channel name) */}
+          <Text style={styles.forwardName}>{item.channelName}</Text>
+          {/* bottom line: for private → member alias; for group→ group name */}
+          {item.groupName && (
+            <Text style={styles.forwardDesc}>{item.groupName}</Text>
           )}
         </View>
-      <View style={styles.radioWrapper}>
-        <View style={styles.radioOuter}>
-          {isSelected && <View style={styles.radioInner} />}
+        <View style={styles.radioWrapper}>
+          <View style={styles.radioOuter}>
+            {isSelected && <View style={styles.radioInner} />}
+          </View>
         </View>
-      </View>
-        
       </TouchableOpacity>
-          );
-        }}
-      />
+    );
+  }}
+/>
+
 
       {/* Send button */}
       <TouchableOpacity
