@@ -1176,6 +1176,7 @@ const openForwardModal = async () => {
           channelName: ch.name,
           groupName:   conv.name,
           groupAvatar: conv.avatar,
+          groupId:     conv._id,
         }));
       } catch (err) {
         console.error(`Failed to load channels for group ${conv._id}`, err);
@@ -1387,21 +1388,43 @@ useEffect(() => {
     setModalVisible(false);
   };
 
-const handleSelectConversationToForward = async (convId) => {
-  try {
-    await axios.post("/api/messages/text", {
-      conversationId: convId,
-      content: selectedMessage.content,
-      type: selectedMessage.type,
-      fileName: selectedMessage.fileName,
-    });
+// At the bottom of your ChatScreen component, replace your
+// existing handleSelectConversationToForward with this:
 
+// replace your old handleSelectConversationToForward with this:
+
+const handleSelectConversationToForward = async (selectedId) => {
+  try {
+    const item = conversationsList.find(i => i._id === selectedId);
+    if (!item) throw new Error("Không tìm thấy cuộc trò chuyện.");
+
+    // build the payload
+    const body = {
+      conversationId: item.type === "channel" ? item.groupId : item._id,
+      channelId:      item.type === "channel" ? item._id     : null,
+      content:        selectedMessage.content,
+      type:           selectedMessage.type,
+      fileName:       selectedMessage.fileName,
+    };
+
+    console.log("📤 Forward payload:", body);
+
+    const res = await axios.post("/api/messages/text", body);
+
+    console.log("📥 Forward response:", res.data);
   } catch (err) {
+    // log everything we can from the AxiosError
+    console.error("🔄 Forward error:", err);
+    if (err.response) {
+      console.error("➡️ Status:", err.response.status);
+      console.error("➡️ Response body:", err.response.data);
+    }
     Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
   } finally {
     setForwardModalVisible(false);
   }
 };
+
 
 
   // Delete action: Remove the message from local state.
