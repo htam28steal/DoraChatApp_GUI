@@ -881,6 +881,11 @@ const handlePinMessages = async (message) => {
     await axios.post("/api/pin-messages", payload);
 
     const refreshed = await handlePinnedMessages();
+
+    socket.emit(SOCKET_EVENTS.PIN_MESSAGE, {
+  conversationId,
+  messageId: message._id,
+});
     setPinnedMessages(refreshed);
     // Update UI
 setMessages((prevMessages) =>
@@ -888,7 +893,10 @@ setMessages((prevMessages) =>
     refreshed.some((p) => p.messageId === msg._id)
       ? { ...msg, isPinned: true }
       : msg
+
+      
   )
+  
 );
   } catch (err) {
     console.error("❌ Error during pin request:", err);
@@ -929,7 +937,12 @@ if (!pinnedById || pinnedById !== memberId) {
 
     // Step 4: Refresh UI
     const refreshed = await handlePinnedMessages();
+    socket.emit(SOCKET_EVENTS.UNPIN_MESSAGE, {
+  conversationId,
+  messageId: message._id,
+});
     setPinnedMessages(refreshed);
+
     setMessages((prev) =>
       prev.map((msg) =>
         refreshed.some((p) => p.messageId === msg._id)
@@ -1751,69 +1764,91 @@ selectedMessage?.isPinned
   animationType="slide"
   onRequestClose={() => setForwardModalVisible(false)}
 >
-  <View style={styles.modalOverlay}>
-    <View style={styles.classifyModal}>
-      <Text style={styles.manageTitle}>Chọn cuộc trò chuyện</Text>
+  <View style={styles.forwardOverlay}>
+    <View style={styles.forwardModal}>
+      {/* Header */}
+      <View style={styles.forwardHeader}>
+        <Text style={styles.forwardTitle}>Chuyển tiếp tới</Text>
+        <Text style={styles.forwardSubtitle}>
+          Chọn nơi bạn muốn chia sẻ tin nhắn này.
+        </Text>
+
+          <TouchableOpacity
+    onPress={() => setForwardModalVisible(false)}
+    style={styles.closeModalButton}
+  >
+    <Image
+      source={require('../icons/Close.png')} // Replace with your close icon path
+      style={styles.closeModalIcon}
+    />
+  </TouchableOpacity>
+
+      </View>
+
+
+
+      {/* Conversation list */}
       <FlatList
-        data={conversationsList}
-        keyExtractor={(c) => c._id}
+        data={conversationsList}   // filter by forwardQuery
+        keyExtractor={c => c._id}
+        style={styles.forwardList}
         renderItem={({ item: conv }) => {
-          console.log("🔸 render conv:", conv);
-
-               const isGroup = conv.type === true;
-      let title, avatarUri;
-
-      if (isGroup) {
-        // group chat
-        title = conv.name;
-        avatarUri = conv.avatar;
-      } else {
-        // private chat: use the `userId` from state, not `currentUserId`
-        const other = conv.members.find(m => m.userId !== userId);
-        console.log("   private-other:", other);
-        title = other?.name ?? "Unknown";
-        avatarUri = other?.avatar;
-      }
           const isSelected = conv._id === selectedForwardId;
+          // determine title & subtitle...
+              // ── derive title & avatarUri ──
+    const isGroup = conv.type === true;
+    let title, avatarUri;
+    if (isGroup) {
+      title     = conv.name;
+      avatarUri = conv.avatar;
+    } else {
+      // private chat: find the “other” member
+      const other = conv.members.find(m => m.userId !== userId);
+      title     = other?.name   || "Unknown";
+      avatarUri = other?.avatar || null;
+    }
+
           return (
             <TouchableOpacity
-              style={styles.classifyRow}
-              onPress={() => {
-                console.log("→ selected conversation:", conv._id);
-                setSelectedForwardId(conv._id);
-              }}
-            >
-              <Image
-                source={avatarUri ? { uri: avatarUri } : AvatarImage}
-                style={styles.friendAvatar}
-              />
-              <Text style={styles.classifyLabel}>{title}</Text>
-              <View
-                style={[
-                  styles.checkbox,
-                  isSelected && styles.checkboxSelected,
-                ]}
-              >
-                {isSelected && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-            </TouchableOpacity>
+        style={styles.forwardRow}
+        onPress={() => setSelectedForwardId(conv._id)}
+      >
+        <Image
+          source={avatarUri ? { uri: avatarUri } : AvatarImage}
+          style={styles.forwardAvatar}
+        />
+        <View style={styles.forwardText}>
+          <Text style={styles.forwardName}>{title}</Text>
+          {isGroup && conv.description && (
+            <Text style={styles.forwardDesc}>{conv.description}</Text>
+          )}
+        </View>
+      <View style={styles.radioWrapper}>
+        <View style={styles.radioOuter}>
+          {isSelected && <View style={styles.radioInner} />}
+        </View>
+      </View>
+        
+      </TouchableOpacity>
           );
         }}
       />
 
+      {/* Send button */}
       <TouchableOpacity
         style={[
-          styles.confirmButton,
-          !selectedForwardId && { opacity: 0.5 },
+          styles.forwardSend,
+          !selectedForwardId && { opacity: 0.5 }
         ]}
         disabled={!selectedForwardId}
         onPress={() => handleSelectConversationToForward(selectedForwardId)}
       >
-        <Text style={styles.confirmText}>Chuyển tiếp</Text>
+        <Text style={styles.forwardSendText}>Chuyển tiếp</Text>
       </TouchableOpacity>
     </View>
   </View>
 </Modal>
+
 
  
 <Modal
@@ -2300,5 +2335,128 @@ reactorHeart: {
     textAlign: 'center',
     color: '#333',
   },
+// overlay to dim background
+forwardOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.6)",
+  justifyContent: "center",
+  alignItems: "center",
+},
+// the white card
+forwardModal: {
+  width: "90%",
+  maxHeight: "80%",
+  backgroundColor: "#fff",
+  borderRadius: 8,
+  padding: 16,
+},
+forwardHeader: {
+  marginBottom: 12,
+},
+forwardTitle: {
+  color: "#000",
+  fontSize: 18,
+  fontWeight: "600",
+},
+forwardSubtitle: {
+  color: "#AAA",
+  fontSize: 12,
+  marginTop: 4,
+},
+
+
+forwardList: {
+  flexGrow: 0,
+  marginBottom: 12,
+},
+forwardRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingVertical: 10,
+},
+forwardAvatar: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+},
+forwardText: {
+  flex: 1,
+  marginLeft: 12,
+},
+forwardName: {
+  color: "#000",
+  fontSize: 16,
+},
+forwardDesc: {
+  color: "#AAA",
+  fontSize: 12,
+  marginTop: 2,
+},
+forwardCheckbox: {
+  width: 20,
+  height: 20,
+  borderWidth: 2,
+  borderColor: "#72767D",
+  borderRadius: 4,
+  justifyContent: "center",
+  alignItems: "center",
+},
+forwardCheckboxSelected: {
+  backgroundColor: "#5865F2",
+  borderColor: "#5865F2",
+},
+checkmark: {
+  color: "#FFF",
+  fontSize: 14,
+  lineHeight: 14,
+},
+forwardSend: {
+  backgroundColor: "#086DC0",
+  borderRadius: 24,
+  paddingVertical: 10,
+  alignItems: "center",
+},
+forwardSendText: {
+  color: "#FFF",
+  fontSize: 16,
+  fontWeight: "600",
+},
+radioWrapper: {
+  paddingLeft: 12,
+  paddingRight: 4,
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+radioOuter: {
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  borderWidth: 2,
+  borderColor: "#086DC0",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+radioInner: {
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: "#086DC0",
+},
+closeModalButton: {
+  position: "absolute",
+  top: 0,
+  right: 0,
+  padding: 6,
+  zIndex: 10,
+},
+
+closeModalIcon: {
+  width: 20,
+  height: 20,
+  tintColor: "#FF0000", // Optional: match your theme
+  resizeMode: "contain",
+},
 
 });
