@@ -809,6 +809,33 @@ const [allMessages, setAllMessages] = useState([]);
 const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
 const [hasMore, setHasMore] = useState(true);
 
+
+  const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
+    if (convId !== conversationId) return;
+    // update pinnedMessages list
+    setPinnedMessages(prev => [...prev, { messageId }]);
+    // mark that message is pinned in your message list
+    setMessages(prev =>
+      prev.map(m => m._id === messageId
+        ? { ...m, isPinned: true }
+        : m
+      )
+    );
+  }, [conversationId]); 
+
+    const handleUnpinSocket = useCallback(({ conversationId: convId, messageId }) => {
+    if (convId !== conversationId) return;
+    // remove from pinnedMessages
+    setPinnedMessages(prev => prev.filter(p => p.messageId !== messageId));
+    // mark that message is no longer pinned
+    setMessages(prev =>
+      prev.map(m => m._id === messageId
+        ? { ...m, isPinned: false }
+        : m
+      )
+    );
+  }, [conversationId]);
+
 useEffect(() => {
   const fetchPinnedMessages = async () => {
     try {
@@ -1556,6 +1583,8 @@ socket.emit(SOCKET_EVENTS.JOIN, userId);
 
 // 2. When entering a chat screen
 socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
+    socket.on(SOCKET_EVENTS.PIN_MESSAGE,   handlePinSocket);
+    socket.on(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinSocket);
 
     socket.on(SOCKET_EVENTS.REACT_TO_MESSAGE, reactUpdateHandler); 
 
@@ -1564,8 +1593,11 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
     socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
     socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
       socket.off(SOCKET_EVENTS.REACT_TO_MESSAGE, reactUpdateHandler); 
+        socket.off(SOCKET_EVENTS.PIN_MESSAGE,   handlePinSocket);
+      socket.off(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinSocket);
   };
-}, [socket, conversationId, userId, recallHandler]);
+}, [socket, conversationId, userId, recallHandler,  handlePinSocket,
+    handleUnpinSocket,]);
 
 
 

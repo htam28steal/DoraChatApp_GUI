@@ -704,13 +704,6 @@ textContent: {
   fontSize: 14,
   color: '#333',
 },
-textBubble: {
-  backgroundColor: '#F2F5F8',  // Light bubble
-  padding: 12,
-  borderRadius: 12,
-  borderColor: '#e0e0e0',
-  borderWidth: 1,
-},
 
 pinnedCard: {
   backgroundColor: '#ffffff',  // Brighter card
