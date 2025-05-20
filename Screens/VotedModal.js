@@ -208,30 +208,40 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
                             </TouchableOpacity>
 
                             {opt.members?.length > 0 && (
-                                <>
-                                    {opt.members.slice(0, 2).map((member, index) => (
-                                        <View
-                                            key={index}
+                                <View style={{ flexDirection: 'row', position: 'absolute', right: 10, top: 8 }}>
+                                    {opt.members.slice(0, 2).map((member, i) => (
+                                        <Image
+                                            key={member._id}
+                                            source={{ uri: member.avatar || DEFAULT_AVATAR }}
                                             style={{
                                                 width: 25,
                                                 height: 25,
-                                                borderRadius: 50,
+                                                borderRadius: 15,
                                                 borderWidth: 1,
-                                                position: 'absolute',
-                                                right: 15 + index * 15,
-                                                top: 8,
-                                                overflow: 'hidden',
-                                                backgroundColor: '#fff',
-                                                zIndex: 2 - index,
+                                                borderColor: '#fff',
+                                                marginLeft: i === 0 ? 0 : -10,
+                                                zIndex: 10 - i
                                             }}
-                                        >
-                                            <Image
-                                                source={{ uri: member.avatar || 'https://i.pravatar.cc/300' }}
-                                                style={{ width: '100%', height: '100%' }}
-                                            />
-                                        </View>
+                                        />
                                     ))}
-                                </>
+
+                                    {opt.members.length > 2 && (
+                                        <View style={{
+                                            width: 25,
+                                            height: 25,
+                                            borderRadius: 15,
+                                            backgroundColor: '#e0e0e0',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            marginLeft: -10,
+                                            borderWidth: 1,
+                                            borderColor: '#fff',
+                                            zIndex: 8
+                                        }}>
+                                            <Text style={{ fontSize: 10 }}>+{opt.members.length - 2}</Text>
+                                        </View>
+                                    )}
+                                </View>
                             )}
                         </View>
                     ))}

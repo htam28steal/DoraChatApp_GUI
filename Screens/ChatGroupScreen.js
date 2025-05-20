@@ -36,6 +36,7 @@ import VotedModal from './VotedModal';
 import VoiceRecordModal from "./VoiceRecordModal";
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import AddNewChannel from './AddChannelModal';
 
 
 const AvatarImage = require("../Images/avt.png");
@@ -48,7 +49,7 @@ const EmojiIcon = require("../icons/emoji.png");
 const SendIcon = require("../icons/send.png");
 const Return = require("../icons/back.png");
 const MicIcon = require("../icons/mic.png");
-
+const addChannel = require("../icons/addChannel.png")
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
@@ -261,10 +262,8 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                                             <Text style={messageItemStyles.optionText}>{opt.name}</Text>
                                         </TouchableOpacity>
 
-                                        {/* Avatars của các member đã vote vào option này */}
                                         {opt.members?.length > 0 && (
                                             <View style={{ flexDirection: 'row', position: 'absolute', right: 10, top: 8 }}>
-                                                {/* Hiển thị tối đa 2 người đầu tiên */}
                                                 {opt.members.slice(0, 2).map((member, i) => (
                                                     <Image
                                                         key={member._id}
@@ -281,7 +280,6 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                                                     />
                                                 ))}
 
-                                                {/* Hiển thị số lượng còn lại nếu có */}
                                                 {opt.members.length > 2 && (
                                                     <View style={{
                                                         width: 25,
@@ -361,17 +359,26 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                         style={messageItemStyles.reactContainer}
                         onPress={() => handlePressEmoji(msg)}
                     >
-                        {msg.reacts.map((react, idx) => {
-                            const emoji = emojiMap[react.type];
-                            return emoji ? (
-                                <Text key={idx} style={messageItemStyles.emojiText}>
-                                    {emoji}
+                        {Object.entries(
+                            msg.reacts.reduce((acc, react) => {
+                                const emoji = emojiMap[react.type];
+                                if (emoji) {
+                                    acc[react.type] = (acc[react.type] || 0) + 1;
+                                }
+                                return acc;
+                            }, {})
+                        ).map(([type, count]) => (
+                            <View key={type} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 4 }}>
+                                <Text style={messageItemStyles.emojiText}>
+                                    {emojiMap[type]}
                                 </Text>
-                            ) : null;
-                        })}
-                        <Text style={messageItemStyles.reactCount}>
-                            {msg.reacts.length}
-                        </Text>
+                                {count > 1 && (
+                                    <Text style={messageItemStyles.reactCount}>
+                                        {count}
+                                    </Text>
+                                )}
+                            </View>
+                        ))}
                     </TouchableOpacity>
                 )}
                 {showTime && (
@@ -712,14 +719,13 @@ export default function ChatScreen({ route, navigation }) {
     const [pinnedMessages, setPinnedMessages] = useState([]);
     const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
     const [selectedReactors, setSelectedReactors] = useState([]);
-
     const [showVoteModal, setVoteShowModal] = useState(false);
-
     const [showVotedModal, setVotedModal] = useState(false);
-
     const [memberId, setMemberId] = useState(null);
-
     const [showRecordModal, setRecordModal] = useState(false);
+
+    const [showAddChannel, setShowAddChannel] = useState(false);
+
 
 
     const emojiToType = {
@@ -803,12 +809,10 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    // useEffect vẫn gọi lần đầu khi conversationId thay đổi
     useEffect(() => {
         fetchAllMessages();
     }, [conversationId]);
 
-    // Lấy ID của channel đầu tiên
     const firstChannelId = channels.length > 0 ? channels[0]._id : null;
     console.log("First Channel ID:", firstChannelId);
 
@@ -976,12 +980,12 @@ export default function ChatScreen({ route, navigation }) {
 
     const pinnedMessageStyles = StyleSheet.create({
         container: {
-            width: '100%',
+            width: '60%',
             minHeight: 60,
             backgroundColor: 'white',
-            borderBottomWidth: 1,
-            borderColor: '#ccc',
             padding: 8,
+            backgroundColor: "#D8EDFF",
+
         },
         title: {
             fontSize: 12,
@@ -1010,11 +1014,21 @@ export default function ChatScreen({ route, navigation }) {
         }
     });
 
+    const checkaddChannel = async (conversation, memberId) => {
+        conversation.managerIds.forEach(id => {
+            console.log('ID:', id);
+        });
+        console.log(`kkkkkkk`, memberId.toString());
+        console.log(`cccc`, conversation.managerIds.some(id => id === memberId.toString()))
 
+        return conversation.managerIds.some(id => id.toString() === memberId.toString());
+    };
 
-    function HeaderSingleChat({ handleDetail }) {
+    function HeaderSingleChat({ handleAddChannel, checkaddChannel }) {
         const navigation = useNavigation();
         const [localPinnedMessages, setLocalPinnedMessages] = useState([]);
+
+        console.log(`HEADER NÈ `, checkaddChannel(conversation, memberId))
 
         useEffect(() => {
             if (channels.length > 0) {
@@ -1066,21 +1080,28 @@ export default function ChatScreen({ route, navigation }) {
                 </View>
 
                 <View style={headerStyles.channelsContainer}>
-                    {channels.map((channel) => (
-                        <TouchableOpacity
-                            key={channel._id}
-                            onPress={() => setCurrentChannelId(channel._id)}
-                            style={[
-                                headerStyles.channelButton,
-                                currentChannelId === channel._id && headerStyles.channelSelected
-                            ]}
-                        >
-                            <Text style={headerStyles.channelText}>{channel.name}</Text>
-                        </TouchableOpacity>
-                    ))}
+                    <View style={{ width: 200, height: '100%' }}>
+                        <ScrollView horizontal={true} style={{ width: '100%', maxHeight: 300, flexDirection: 'row', }}>
+                            {channels.map((channel) => (
+                                <TouchableOpacity
+                                    key={channel._id}
+                                    onPress={() => setCurrentChannelId(channel._id)}
+                                    style={[
+                                        headerStyles.channelButton,
+                                        currentChannelId === channel._id && headerStyles.channelSelected
+                                    ]}
+                                >
+                                    <Text style={headerStyles.channelText}>{channel.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                    {checkaddChannel(conversation, memberId) && (
+                        <TouchableOpacity style={{ position: 'absolute', right: 5, top: 10, }} onPress={() => { handleAddChannel('123') }}><Image source={addChannel} style={{ height: 20, width: 20 }} /></TouchableOpacity>
+                    )}
                 </View>
-                <TouchableOpacity style={[{ width: '100%' }]}>
-                    <PinnedMessagesSection pinnedMessages={lastMessage} />
+                <TouchableOpacity style={[{ width: '100%', color: "black", display: 'flex' }]}>
+                    <PinnedMessagesSection pinnedMessages={lastMessage} style={{ backgroundColor: 'black' }} />
                 </TouchableOpacity>
 
             </View>
@@ -1126,7 +1147,10 @@ export default function ChatScreen({ route, navigation }) {
         statusText: { fontSize: 14, marginLeft: 6, color: "#333" },
 
         channelsContainer: {
+            display: 'flex',
             flexDirection: 'row',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
             flexWrap: 'wrap',
             marginTop: 10,
         },
@@ -1137,6 +1161,7 @@ export default function ChatScreen({ route, navigation }) {
             borderRadius: 15,
             marginRight: 8,
             marginBottom: 8,
+            alignItems: 'center'
         },
         channelSelected: {
             backgroundColor: '#086DC0',
@@ -1612,6 +1637,14 @@ export default function ChatScreen({ route, navigation }) {
         fetchMemberId();
     }, [conversationId, userId]);
 
+
+
+    const handleCreateChannel = (channelName) => {
+
+
+        setShowAddChannel(true);
+    };
+
     return (
 
         <View style={chatScreenStyles.container}>
@@ -1620,7 +1653,10 @@ export default function ChatScreen({ route, navigation }) {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
-                <HeaderSingleChat />
+                <HeaderSingleChat
+                    handleAddChannel={handleCreateChannel}
+                    checkaddChannel={checkaddChannel}
+                />
                 <View style={chatScreenStyles.chatContainer}>
                     <ChatBox
                         messages={messages}
@@ -1670,6 +1706,12 @@ export default function ChatScreen({ route, navigation }) {
                     conversationId={conversationId}
                     channelId={currentChannelId}
                     onSendRecord={(uri) => console.log('File ghi âm:', uri)}
+                />
+
+                <AddNewChannel
+                    visible={showAddChannel}
+                    onCancel={() => setShowAddChannel(false)}
+                    onCreate={handleCreateChannel}
                 />
 
                 <Modal
