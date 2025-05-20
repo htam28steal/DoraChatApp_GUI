@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, forwardRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import {
   View,
   Text,
@@ -50,27 +50,50 @@ const screenWidth = Dimensions.get("window").width;
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-function MessageItem({
-  msg,
-  showAvatar,
-  showTime,
-  currentUserId,
-  onLongPress,
-  currentUserAvatar,
-  otherUserAvatar, 
+const MessageItem = forwardRef(function MessageItem(
+  props,
+  ref
+) {
+  const {
+    msg,
+    showAvatar,
+    showTime,
+    currentUserId,
+    onLongPress,
+    currentUserAvatar,
+    otherUserAvatar,
     allMessages,
-    onReplyPress
-}) {
+    onReplyPress,
+    handlePressEmoji,
+    onMediaLoad,
+  } = props;
 
 
 
   
 
- const [imgLoading, setImgLoading] = useState(false);
+const [imgLoading, setImgLoading] = useState(true);
+
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
-  const Container = onLongPress ? TouchableOpacity : View;
+      const emojiMap = {
+        1: '❤️',
+        2: '😂',
+        3: '😢',
+        4: '👍',
+        5: '👎',
+        6: '😮',
+    };
+  const innerRef = useRef();
+
+  useImperativeHandle(ref, () => ({
+    measureLayout: (...args) => {
+      if (innerRef.current?.measureLayout) {
+        innerRef.current.measureLayout(...args);
+      }
+    },
+  }));
 
 
   const repliedMsg = msg.replyMessageId
@@ -139,15 +162,22 @@ function MessageItem({
     }
   };
 
+const Container = onLongPress ? TouchableOpacity : View;
+
   return (
-    <Container
-      onLongPress={onLongPress}
-      activeOpacity={0.7}
-      style={[
-        messageItemStyles.container,
-        isMe ? messageItemStyles.rightAlign : messageItemStyles.leftAlign,
-      ]}
-    >
+     <Container
+       onLongPress={onLongPress}
+       activeOpacity={0.7}
+     >
+        <View
+        ref={innerRef}
+         style={[
+           messageItemStyles.container,
+           msg.memberId.userId === currentUserId
+             ? messageItemStyles.rightAlign
+             : messageItemStyles.leftAlign,
+         ]}
+       >
 {showAvatar ? (
   <Image
     source={
@@ -169,6 +199,13 @@ function MessageItem({
 
 
       <View style={messageItemStyles.contentContainer}>
+        {msg.isPinned && (
+  <View style={messageItemStyles.pinnedContainer}>
+
+    <Text style={messageItemStyles.pinnedLabel}> 📌  Pinned</Text>
+  </View>
+)}
+
         {repliedMsg && (
           // wrap the quote in its own TouchableOpacity
           <TouchableOpacity
@@ -188,6 +225,7 @@ function MessageItem({
             </Text>
           </TouchableOpacity>
         )}
+
 
 {msg.replyTo && (
   <View style={messageItemStyles.replyContainer}>
@@ -212,20 +250,24 @@ function MessageItem({
 )}
 
         
-        {msg.type === "IMAGE" ? (
-           <View style={{ position: "relative" }}>
-      {imgLoading && (
-        <View style={[messageItemStyles.imageContent, styles.placeholder]}>
-          <ActivityIndicator size="small" color="#086DC0" />
-        </View>
-      )}
-      <Image
-        source={{ uri: msg.content }}
-        style={messageItemStyles.imageContent}
-        onLoadStart={() => setImgLoading(true)}
-        onLoadEnd={() => setImgLoading(false)}
-      />
+{msg.type === "IMAGE" ? (
+ <View style={{ position: "relative" }}>
+  <Image
+    source={{ uri: msg.content }}
+    style={messageItemStyles.imageContent}
+    onLoadStart={() => setImgLoading(true)}
+    onLoadEnd={() => {
+      setImgLoading(false);
+      onMediaLoad?.();
+    }}
+  />
+  {imgLoading && (
+    <View style={messageItemStyles.imageOverlay}>
+      <ActivityIndicator size="small" color="#086DC0" />
     </View>
+  )}
+</View>
+
         ) : msg.type === "VIDEO" ? (
           <Video
             source={{ uri: content }}
@@ -233,6 +275,7 @@ function MessageItem({
             useNativeControls
             resizeMode="cover"
             isLooping={false}
+             onLoad={() => onMediaLoad?.()}
           />
         ) : msg.type === "FILE" ? (
           <TouchableOpacity
@@ -264,17 +307,36 @@ function MessageItem({
     : content}
 </Text>
         )}
+         {msg.reacts && msg.reacts.length > 0 && (
+                            <TouchableOpacity
+                                style={messageItemStyles.reactContainer}
+                                onPress={() => handlePressEmoji(msg)}
+                            >
+                                {msg.reacts.map((react, idx) => {
+                                    const emoji = emojiMap[react.type];
+                                    return emoji ? (
+                                        <Text key={idx} style={messageItemStyles.emojiText}>
+                                            {emoji}
+                                        </Text>
+                                    ) : null;
+                                })}
+                                <Text style={messageItemStyles.reactCount}>
+                                    {msg.reacts.length}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
         {showTime && (
           <Text style={[messageItemStyles.timeText, isMe && { alignSelf: "flex-end" }]}>
             {dayjs(msg.createdAt).fromNow()}
           </Text>
         )}
       </View>
+      </View>
     </Container>
   );
 }
 
-
+);
 const messageItemStyles = StyleSheet.create({
   container: {
     flexDirection: "row",
@@ -285,7 +347,7 @@ const messageItemStyles = StyleSheet.create({
   rightAlign: { flexDirection: "row-reverse" },
   avatar: { width: 40, height: 40, borderRadius: 20 },
   avatarPlaceholder: { width: 40, height: 40 },
-  contentContainer: { maxWidth: 468, marginHorizontal: 8 },
+  contentContainer: {  maxWidth: screenWidth * 0.8, marginHorizontal: 8, },
   imageContent: {
     width: 250,
     height: 250,
@@ -319,13 +381,23 @@ const messageItemStyles = StyleSheet.create({
     marginTop: 4,
     flexWrap: "wrap",
   },
-  textContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderRadius: 12,
-    fontSize: 14,
-    color: "#000",
-  },
+textContent: {
+  paddingHorizontal: 12,
+  paddingVertical: 14,
+  borderRadius: 12,
+  fontSize: 14,
+  color: "#000",
+  flexWrap: "wrap",
+  flexShrink: 1,       // <-- this lets it shrink rather than overflow
+},
+imageOverlay: {
+  ...StyleSheet.absoluteFillObject,
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "#F0F0F0",
+  borderRadius: 8,
+},
+
   videoContainer: {
     width: 250,
     height: 250,
@@ -381,57 +453,156 @@ replyTextContainer: {
     textAlign: "center",
     fontStyle:'italic'
   },
+      reactContainer: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginTop: 5,
+        alignSelf: 'flex-start',
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1,
+        elevation: 2,
+    },
+    emojiText: {
+        fontSize: 16,
+        marginRight: 2,
+    },
+    reactCount: {
+        fontSize: 12,
+        marginLeft: 4,
+        color: '#666',
+    },
+    pinnedLabel: {
+  fontSize: 12,
+  color: "#FF2D55",  // or any strong color
+  marginBottom: 4,
+  fontWeight: "bold",
+},
+pinnedContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 4,
+  gap: 4, // spacing between icon and text
+},
+
+pinIcon: {
+  width: 14,
+  height: 14,
+  resizeMode: 'contain',
+  tintColor: '#FF2D55', // optional: to match your UI theme
+},
+
+pinnedLabel: {
+  fontSize: 12,
+  color: "#FF2D55",
+  fontWeight: "bold",
+},
+
+
 });
 
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, currentUserAvatar, otherUserAvatar, onMessageLongPress }) {
+function ChatBox({
+  messages,
+  currentUserId,
+  currentUserAvatar,
+  otherUserAvatar,
+  onMessageLongPress,
+  handlePressEmoji,
+  loadMoreMessages,
+  loadingMore,
+  allMessages, 
+  scrollToMessageId
+}) {
 
 
+ const lastIdRef = useRef(messages[messages.length - 1]?._id);
+const prevLengthRef = useRef(0);
   const scrollViewRef = useRef(null);
-  const messageRefs = useRef({});
+  const messageRefs    = useRef({});
 
 // helper to jump:
 const scrollToMessage = useCallback((messageId) => {
   const item = messageRefs.current[messageId];
   if (!item || !scrollViewRef.current) return;
 
-  // measure its y offset relative to the ScrollView's inner view
-  item.measureLayout(
-    // on Android you might need `.getInnerViewNode()`
-    scrollViewRef.current.getInnerViewNode(),  
-    (x, y) => {
-      scrollViewRef.current.scrollTo({ y: y - 20, animated: true }); // -20 to give a bit of top padding
-    },
-    () => {}
-  );
+  if (item.measureLayout) {
+    item.measureLayout(
+      scrollViewRef.current, 
+      (x, y) => scrollViewRef.current.scrollTo({ y: y - 20, animated: true }),
+      () => {}
+    );
+  } else {
+    console.warn("Ref missing measureLayout for messageId:", messageId);
+  }
 }, []);
 
+
+   useEffect(() => {
+    if (scrollToMessageId && messages.length) {
+      // give the list a frame to render
+      setTimeout(() => scrollToMessage(scrollToMessageId), 50);
+    }
+  }, [scrollToMessageId, messages]);
+  
   useEffect(() => {
-    if (scrollViewRef.current)
-      scrollViewRef.current.scrollToEnd({ animated: true });
+  const newLastId = messages[messages.length - 1]?._id;
+
+  // scroll only when a brand-new message is at the bottom
+  if (newLastId && newLastId !== lastIdRef.current) {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }
+
+  lastIdRef.current = newLastId;
   }, [messages]);
 
   return (
     
-    <ScrollView
-      style={chatBoxStyles.container}
-      contentContainerStyle={chatBoxStyles.contentContainer}
-    >
+<ScrollView
+  style={chatBoxStyles.container}
+  contentContainerStyle={chatBoxStyles.contentContainer}
+  ref={scrollViewRef}
+  onScroll={({ nativeEvent }) => {
+    if (nativeEvent.contentOffset.y <= 50) {
+      loadMoreMessages();
+    }
+  }}
+  scrollEventThrottle={100}
+>
+    {loadingMore && (
+    <ActivityIndicator
+      size="small"
+      color="#086DC0"
+      style={{ marginBottom: 8 }}
+    />
+  )}
+
       {messages.map((msg, index) => {
         const userId = msg.memberId?.userId || "";
-        const prevId = messages[index - 1]?.memberId?.userId || "";
+        const prevMsg = messages[index - 1];
+        const prevId = prevMsg?.memberId?.userId || "";
         const nextId = messages[index + 1]?.memberId?.userId || "";
-        const isFirstInGroup = index === 0 || prevId !== userId;
         const isLastInGroup = index === messages.length - 1 || nextId !== userId;
         const key = `${msg._id}-${index}`;
 
+        const isFirstInGroup =
+  index === 0 ||
+  prevId !== userId ||
+  prevMsg?.type === "NOTIFY";
+
         return (
         <MessageItem
-          key={key}
+            key={msg._id}
+          ref={ref => (messageRefs.current[msg._id] = ref)}
           msg={msg}
-            allMessages={messages}
+            allMessages={allMessages}
           showAvatar={isFirstInGroup}
           showTime={isLastInGroup}
           currentUserId={currentUserId}
@@ -439,7 +610,13 @@ const scrollToMessage = useCallback((messageId) => {
            otherUserAvatar={otherUserAvatar}
 onLongPress={() => onMessageLongPress(msg)}
         onReplyPress={scrollToMessage}
-        onMessageLongPress={() => onMessageLongPress(msg)}
+
+        handlePressEmoji={handlePressEmoji}
+         onMediaLoad={() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100); // slight delay to allow layout to recalculate
+  }}
           
         />
 
@@ -527,7 +704,8 @@ const messageInputStyles = StyleSheet.create({
  */
 function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser     }) {
   const navigation = useNavigation();
-  const other = conversation.members.find(m => m.userId !== currentUserId);
+ const other = conversation.members.find(m => m.userId !== currentUserId);
+
   return (
     <View style={headerStyles.container}>
       <TouchableOpacity onPress={() => navigation.navigate("ConversationScreen")}>
@@ -538,7 +716,10 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser
         style={headerStyles.avatar}
       />
       <View style={headerStyles.infoContainer}>
-        <Text style={headerStyles.name} numberOfLines={1}>{otherUser?.name}</Text>
+        <Text style={headerStyles.name} numberOfLines={1}>
+  {other?.name}
+</Text>
+
         <View style={headerStyles.statusContainer}>
           <View style={headerStyles.statusDot} />
           <Text style={headerStyles.statusText}>Active</Text>
@@ -571,9 +752,9 @@ const headerStyles = StyleSheet.create({
     marginTop: 10,
   },
   backBtn: { width: 25, height: 20, marginRight: 20 },
-  avatar: { width: 50, height: 50, borderRadius: 35 },
+  avatar: { width: 45, height: 45, borderRadius: 35 },
   infoContainer: { marginLeft: 12, flex: 1 },
-  name: { fontSize: 15, fontWeight: "600", color: "#086DC0" },
+  name: { fontSize: 16, fontWeight: "600", color: "#086DC0" },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -592,14 +773,20 @@ const headerStyles = StyleSheet.create({
  */
 export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from route parameters.
+  const [channelsList, setChannelsList] = useState([]);
+
+  
+      const [selectedReactors, setSelectedReactors] = useState([]);
+      const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
 const [userId, setUserId] = useState(null);
-  const { conversation } = route.params;
+  const { conversation, scrollToMessageId } = route.params;
   const conversationId = conversation._id;
 const [conversationsList, setConversationsList] = useState([]);
 const [uploading, setUploading] = useState(false);
 
 const [userIdReady, setUserIdReady] = useState(false);
 const [replyTo, setReplyTo] = useState(null);
+const [pinnedMessages, setPinnedMessages] = useState([]);
 
 
 
@@ -614,6 +801,316 @@ const [replyTo, setReplyTo] = useState(null);
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
+
+
+const [loadingMore, setLoadingMore] = useState(false);
+
+
+const [allMessages, setAllMessages] = useState([]);
+
+const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
+const [hasMore, setHasMore] = useState(true);
+
+
+  const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
+    if (convId !== conversationId) return;
+    // update pinnedMessages list
+    setPinnedMessages(prev => [...prev, { messageId }]);
+    // mark that message is pinned in your message list
+    setMessages(prev =>
+      prev.map(m => m._id === messageId
+        ? { ...m, isPinned: true }
+        : m
+      )
+    );
+  }, [conversationId]); 
+
+    const handleUnpinSocket = useCallback(({ conversationId: convId, messageId }) => {
+    if (convId !== conversationId) return;
+    // remove from pinnedMessages
+    setPinnedMessages(prev => prev.filter(p => p.messageId !== messageId));
+    // mark that message is no longer pinned
+    setMessages(prev =>
+      prev.map(m => m._id === messageId
+        ? { ...m, isPinned: false }
+        : m
+      )
+    );
+  }, [conversationId]);
+
+useEffect(() => {
+  const fetchPinnedMessages = async () => {
+    try {
+      const response = await axios.get(`/api/pin-messages/${conversationId}`);
+      const pinned = response.data || [];
+
+      setPinnedMessages(pinned);
+
+      setMessages((prev) =>
+        prev.map((msg) => ({
+          ...msg,
+          isPinned: pinned.some((pin) => pin.messageId === msg._id),
+        }))
+      );
+    } catch (err) {
+      console.error("❌ Failed to fetch pinned messages:", err);
+    }
+  };
+
+  if (conversationId) {
+    fetchPinnedMessages();
+  }
+}, [conversationId]);
+
+const handlePinMessages = async (message) => {
+  if (!message) return;
+
+  try {
+    console.log("📌 Attempting to pin message:", message);
+
+    // ✅ Get memberId from backend (to avoid relying on potentially stale UI state)
+    const memberRes = await axios.get(`/api/members/${conversationId}/${userId}`);
+    const memberId = memberRes.data.data?._id;
+
+    const payload = {
+      messageId: message._id,
+      conversationId: message.conversationId,
+       pinnedBy: message.memberId._id, // ✅ safest
+    };
+
+    console.log("📦 Sending pin payload:", payload);
+
+    await axios.post("/api/pin-messages", payload);
+
+    const refreshed = await handlePinnedMessages();
+
+    socket.emit(SOCKET_EVENTS.PIN_MESSAGE, {
+  conversationId,
+  messageId: message._id,
+});
+    setPinnedMessages(refreshed);
+    // Update UI
+setMessages((prevMessages) =>
+  prevMessages.map((msg) =>
+    refreshed.some((p) => p.messageId === msg._id)
+      ? { ...msg, isPinned: true }
+      : msg
+
+      
+  )
+  
+);
+  } catch (err) {
+    console.error("❌ Error during pin request:", err);
+
+  }
+};
+const handleUnpinMessage = async (message) => {
+  if (!message || !message._id || !userId) {
+
+    return;
+  }
+
+  try {
+    // Step 1: Fetch memberId (_id) for current user
+    const res = await axios.get(`/api/members/${conversationId}/${userId}`);
+    const memberId = res.data?.data?._id;
+
+    
+
+    if (!memberId) throw new Error("Không tìm thấy thành viên.");
+
+    console.log("🔎 message.pinnedBy:", message.pinnedBy, "→ type:", typeof message.pinnedBy);
+console.log("🔎 Your memberId:", memberId);
+
+
+    // Step 2: Check if this user is the one who pinned the message
+const pinEntry = pinnedMessages.find((p) => p.messageId === message._id);
+const pinnedById = pinEntry?.pinnedBy?._id || pinEntry?.pinnedBy || null;
+
+if (!pinnedById || pinnedById !== memberId) {
+
+  return;
+}
+
+
+    // Step 3: Proceed to unpin
+    await axios.delete(`/api/pin-messages/${message._id}/${memberId}`);
+
+    // Step 4: Refresh UI
+    const refreshed = await handlePinnedMessages();
+    socket.emit(SOCKET_EVENTS.UNPIN_MESSAGE, {
+  conversationId,
+  messageId: message._id,
+});
+    setPinnedMessages(refreshed);
+
+    setMessages((prev) =>
+      prev.map((msg) =>
+        refreshed.some((p) => p.messageId === msg._id)
+          ? { ...msg, isPinned: true }
+          : { ...msg, isPinned: false }
+      )
+    );
+
+
+  } catch (err) {
+    console.error("❌ Error unpinning message:", err);
+    Alert.alert("Lỗi", err.response?.data?.message || "Không thể bỏ ghim.");
+  }
+};
+
+
+    const handlePinnedMessages = async () => {
+        try {
+            const response = await axios.get(`/api/pin-messages/${conversationId}`);
+            return response.data;
+        } catch (err) {
+            console.log(err);
+            return [];
+        }
+    };
+
+const loadMoreMessages = async () => {
+  if (loadingMore || !hasMore) return;
+
+  setLoadingMore(true);
+  try {
+    const { skip, limit } = pagination;
+    const newSkip = Math.max(0, skip - limit);
+    const more = allMessages.slice(newSkip, skip); // fetch the older batch
+
+    if (more.length === 0) {
+      setHasMore(false);
+    } else {
+      setMessages((prev) => [...more, ...prev]);
+      setPagination({ skip: newSkip, limit });
+    }
+  } catch (error) {
+    console.error("Error loading more messages:", error);
+  } finally {
+    setLoadingMore(false);
+  }
+};
+
+    const emojiToType = {
+        '❤️': 1,
+        '😂': 2,
+        '😢': 3,
+        '👍': 4,
+        '👎': 5,
+        '😮': 6,
+    };
+const handleGetMember = async (memberId) => {
+  console.log("🔍 currentUser:", currentUser?._id, "otherUser:", otherUser?._id, "looking for:", memberId);
+
+  // 1) If it’s you
+  if (currentUser && currentUser._id === memberId) {
+    return { name: currentUser.name, avatar: currentUser.avatar };
+  }
+
+  // 2) If it’s the other chat partner
+  if (otherUser && otherUser._id === memberId) {
+    return { name: otherUser.name, avatar: otherUser.avatar };
+  }
+
+  // 3) Fallback: fetch any other user by their Mongo _id
+  try {
+    const data = await UserService.getUserById(memberId);
+    console.log("✅ Fetched fallback user:", data);
+    return { name: data.name, avatar: data.avatar };
+  } catch (err) {
+    console.error("❌ Failed to fetch fallback user:", err);
+    return { name: "Unknown", avatar: null };
+  }
+};
+
+
+
+
+    
+const handlePressEmoji = async (msg) => {
+  try {
+    const reactors = await Promise.all(
+      msg.reacts.map(async (react) => {
+        // Step 1: Extract the memberId
+        const memberId = typeof react.memberId === "object"
+          ? react.memberId._id
+          : react.memberId;
+
+        // Step 2: Lookup in conversation.members to find userId
+        const matchedMember = conversation.members.find(
+          (m) => m._id === memberId
+        );
+
+        const userId = matchedMember?.userId;
+
+        if (!userId) {
+          console.warn("❌ Cannot find userId for memberId:", memberId);
+          return {
+            name: "Unknown",
+            avatar: null,
+            type: react.type,
+          };
+        }
+
+        // Step 3: Try fetching full user data from userId
+        try {
+          const user = await UserService.getUserById(userId);
+          return {
+            name: user.name,
+            avatar: user.avatar,
+            type: react.type,
+          };
+        } catch (err) {
+          console.warn("❌ Failed to fetch user info for userId:", userId);
+          return {
+            name: "Unknown",
+            avatar: null,
+            type: react.type,
+          };
+        }
+      })
+    );
+
+    console.log("✅ Final reactors:", reactors);
+    setSelectedReactors(reactors);
+    setReactDetailModalVisible(true);
+  } catch (err) {
+    console.error("❌ handlePressEmoji failed:", err);
+    Alert.alert("Lỗi", "Không thể hiển thị chi tiết cảm xúc.");
+  }
+};
+
+
+
+    const handleReact = async (message, reactType) => {
+        try {
+            const response = await axios.post('/api/messages/react', {
+                conversationId: message.conversationId,
+                messageId: message._id,
+                reactType: reactType,
+            });
+
+            // Chỉ cập nhật message được react
+            setMessages(prevMessages =>
+                prevMessages.map(m =>
+                    m._id === message._id
+                        ? { ...m, reacts: response.data?.reacts || m.reacts }
+                        : m
+                )
+            );
+            socket.emit(SOCKET_EVENTS.REACT_TO_MESSAGE, {
+  conversationId: message.conversationId,
+  messageId: message._id,
+  reactType, // optional if server handles type logic
+});
+
+        } catch (error) {
+            console.error('Failed to send react:', error.response?.data || error.message);
+        }
+    };
+
 
 const handleReplyAction = () => {
 
@@ -660,19 +1157,81 @@ const handleReadMessage = async () => {
 
 
 
-
 const openForwardModal = async () => {
   try {
-    const { data } = await axios.get("/api/conversations");
-    console.log("🔍 all conversations:", data);
-    setConversationsList(data);
+    const { data: conversations } = await axios.get("/api/conversations");
+    console.log("Fetched all conversations:", conversations);
+
+    // split out groups vs. private
+    const groupConvs   = conversations.filter(c => c.type === true);
+    const privateConvs = conversations.filter(c => c.type !== true);
+
+    // 1️⃣ build group→channels list exactly as you had it
+    const channelPromises = groupConvs.map(async (conv) => {
+      try {
+        const { data: channels } = await axios.get(`/api/channels/${conv._id}`);
+        return channels.map(ch => ({
+          _id:         ch._id,
+          type:        "channel",
+          channelName: ch.name,
+          groupName:   conv.name,
+          groupAvatar: conv.avatar,
+          groupId:     conv._id,
+        }));
+      } catch (err) {
+        console.error(`Failed to load channels for group ${conv._id}`, err);
+        return [];
+      }
+    });
+
+    // 2️⃣ build private chats list by fetching:
+    //   • the user’s actual profile (to get real name & avatar)
+    //   • the member-record (to get their conversation-alias)
+    const privatePromises = privateConvs.map(async (conv) => {
+      // find the “other” member
+      const otherM = conv.members.find(m => m.userId !== userId);
+      if (!otherM) return null;
+
+      // fetch their member record (alias)
+      const memberRes = await axios.get(`/api/members/${conv._id}/${otherM.userId}`);
+      const memberRec = memberRes.data.data;            // { name: "Tran Tam", ... }
+
+      // fetch the actual user record
+      const userRec   = await UserService.getUserById(otherM.userId);  
+      // { name: "Quang Hoang", avatar: "..." }
+
+      return {
+        _id:         conv._id,
+        type:        "private",
+        channelName: userRec.name,        // real name on top
+        groupName:   memberRec.name,      // alias below
+        groupAvatar: userRec.avatar,
+      };
+    });
+
+    const [allGroupChannels, allPrivate] = await Promise.all([
+      Promise.all(channelPromises),
+      Promise.all(privatePromises),
+    ]);
+
+    const fullList = [
+      // filter out any nulls
+      ...allPrivate.filter(Boolean),
+      ...allGroupChannels.flat(),
+    ];
+
+    console.log("Full forward list:", fullList);
+    setConversationsList(fullList);
     setModalVisible(false);
     setForwardModalVisible(true);
   } catch (err) {
-    console.error("Error fetching conversations:", err);
-    Alert.alert("Lỗi lấy cuộc trò chuyện", err.message);
+    console.error("Error fetching conversations/channels:", err);
+    Alert.alert("Lỗi", err.message);
   }
 };
+
+
+
 
 useEffect(() => {
   const fetchOther = async () => {
@@ -729,116 +1288,10 @@ const recallHandler = useCallback((data) => {
 }, []);
 
 
-useEffect(() => {
-  if (!socket || !conversationId) return;
-
-  const receiveHandler = (message) => {
-    setMessages((prev) => {
-  if (message.memberId?.userId === userId) {
-      const index = prev.findIndex(
-        (m) => m.pending && m.content === message.content
-      );
-      if (index !== -1) {
-        const updated = [...prev];
-        updated[index] = message;
-        return updated;
-      }
-    }
-
-    // ❌ Fix: check for duplicate `message._id`
-    if (prev.some((m) => m._id === message._id)) {
-      console.log("⚠️ Duplicate message skipped:", message._id);
-      return prev;
-    }
-
-    console.log("📥 New message received:", message);
-    return [...prev, message];
-  });
-  };
-
-  socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-  socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-
-  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-  socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-
-  socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
-
-  return () => {
-    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-    socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-    socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
-  };
-}, [socket, conversationId, recallHandler]);
 
 
-  const handleSelectFriendToForward = async (friend) => {
-  try {
-    const convResponse = await axios.post(`/api/conversations/individuals/${friend._id}`);
-    const newConv = convResponse.data;
-
-    const messageToForward = {
-      conversationId: newConv._id,
-      content: selectedMessage.content,
-      type: selectedMessage.type,
-      fileName: selectedMessage.fileName,
-    };
-
-    await axios.post("/api/messages/text", messageToForward);
-
-   
-    setForwardModalVisible(false);
-  } catch (err) {
-    Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
-  }
-};
 
 
-  const handleForwardAction = async () => {
-    try {
-      const response = await axios.get("/api/friends");
-      const friends = response.data;
-  
-      if (!friends || friends.length === 0) {
-        Alert.alert("Không có bạn bè nào để chuyển tiếp.");
-        return;
-      }
-  
-      // Hiện danh sách bạn bè bằng Alert để chọn
-      Alert.alert(
-        "Chọn người nhận",
-        "Hãy chọn người để chuyển tiếp:",
-        friends.map((friend) => ({
-          text: friend.name || friend.username,
-          onPress: async () => {
-            try {
-              // Gọi API tạo cuộc trò chuyện nếu chưa có
-              const convResponse = await axios.post(
-                `/api/conversations/individuals/${friend._id}`
-              );
-  
-              const newConv = convResponse.data;
-              const messageToForward = {
-                conversationId: newConv._id,
-                content: selectedMessage.content,
-                type: selectedMessage.type,
-                fileName: selectedMessage.fileName,
-              };
-  
-              // Gửi message chuyển tiếp
-              await axios.post("/api/messages/text", messageToForward);
-
-            } catch (err) {
-              Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
-            }
-          },
-        }))
-      );
-    } catch (error) {
-      Alert.alert("Lỗi lấy danh sách bạn bè", error.response?.data?.message || error.message);
-    }
-    setModalVisible(false);
-  };
   // Retrieve userId from AsyncStorage.
   useEffect(() => {
     const fetchUserId = async () => {
@@ -855,25 +1308,44 @@ useEffect(() => {
     };
     fetchUserId();
   }, []);
+useEffect(() => {
+  const fetchAllMessages = async () => {
+    try {
+      const [msgRes, pinRes] = await Promise.all([
+        axios.get(`/api/messages/${conversationId}`),
+        axios.get(`/api/pin-messages/${conversationId}`),
+      ]);
 
-  // Fetch all messages for the conversation using conversationId.
-  useEffect(() => {
-    if (!conversationId) return;
-    const fetchAllMessages = async () => {
-      try {
-        const response = await axios.get("/api/messages/" + conversationId);
-        // Assuming response.data is an array of messages.
-        setMessages(response.data);
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-        Alert.alert(
-          "Error fetching messages",
-          error.response?.data?.message || error.message
-        );
-      }
-    };
-    fetchAllMessages();
-  }, [conversationId]);
+      const all = msgRes.data || [];
+      const pinned = pinRes.data || [];
+
+      setAllMessages(all);
+
+      // Attach isPinned flag
+      const pinnedIds = new Set(pinned.map(p => p.messageId));
+      const decorated = all.map(msg =>
+        pinnedIds.has(msg._id)
+          ? { ...msg, isPinned: true }
+          : msg
+      );
+
+      const initialLimit = 40;
+      const skip = Math.max(0, decorated.length - initialLimit);
+      const lastMessages = decorated.slice(skip);
+
+      setMessages(lastMessages);
+      setPagination({ skip, limit: 20 });
+      setHasMore(skip > 0);
+      setPinnedMessages(pinned);
+
+    } catch (err) {
+      console.error("Failed to load messages or pins", err);
+    }
+  };
+
+  if (conversationId) fetchAllMessages();
+}, [conversationId]);
+
 
   // Unified long press handler to show the custom modal with options.
   const handleMessageLongPress = (message) => {
@@ -916,21 +1388,43 @@ useEffect(() => {
     setModalVisible(false);
   };
 
-const handleSelectConversationToForward = async (convId) => {
-  try {
-    await axios.post("/api/messages/text", {
-      conversationId: convId,
-      content: selectedMessage.content,
-      type: selectedMessage.type,
-      fileName: selectedMessage.fileName,
-    });
+// At the bottom of your ChatScreen component, replace your
+// existing handleSelectConversationToForward with this:
 
+// replace your old handleSelectConversationToForward with this:
+
+const handleSelectConversationToForward = async (selectedId) => {
+  try {
+    const item = conversationsList.find(i => i._id === selectedId);
+    if (!item) throw new Error("Không tìm thấy cuộc trò chuyện.");
+
+    // build the payload
+    const body = {
+      conversationId: item.type === "channel" ? item.groupId : item._id,
+      channelId:      item.type === "channel" ? item._id     : null,
+      content:        selectedMessage.content,
+      type:           selectedMessage.type,
+      fileName:       selectedMessage.fileName,
+    };
+
+    console.log("📤 Forward payload:", body);
+
+    const res = await axios.post("/api/messages/text", body);
+
+    console.log("📥 Forward response:", res.data);
   } catch (err) {
+    // log everything we can from the AxiosError
+    console.error("🔄 Forward error:", err);
+    if (err.response) {
+      console.error("➡️ Status:", err.response.status);
+      console.error("➡️ Response body:", err.response.data);
+    }
     Alert.alert("Lỗi chuyển tiếp", err.response?.data?.message || err.message);
   } finally {
     setForwardModalVisible(false);
   }
 };
+
 
 
   // Delete action: Remove the message from local state.
@@ -960,154 +1454,76 @@ const handleSelectConversationToForward = async (convId) => {
     }
   };
 
-  const pickImage = async () => {
-    const formData = new FormData();
-    if (!userId) {
-  Alert.alert("Vui lòng chờ", "Đang tải thông tin người dùng...");
-  return;
-}
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Permission denied", "Gallery access needed.");
-      return;
-    }
 
-    // Mở thư viện hình ảnh
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All, // Cho phép chọn cả Images và Videos
-      quality: 1,
-      allowsEditing: false, // Bạn có thể bật chế độ chỉnh sửa nếu cần
-    });
+const uploadMediaAndSendMessage = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert("Permission denied", "Gallery access needed.");
+    return;
+  }
 
-    if (!result.canceled && result.assets.length > 0) {
-      const selectedImage = result.assets[0];
-      console.log(selectedImage); // Kiểm tra thông tin của hình ảnh được chọn
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.All,
+    quality: 1,
+    allowsEditing: false,
+  });
 
-      // Lấy URI hình ảnh
-      const imageUri = selectedImage.uri;
-      const fileName = selectedImage.uri.split('/').pop(); // Lấy tên file từ URI
-      const mimeType = selectedImage.mimeType;
+  if (result.canceled || !result.assets || result.assets.length === 0) return;
 
-      // Tạo một đối tượng `File` cho FormData
-      const file = {
-        uri: imageUri,
-        name: fileName,
-        type: mimeType,
-      };
+  const selectedMedia = result.assets[0];
+  const mediaUri = selectedMedia.uri;
+  const fileName = mediaUri.split("/").pop();
+  const mimeType = selectedMedia.mimeType || (selectedMedia.type === "video" ? "video/mp4" : "image/jpeg");
 
-      formData.append('id', userId);
-      formData.append('image', file);
-      formData.append('conversationId', conversationId);
+  const formData = new FormData();
+  formData.append("id", userId);
+  formData.append("conversationId", conversationId);
+  formData.append(selectedMedia.type === "video" ? "video" : "image", {
+    uri: mediaUri,
+    name: fileName,
+    type: mimeType,
+  });
 
-      setUploading(true);
-      try {
-        // Gửi tệp lên server
-        const response = await axios.post('/api/messages/images', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 20000,
-        });
+ try {
+  const endpoint = selectedMedia.type === "video"
+    ? "/api/messages/video"
+    : "/api/messages/images";
 
-        // Nhận URL hình ảnh từ phản hồi và tạo thông điệp mới
-        const imageUrl = response.data?.file?.url;
-        const newMsg = {
-          _id: String(Date.now()),
-          memberId: { userId: userId || "" },
-          type: "IMAGE",
-          content: imageUrl,
-          createdAt: new Date().toISOString(),
-        };
+  const response = await axios.post(endpoint, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: selectedMedia.type === "video" ? 30000 : 20000,
+  });
 
-        // Cập nhật danh sách tin nhắn với ảnh mới
-        setMessages((prev) => [...prev, newMsg]);
-        console.log('Image uploaded successfully:', imageUrl);
+  const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
+
+  const mediaUrl =
+    responseData?.file?.url ||
+    responseData?.url ||
+    responseData?.content ||
+    responseData?.message?.url ||
+    null;
+
+  if (!mediaUrl) {
+    console.warn("⚠️ Unexpected upload response:", response.data);
+    throw new Error("Server did not return a URL");
+  }
+
+  // sendOptimisticMediaMessage({
+  //   type: selectedMedia.type === "video" ? "VIDEO" : "IMAGE",
+  //   url: mediaUrl,
+  // });
 
 } catch (err) {
-  Alert.alert("Error", "Failed to upload image");
-} finally {
-  setUploading(false);
+  console.error("Upload error:", err);
+  Alert.alert("Error", "Failed to upload media.");
 }
-    }
-  };
 
-  // const pickVideo = async () => {
-  //   const formData = new FormData();
+};
 
-  //   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  //   if (!permission.granted) {
-  //     Alert.alert("Permission denied", "Gallery access needed.");
-  //     return;
-  //   }
-  //   const result = await ImagePicker.launchImageLibraryAsync({
-  //     mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-  //     quality: 1,
-  //     allowsEditing: false,
-  //   });
-  //   if (!result.canceled && result.assets.length > 0) {
-  //     const selectedVideo = result.assets[0];
-  //     console.log(selectedVideo);
-  //     const videoUri = selectedVideo.uri;
-  //     const fileName = selectedVideo.uri.split('/').pop();
-  //     const mimeType = selectedVideo.mimeType || 'video/mp4';
 
-  //     const file = {
-  //       uri: videoUri,
-  //       name: fileName,
-  //       type: mimeType,
-  //     };
-
-  //     formData.append('id', userId);
-  //     formData.append('video', file);
-  //     formData.append('conversationId', conversationId);
-
-  //     try {
-  //       // Gửi tệp lên server
-  //       const response = await axios.post('/api/messages/videos', formData, {
-  //         headers: {
-  //           'Content-Type': 'multipart/form-data',
-  //         },
-  //         timeout: 30000,
-  //       });
-
-  //       const videoUrl = response.data?.file?.url;
-  //       const newMsg = {
-  //         _id: String(Date.now()),
-  //         memberId: { userId: userId || "" },
-  //         type: "VIDEO",
-  //         content: videoUrl,
-  //         createdAt: new Date().toISOString(),
-  //       };
-
-  //       setMessages((prev) => [...prev, newMsg]);
-  //       console.log('Video uploaded successfully:', videoUrl);
-
-  //     } catch (err) {
-  //       console.log('Error uploading video:', err);
-  //       Alert.alert('Error', 'Failed to upload video');
-  //     }
-  //   }
-  // };
-
-  const base64ToBlob = (base64Data, contentType = '', sliceSize = 512) => {
-    const byteCharacters = atob(base64Data); // decode base64
-    const byteArrays = [];
-
-    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-      const slice = byteCharacters.slice(offset, offset + sliceSize);
-
-      const byteNumbers = new Array(slice.length);
-      for (let i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i);
-      }
-
-      const byteArray = new Uint8Array(byteNumbers);
-      byteArrays.push(byteArray);
-    }
-
-    return new Blob(byteArrays, { type: contentType });
-  };
 
  const pickDocument = async () => {
   setUploading(true);
@@ -1167,105 +1583,120 @@ const handleSelectConversationToForward = async (convId) => {
     setUploading(false);
   }
 };
+const handleSendMessage = async (text) => {
+  if (!text.trim()) return;
 
-
-  // Handle sending a text message.
-  const handleSendMessage = async (message) => {
-
-    if (uploading) {
-  Alert.alert("Vui lòng đợi", "Đang tải lên, vui lòng chờ.");
-  return;
-}
-
-    if (!message.trim()) return;
-
-
-      if (replyTo) {
-    try {
-const res = await axios.post("/api/messages/reply", {
-  conversationId,
-  content: message,
-  replyMessageId: replyTo._id,
-  type: "TEXT",
-});
-    } catch (err) {
-      Alert.alert("Reply failed", err.message);
-    } finally {
-      setReplyTo(null);
-      setInput("");
-    }
-    return;
-  }
-    if (!userId) {
-      Alert.alert("User not loaded", "Unable to send message without a valid user.");
-      return;
-    }
-    try {
-      // Create an optimistic message with a pending flag.
-     const newMessage = {
-  _id: String(Date.now()),
-  memberId: { userId },
-  type: "TEXT",
-  content: message,
-  createdAt: new Date().toISOString(),
-  pending: true, // <== important
-};
-
-setMessages((prev) => [...prev, newMessage]);
-
-
-      await axios.post("/api/messages/text", {
-        conversationId: conversationId,
-        content: message,
-      });
-
-      // Emit the message over socket; your server should broadcast it back
-      socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
-        conversationId: conversationId,
-        content: message,
-      });
-    } catch (err) {
-      Alert.alert("Cannot send message", err.response?.data?.message || err.message);
-    }
+  const tempId = String(Date.now());
+  const optimisticMsg = {
+    _id: tempId,
+    memberId: { userId },
+    type: "TEXT",
+    content: text,
+    pending: true,
+    replyMessageId: replyTo?._id,
+    createdAt: new Date().toISOString(),
   };
 
-  // Listen for incoming messages from the socket.
-  useEffect(() => {
-    if (!socket || !conversationId) return;
-const receiveHandler = (message) => {
-  setMessages((prev) => {
-    // If it's from the current user, replace the optimistic one
-    if (message.memberId?.userId === userId) {
-      const index = prev.findIndex(
-        (m) => m.pending && m.content === message.content
-      );
-      if (index !== -1) {
-        const updated = [...prev];
-        updated[index] = message;
-        return updated;
-      }
-    }
+  setMessages(prev => [...prev, optimisticMsg]);
 
-    // If it already exists by ID, don't add
-    if (prev.some((m) => m._id === message._id)) return prev;
+  try {
+    const { data } = await axios.post("/api/messages/text", {
+      conversationId,
+      content: text,
+      type: "TEXT",
+      replyMessageId: replyTo?._id || null,
+      channelId: null,
+      tags: [],
+      tagPositions: [],
+    });
 
-    // Otherwise, add the new message
-    return [...prev, message];
-  });
+    setMessages(prev =>
+      prev.map((m) =>
+        m._id === tempId ? data : m
+      )
+    );
+
+    setReplyTo(null); // ✅ clear after successful send
+  } catch (error) {
+    console.error("❌ Failed to send message:", error);
+    Alert.alert("Error", "Không thể gửi tin nhắn.");
+    setMessages(prev => prev.filter(m => m._id !== tempId));
+  }
 };
 
-    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE);
-    socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+const reactUpdateHandler = (message) => {
+  if (!message || !message._id || !message.reacts) {
+    console.warn("⚠️ Invalid reaction payload:", message);
+    return;
+  }
 
-    socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conversationId);
+  const messageId = message._id;
+  const reacts = message.reacts;
 
-    return () => {
-      socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
-      socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
-      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
-    };
-  }, [socket, conversationId]);
+  console.log("🆕 Updating message", messageId, "with reacts:", reacts);
 
+  setMessages((prev) =>
+    prev.map((msg) =>
+      msg._id === messageId ? { ...msg, reacts } : msg
+    )
+  );
+};
+
+
+
+useEffect(() => {
+
+    if (!socket || !conversationId || !userId) return;
+
+    
+
+  const receiveHandler = (message) => {
+    if (message.conversationId !== conversationId) return;
+    setMessages((prev) => {
+      // replace the optimistic placeholder if it matches
+      console.log("📨 Received message from server:", message);
+
+      if (message.memberId?.userId === userId) {
+        const idx = prev.findIndex(
+          m => m.pending && m.content === message.content
+        );
+        if (idx !== -1) {
+          const updated = [...prev];
+          updated[idx] = message;
+          return updated;
+        }
+      }
+      // otherwise skip if it’s already there by server _id
+      if (prev.some(m => m._id === message._id)) return prev;
+      return [...prev, message];
+    });
+  };
+  
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+  socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+  
+console.log("➡️ Joining conversation with userId:", userId, "conversationId:", conversationId);
+
+socket.emit(SOCKET_EVENTS.JOIN, userId);
+
+// 2. When entering a chat screen
+socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
+    socket.on(SOCKET_EVENTS.PIN_MESSAGE,   handlePinSocket);
+    socket.on(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinSocket);
+
+    socket.on(SOCKET_EVENTS.REACT_TO_MESSAGE, reactUpdateHandler); 
+
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+    socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
+    socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+      socket.off(SOCKET_EVENTS.REACT_TO_MESSAGE, reactUpdateHandler); 
+        socket.off(SOCKET_EVENTS.PIN_MESSAGE,   handlePinSocket);
+      socket.off(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinSocket);
+  };
+}, [socket, conversationId, userId, recallHandler,  handlePinSocket,
+    handleUnpinSocket,]);
 
 
 
@@ -1282,21 +1713,24 @@ const receiveHandler = (message) => {
 
 <ChatBox
   messages={messages}
+   allMessages={allMessages} 
   currentUserId={userId}
   currentUserAvatar={currentUser?.avatar}
-   otherUserAvatar={otherUser?.avatar}// ✅ this is fine
+  otherUserAvatar={otherUser?.avatar}
+  handlePressEmoji={handlePressEmoji}
   onMessageLongPress={handleMessageLongPress}
+  loadMoreMessages={loadMoreMessages}
+  loadingMore={loadingMore} 
+   scrollToMessageId={scrollToMessageId}  
 />
+
+
   )}
 
 
       </View>
 
-      {uploading && (
-  <View style={chatScreenStyles.loadingOverlay}>
-    <ActivityIndicator size="large" color="#086DC0" />
-  </View>
-)}
+
   {replyTo && (
   <View style={styles.replyPreview}>
     <View style={styles.replyLeftAccent} />
@@ -1322,7 +1756,7 @@ const receiveHandler = (message) => {
         input={input}
         setInput={setInput}
         onSend={handleSendMessage}
-        onPickMedia={pickImage}
+        onPickMedia={uploadMediaAndSendMessage}
 
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
@@ -1334,10 +1768,10 @@ const receiveHandler = (message) => {
       />
 
       {/* Modal for message actions on long press */}
-     <Modal
+<Modal
   visible={modalVisible}
   transparent
-  animationType="fade"
+  animationType="slide"
   onRequestClose={() => setModalVisible(false)}
 >
   <TouchableOpacity
@@ -1345,53 +1779,66 @@ const receiveHandler = (message) => {
     activeOpacity={1}
     onPressOut={() => setModalVisible(false)}
   >
-    <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      {/* —————————————————————— */}
+      {/* 1) Reaction bar */}
 
+                            <View style={styles.reactionBar}>
+                                {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
+                                    <TouchableOpacity
+                                        key={emoji}
+                                        onPress={() => {
+                                            const type = emojiToType[emoji];
+                                            handleReact(selectedMessage, type);
+                                            setModalVisible(false);
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 24 }}>{emoji}</Text>
+                                    </TouchableOpacity>
+        ))}
+      </View>
 
+      {/* —————————————————————— */}
+      {/* 2) Action grid */}
+      <View style={styles.optionsGrid}>
+        {[
 
-      {!selectedMessage?.isDeleted && selectedMessage?.type === "TEXT" && (
-  <TouchableOpacity
-    style={styles.modalButton}
-    onPress={handleReadMessage}
-  >
-    <Text style={styles.modalButtonText}>Read message</Text>
-  </TouchableOpacity>
-)}
+            ...(selectedMessage?.memberId?.userId === userId
+    ? [{ icon: require('../icons/undo.png'), label: 'Recall', onPress: handleRecallAction }]
+    : []
+  ),
+            { icon: require('../icons/forward.png'), label: 'Forward', onPress: openForwardModal },
+          { icon: require('../icons/reply.png'),   label: 'Reply',    onPress: handleReplyAction },
+          { icon: require('../icons/Delete.png'),   label: 'Delete',    onPress: handleDeleteAction },
+selectedMessage?.isPinned
+  ? {
+      icon: require('../icons/Unpin.png'), 
+      label: 'Unpin message',
+      onPress: () => handleUnpinMessage(selectedMessage),
+    }
+  : {
+      icon: require('../icons/Pin_action.png'),
+      label: 'Pin message',
+      onPress: () => {
+        handlePinMessages(selectedMessage);
+      },
+    },
+          { icon: require('../icons/mic.png'),label: 'Read Message',   onPress: handleReadMessage },
 
-{selectedMessage?.isDeleted ? (
-    <TouchableOpacity
-      style={styles.modalButton}
-      onPress={handleRecallAction}
-    >
-      <Text style={styles.modalButtonText}>Thu hồi</Text>
-    </TouchableOpacity>
-
-) : (
-  <>
-    <TouchableOpacity
-    style={styles.modalButton}
-    onPress={handleDeleteAction}
-  >
-    <Text style={styles.modalButtonText}>Xoá</Text>
-  </TouchableOpacity>
-
-    <TouchableOpacity
-      style={styles.modalButton}
-      onPress={openForwardModal}
-    >
-      <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-    </TouchableOpacity>
-  <TouchableOpacity
-    style={styles.modalButton}
-    onPress={handleReplyAction}
-  >
-    <Text style={styles.modalButtonText}>Reply</Text>
-  </TouchableOpacity>
-
-
-  </>
-)}
-
+        ].map((opt, i) => (
+          <TouchableOpacity
+            key={i}
+            style={styles.optionItem}
+            onPress={() => {
+              opt.onPress();
+              setModalVisible(false);
+            }}
+          >
+            <Image source={opt.icon} style={styles.optionIcon} />
+            <Text style={styles.optionLabel}>{opt.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   </TouchableOpacity>
 </Modal>
@@ -1403,72 +1850,134 @@ const receiveHandler = (message) => {
   animationType="slide"
   onRequestClose={() => setForwardModalVisible(false)}
 >
-  <View style={styles.modalOverlay}>
-    <View style={styles.classifyModal}>
-      <Text style={styles.manageTitle}>Chọn cuộc trò chuyện</Text>
-      <FlatList
-        data={conversationsList}
-        keyExtractor={(c) => c._id}
-        renderItem={({ item: conv }) => {
-          console.log("🔸 render conv:", conv);
+  <View style={styles.forwardOverlay}>
+    <View style={styles.forwardModal}>
+      {/* Header */}
+      <View style={styles.forwardHeader}>
+        <Text style={styles.forwardTitle}>Chuyển tiếp tới</Text>
+        <Text style={styles.forwardSubtitle}>
+          Chọn nơi bạn muốn chia sẻ tin nhắn này.
+        </Text>
 
-               const isGroup = conv.type === true;
-      let title, avatarUri;
+          <TouchableOpacity
+    onPress={() => setForwardModalVisible(false)}
+    style={styles.closeModalButton}
+  >
+    <Image
+      source={require('../icons/Close.png')} // Replace with your close icon path
+      style={styles.closeModalIcon}
+    />
+  </TouchableOpacity>
 
-      if (isGroup) {
-        // group chat
-        title = conv.name;
-        avatarUri = conv.avatar;
-      } else {
-        // private chat: use the `userId` from state, not `currentUserId`
-        const other = conv.members.find(m => m.userId !== userId);
-        console.log("   private-other:", other);
-        title = other?.name ?? "Unknown";
-        avatarUri = other?.avatar;
-      }
-          const isSelected = conv._id === selectedForwardId;
-          return (
-            <TouchableOpacity
-              style={styles.classifyRow}
-              onPress={() => {
-                console.log("→ selected conversation:", conv._id);
-                setSelectedForwardId(conv._id);
-              }}
-            >
-              <Image
-                source={avatarUri ? { uri: avatarUri } : AvatarImage}
-                style={styles.friendAvatar}
-              />
-              <Text style={styles.classifyLabel}>{title}</Text>
-              <View
-                style={[
-                  styles.checkbox,
-                  isSelected && styles.checkboxSelected,
-                ]}
-              >
-                {isSelected && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-            </TouchableOpacity>
-          );
-        }}
-      />
+      </View>
 
+
+
+      {/* Conversation list */}
+<FlatList
+  data={conversationsList}
+  keyExtractor={item => item._id}
+  style={styles.forwardList}
+  renderItem={({ item }) => {
+    const isSelected = item._id === selectedForwardId;
+    return (
+      <TouchableOpacity
+        style={styles.forwardRow}
+        onPress={() => setSelectedForwardId(item._id)}
+      >
+        <Image
+          source={item.groupAvatar ? { uri: item.groupAvatar } : AvatarImage}
+          style={styles.forwardAvatar}
+        />
+        <View style={styles.forwardText}>
+          {/* top line: channelName (user name or channel name) */}
+          <Text style={styles.forwardName}>{item.channelName}</Text>
+          {/* bottom line: for private → member alias; for group→ group name */}
+          {item.groupName && (
+            <Text style={styles.forwardDesc}>{item.groupName}</Text>
+          )}
+        </View>
+        <View style={styles.radioWrapper}>
+          <View style={styles.radioOuter}>
+            {isSelected && <View style={styles.radioInner} />}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }}
+/>
+
+
+      {/* Send button */}
       <TouchableOpacity
         style={[
-          styles.confirmButton,
-          !selectedForwardId && { opacity: 0.5 },
+          styles.forwardSend,
+          !selectedForwardId && { opacity: 0.5 }
         ]}
         disabled={!selectedForwardId}
         onPress={() => handleSelectConversationToForward(selectedForwardId)}
       >
-        <Text style={styles.confirmText}>Chuyển tiếp</Text>
+        <Text style={styles.forwardSendText}>Chuyển tiếp</Text>
       </TouchableOpacity>
     </View>
   </View>
 </Modal>
 
- 
 
+ 
+<Modal
+  visible={reactDetailModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setReactDetailModalVisible(false)}
+>
+                   <View style={styles.reactModalBackground}>
+    <View style={styles.reactModalContainer}>
+      {/* Header */}
+      <View style={styles.reactModalHeader}>
+        <Text style={styles.reactModalTitle}>Cảm xúc về tin nhắn</Text>
+        <TouchableOpacity onPress={() => setReactDetailModalVisible(false)}>
+          <Image source={require('../icons/Close.png')} style={styles.reactModalClose} />
+        </TouchableOpacity>
+      </View>
+      
+<FlatList
+  data={selectedReactors}
+  keyExtractor={(item, index) => `${item.name}-${index}`}
+  
+  renderItem={({ item }) => {
+    const emojiMap = {
+      1: '❤️',
+      2: '😂',
+      3: '😢',
+      4: '👍',
+      5: '👎',
+      6: '😮',
+    };
+
+    
+    const emoji = emojiMap[item.type];
+
+    return (
+      <View style={styles.reactorRow}>
+        <Image
+          source={item.avatar ? { uri: item.avatar } : AvatarImage}
+          style={styles.reactorAvatar}
+        />
+        <View style={styles.reactorInfo}>
+          <Text style={styles.reactorName}>{item.name || "Unknown"}</Text>
+
+        </View>
+        <Text style={styles.reactorHeart}>{emoji}</Text>
+      </View>
+    );
+  }}
+/>
+
+
+                        </View>
+                    </View>
+                </Modal>
     </View>
   );
 }
@@ -1707,5 +2216,321 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#777",
   },
+
+      reactModalContainer: {
+        backgroundColor: "#fff",
+        padding: 20,
+        borderRadius: 10,
+        width: "80%",
+        maxHeight: "70%",
+    },
+    reactModalTitle: {
+        fontSize: 18,
+        fontWeight: "bold",
+        marginBottom: 15,
+        textAlign: "center",
+    },
+    reactorItem: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    reactorInfo: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    emojiLarge: {
+        fontSize: 24,
+        marginRight: 10,
+    },
+    reactorName: {
+        fontSize: 16,
+    },
+    removeButton: {
+        backgroundColor: "#f0f0f0",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+    },
+    removeButtonText: {
+        color: "#666",
+        fontSize: 14,
+    },
+    closeButton: {
+        backgroundColor: "#086DC0",
+        paddingVertical: 10,
+        borderRadius: 5,
+        marginTop: 15,
+        alignItems: "center",
+    },
+    closeButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
+        modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { width: '80%', backgroundColor: 'white', padding: 20, borderRadius: 10 },
+    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+    reactorItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+    reactModalBackground: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.4)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+reactModalContainer: {
+  width: '90%',
+  maxHeight: '70%',
+  backgroundColor: '#fff',
+  borderRadius: 10,
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+},
+reactModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+reactModalTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+},
+reactModalClose: {
+  width: 20,
+  height: 20,
+  tintColor: '#333',
+},
+reactTabs: {
+  flexDirection: 'row',
+  borderBottomWidth: 1,
+  borderBottomColor: '#eee',
+  marginBottom: 8,
+},
+reactTab: {
+  flex: 1,
+  alignItems: 'center',
+  paddingVertical: 8,
+},
+reactTabText: {
+  fontSize: 14,
+  color: '#086DC0',
+  fontWeight: '600',
+},
+reactorRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+reactorAvatar: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  marginRight: 12,
+},
+reactorInfo: {
+  flex: 1,
+},
+reactorName: {
+  fontSize: 16,
+  color: '#333',
+},
+reactorSubtitle: {
+  fontSize: 12,
+  color: '#888',
+  marginTop: 2,
+},
+reactorHeart: {
+  width: 24,
+  height: 24,
+  tintColor: '#E0245E',
+},
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // white rounded container
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '90%',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+    elevation: 10,           // shadow on Android
+    shadowColor: '#000',     // shadow on iOS
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+
+  // —— Reaction bar ——
+  reactionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  reactionIcon: {
+    padding: 4,
+  },
+  reactionEmoji: {
+    fontSize: 28,
+  },
+
+  // —— Options grid ——
+  optionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+
+  },
+  optionItem: {
+    width: '25%',           // 4 items per row
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  optionIcon: {
+    width: 32,
+    height: 32,
+    marginBottom: 6,
+  },
+  optionLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#333',
+  },
+// overlay to dim background
+forwardOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.6)",
+  justifyContent: "center",
+  alignItems: "center",
+},
+// the white card
+forwardModal: {
+  width: "90%",
+  maxHeight: "80%",
+  backgroundColor: "#fff",
+  borderRadius: 8,
+  padding: 16,
+},
+forwardHeader: {
+  marginBottom: 12,
+},
+forwardTitle: {
+  color: "#000",
+  fontSize: 18,
+  fontWeight: "600",
+},
+forwardSubtitle: {
+  color: "#AAA",
+  fontSize: 12,
+  marginTop: 4,
+},
+
+
+forwardList: {
+  flexGrow: 0,
+  marginBottom: 12,
+},
+forwardRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingVertical: 10,
+},
+forwardAvatar: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+},
+forwardText: {
+  flex: 1,
+  marginLeft: 12,
+},
+forwardName: {
+  color: "#000",
+  fontSize: 16,
+},
+forwardDesc: {
+  color: "#AAA",
+  fontSize: 12,
+  marginTop: 2,
+},
+forwardCheckbox: {
+  width: 20,
+  height: 20,
+  borderWidth: 2,
+  borderColor: "#72767D",
+  borderRadius: 4,
+  justifyContent: "center",
+  alignItems: "center",
+},
+forwardCheckboxSelected: {
+  backgroundColor: "#5865F2",
+  borderColor: "#5865F2",
+},
+checkmark: {
+  color: "#FFF",
+  fontSize: 14,
+  lineHeight: 14,
+},
+forwardSend: {
+  backgroundColor: "#086DC0",
+  borderRadius: 24,
+  paddingVertical: 10,
+  alignItems: "center",
+},
+forwardSendText: {
+  color: "#FFF",
+  fontSize: 16,
+  fontWeight: "600",
+},
+radioWrapper: {
+  paddingLeft: 12,
+  paddingRight: 4,
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+radioOuter: {
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  borderWidth: 2,
+  borderColor: "#086DC0",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+radioInner: {
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: "#086DC0",
+},
+closeModalButton: {
+  position: "absolute",
+  top: 0,
+  right: 0,
+  padding: 6,
+  zIndex: 10,
+},
+
+closeModalIcon: {
+  width: 20,
+  height: 20,
+  tintColor: "#FF0000", // Optional: match your theme
+  resizeMode: "contain",
+},
 
 });

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 import bg from '../Images/bground.png';
+                           
 
 
 import axios from '../api/apiConfig'; 
@@ -16,6 +17,8 @@ const size = Dimensions.get('window').width / numColumns - 20;
 
 export default function SingleChatDetail({ route, navigation }) {
   const { conversationId } = route.params;
+const [pinnedMessages, setPinnedMessages] = useState([]);
+const [pinModalVisible, setPinModalVisible] = useState(false);
 
 
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -30,7 +33,42 @@ export default function SingleChatDetail({ route, navigation }) {
   
   
 
+const fetchPinnedMessages = async () => {
+  try {
+    const [pinsRes, messagesRes] = await Promise.all([
+     axios.get(`/api/pin-messages/${conversationId}`),
+      axios.get(`/api/messages/${conversationId}`)
+    ]);
 
+  const pins = pinsRes.data;
+const messages = messagesRes.data;
+
+const messageMap = {};
+messages.forEach(m => {
+  const id = m._id?.$oid || m._id; // Handle both { $oid: ... } and plain string
+  messageMap[id] = {
+    ...m,
+    createdAt: m.createdAt?.$date || m.createdAt,
+  };
+});
+
+// Merge pin with message
+const enrichedPins = pins.map(pin => {
+  const pinMsgId = pin.messageId?.$oid || pin.messageId;
+  return {
+    ...pin,
+    createdAt: pin.pinnedAt?.$date || pin.pinnedAt, // For date rendering
+    message: messageMap[pinMsgId] || null,
+  };
+});
+
+setPinnedMessages(enrichedPins);
+setPinModalVisible(true);
+  } catch (err) {
+    console.error("❌ Failed to fetch pinned messages:", err);
+    Alert.alert("Error", "Could not load pinned messages.");
+  }
+};
   
   useEffect(() => {
     (async () => {
@@ -158,7 +196,7 @@ useEffect(() => {
         </TouchableOpacity>
         <Text style={{ color: '#086DC0', fontWeight: 'bold', fontSize: 15 }}>Details</Text>
         <View style={{ flexDirection: 'row', position: 'absolute', right: 10 }}>
-          <TouchableOpacity style={styles.pinButton}>
+          <TouchableOpacity style={styles.pinButton} onPress={fetchPinnedMessages}> 
             <Image source={require('../icons/Pin.png')} />
           </TouchableOpacity>
         </View>
@@ -305,6 +343,80 @@ useEffect(() => {
     
 
     </View>
+<Modal
+  visible={pinModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setPinModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.pinModalContainer}>
+      {/* Header */}
+      <View style={styles.pinModalHeader}>
+        <Text style={styles.pinModalTitle}>Tin nhắn đã ghim</Text>
+        <TouchableOpacity onPress={() => setPinModalVisible(false)}>
+          <Image
+            source={require('../icons/Close.png')}
+            style={styles.closeIcon}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Message list */}
+      <FlatList
+        data={pinnedMessages}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => {
+          const isImage = item.message?.type === 'IMAGE';
+          const content = item.message?.content;
+          const sender = item.pinnedBy?.name || "Unknown";
+          const avatar = item.pinnedBy?.avatar;
+
+          return (
+            <TouchableOpacity style={styles.pinnedCard}
+             activeOpacity={0.7}
+  onPress={() => navigation.navigate('ChatScreen', {
+    conversation,
+    scrollToMessageId: item.message._id
+  })}
+
+            
+            >
+              <View style={styles.cardHeader}>
+                <Image
+                  source={avatar ? { uri: avatar } : require('../Images/avt.png')}
+                  style={styles.pinnedAvatar}
+                />
+                <Text style={styles.pinnedSender}>{sender}</Text>
+                <Text style={styles.pinnedTime}>
+                  {new Date(item.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </Text>
+              </View>
+
+              {isImage ? (
+                <Image
+                  source={{ uri: content }}
+                  style={styles.pinnedImage}
+                />
+              ) : (
+                <View style={styles.textBubble}>
+                  <Text style={styles.textContent}>{content}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      />
+    </View>
+  </View>
+</Modal>
+
+
+
 
     </SafeAreaView>
     </ImageBackground>
@@ -529,4 +641,96 @@ recentList: {
     borderRadius: 8,
     backgroundColor:'#fff'
   },
+ pinModalContainer: {
+  backgroundColor: '#fff',
+  width: '95%',
+  height: '80%',
+  borderRadius: 12,
+  padding: 16,
+  alignSelf: 'center',
+  marginTop: 60,
+},
+pinModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  borderBottomWidth: 1,
+  borderColor: '#eee',
+  paddingBottom: 8,
+  marginBottom: 10,
+},
+pinModalTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#000',
+},
+closeIcon: {
+  width: 20,
+  height: 20,
+  tintColor: '#999',
+},
+
+
+cardHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+pinnedAvatar: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  marginRight: 8,
+},
+pinnedSender: {
+  fontWeight: '600',
+  fontSize: 14,
+  flex: 1,
+  color: '#333',
+},
+pinnedTime: {
+  fontSize: 12,
+  color: '#999',
+},
+pinnedImage: {
+  width: '100%',
+  height: 160,
+  borderRadius: 8,
+  resizeMode: 'cover',
+  backgroundColor: '#e0e0e0',
+},
+
+textContent: {
+  fontSize: 14,
+  color: '#333',
+},
+
+pinnedCard: {
+  backgroundColor: '#ffffff',  // Brighter card
+  borderRadius: 12,
+  padding: 12,
+  marginBottom: 12,
+  shadowColor: '#000',
+  shadowOpacity: 0.08,
+  shadowRadius: 3,
+  elevation: 1,
+},
+
+modalOverlay: {
+  flex: 1,
+  justifyContent: 'flex-end',
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+},
+
+pinModalContainer: {
+  backgroundColor: '#FDFEFF',  // Brighter color
+  width: '100%',
+  maxHeight: '80%',
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  paddingHorizontal: 16,
+  paddingTop: 16,
+  paddingBottom: 32,
+},
+
 });

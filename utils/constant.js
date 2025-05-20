@@ -6,6 +6,15 @@ export const API_STATUS = {
   LOADING: "loading",
 };
 
+export const REACT_ICONS = {
+  0: "👍", // Like
+  1: "❤️", // Love
+  2: "😆", // Haha
+  3: "😮", // Wow
+  4: "😢", // Sad
+  5: "😣", // Angry
+  6: "🤗", // Care
+};
 export const SOCKET_EVENTS = {
   //Join socket user id
   JOIN_USER: "join",
@@ -14,6 +23,7 @@ export const SOCKET_EVENTS = {
   RECEIVE_MESSAGE: "receive-message",
   MESSAGE_RECALLED: "message-recalled",
   MESSAGE_DELETED_FOR_ME: "message_deleted_for_me",
+  REACT_TO_MESSAGE: "react-to-message",
   TAGGED: "tagged",
 
   // Friend system
@@ -63,7 +73,6 @@ export const SOCKET_EVENTS = {
   // Call - Group call (Metered)
   GROUP_CALL_USER: "group-call-user",
   GROUP_CALL_ENDED: "group-call-ended",
-
 
   // Last view tracking
   CONVERSATION_LAST_VIEW: "conversation-last-view",
