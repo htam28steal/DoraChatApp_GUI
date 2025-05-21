@@ -319,13 +319,13 @@ export default function ContactScreen({ navigation }) {
                 }
               }}
           style={styles.btnPending}>
-              <Text style={styles.txtAccecpt}>Đã gửi lời mời</Text>
+              <Text style={styles.txtAccecpt}>Request sent</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
               onPress={handleAddFriend}
              style={styles.btnAccept}>
-            <Text style={styles.txtAccecpt}>Kết bạn</Text>
+            <Text style={styles.txtAccecpt}>Add friend</Text>
             </TouchableOpacity>
           ))}
       </TouchableOpacity>

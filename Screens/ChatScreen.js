@@ -74,6 +74,8 @@ const MessageItem = forwardRef(function MessageItem(
 
 const [imgLoading, setImgLoading] = useState(true);
 
+  const navigation = useNavigation();
+
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
@@ -251,7 +253,9 @@ const Container = onLongPress ? TouchableOpacity : View;
 
         
 {msg.type === "IMAGE" ? (
- <View style={{ position: "relative" }}>
+ <View style={{ position: "relative" }}
+  
+ >
   <Image
     source={{ uri: msg.content }}
     style={messageItemStyles.imageContent}
@@ -575,6 +579,13 @@ const scrollToMessage = useCallback((messageId) => {
     }
   }}
   scrollEventThrottle={100}
+
+  onContentSizeChange={() => {
+   if (scrollToMessageId) {
+     // once the content has rendered, fire your scroll
+     scrollToMessage(scrollToMessageId);
+   }
+ }}
 >
     {loadingMore && (
     <ActivityIndicator

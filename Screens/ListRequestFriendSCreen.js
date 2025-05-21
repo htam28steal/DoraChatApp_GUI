@@ -99,36 +99,42 @@ const handleThuHoi = async (friendId) => {
   }
 };
 const renderSearchItem = ({ item }) => (
-  <View style={styles.fMessage}>
-    <Image source={item.avatar ? { uri: item.avatar } : userIcon} style={styles.imgAG} />
-    <View style={styles.fInfor}>
-      <Text style={styles.name}>{item.name}</Text>
-      <Text style={styles.phoneNumber} numberOfLines={1}>{item.username}</Text>
-    </View>
-    <View style={styles.actionContainer}>
+      <TouchableOpacity
+    style={styles.fMessage}
+    onPress={async () => {
+      try {
+        const resp = await axios.post(`/api/conversations/individuals/${item._id}`);
+        const conversation = resp.data;
+
+        navigation.navigate('ChatScreen', {
+          conversation,
+          userId,
+        });
+      } catch (err) {
+        console.error('Error opening chat:', err);
+        Alert.alert('Không thể mở trò chuyện', err.message);
+      }
+    }}
+  >
+      {item.avatar ? <Image source={{uri:item.avatar}} style={styles.imgAG}/> : <View style={[styles.avatarCl,{backgroundColor:item.avatarColor||'#086DC0'}]}><Text style={styles.avatarText}>{item.name.charAt(0)}</Text></View>}
+      <View style={styles.fInfoText}>
+        <Text style={styles.name}>{item.name}</Text>
+        <Text style={styles.phoneNumber}  numberOfLines={1}>{item.username}</Text>
+      </View>
+      <View style={styles.fInfoAction}>
       {stateFriend === false && sentInvites !== 'pending' && (
         <TouchableOpacity
-          style={[styles.requestSent, { backgroundColor: '#4CBB17' }]}
+          style={styles.btnAccept}
           onPress={() => handleAddFriend(item._id)}
         >
-          <Text style={styles.txtAccecpt}>Kết bạn</Text>
+          <Text style={styles.txtAccecpt}>Add Friend</Text>
         </TouchableOpacity>
       )}
-      {stateFriend === true && (
-         <View style={styles.btnDisabled}><Text style={styles.txtAccecpt}>Đã kết bạn</Text></View>
-      )}
-      {sentInvites === 'pending' && (
-        <TouchableOpacity
-          style={styles.btnPending}
-          onPress={() => handleThuHoi(item._id)}
-        >
-          <Text style={styles.txtAccecpt}>Đã gửi lời mời</Text>
-          </TouchableOpacity>
-      )}
-    </View>
-  </View>
-);
-
+        {stateFriend===true  && <View style={styles.btnDisabled}><Text style={styles.txtAccecpt}>Friend</Text></View>}
+        {sentInvites==='pending' && <TouchableOpacity style={styles.btnPending} onPress={()=>handleThuHoi(item._id)}><Text style={styles.txtAccecpt}>Request Sent</Text></TouchableOpacity>}
+      </View>
+    </TouchableOpacity>
+  );
 
   useEffect(() => {
   const fetchCurrentUser = async () => {
@@ -368,7 +374,7 @@ const renderFriend = ({ item }) => (
     data={filtered}
     keyExtractor={item => item._id}
     renderItem={renderFriend}
-    ListEmptyComponent={<Text style={styles.placeholderText}>Không có lời mời kết bạn nào.</Text>}
+    ListEmptyComponent={<Text style={styles.placeholderText}>No friend requests.</Text>}
   />
 )}
 
@@ -439,6 +445,7 @@ fMessage: {
     width: 55,
     height: 55,
     borderRadius: 27.5,
+    marginRight:10
   },
   fInfor: {
     flex: 1,
@@ -459,6 +466,7 @@ fMessage: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 5,
+
   },
   requestSentText: {
     fontSize: 14,
@@ -534,5 +542,13 @@ txtFillterChosen: { fontSize: 16, fontWeight: '600', color: '#F49300' },
   btnPending: { backgroundColor: '#FFA500', borderRadius: 30, paddingHorizontal: 10, paddingVertical: 5 },
   iconaddF: { width: 15, height: 15, marginRight: 5 },
   txtAccecpt: { fontSize: 11, fontWeight: '500', color: 'white' },
+  placeholderText:{
+    alignSelf:'center',
+    fontWeight:'bold',
+    fontSize:16
+  },
+  fInfoText:{
+    marginRight:25
+  },
 
 });

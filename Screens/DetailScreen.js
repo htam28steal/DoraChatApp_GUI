@@ -54,13 +54,20 @@ messages.forEach(m => {
 
 // Merge pin with message
 const enrichedPins = pins.map(pin => {
-  const pinMsgId = pin.messageId?.$oid || pin.messageId;
-  return {
-    ...pin,
-    createdAt: pin.pinnedAt?.$date || pin.pinnedAt, // For date rendering
-    message: messageMap[pinMsgId] || null,
-  };
-});
+    const pinMsgId = pin.messageId?.$oid || pin.messageId;
+    return {
+      ...pin,
+      createdAt: pin.pinnedAt?.$date || pin.pinnedAt,
+      message: messageMap[pinMsgId] || null,
+    };
+
+ })
+
+ .filter(pin => {
+     const msg = pin.message;
+
+   return msg && !msg.isDeleted;
+ });
 
 setPinnedMessages(enrichedPins);
 setPinModalVisible(true);

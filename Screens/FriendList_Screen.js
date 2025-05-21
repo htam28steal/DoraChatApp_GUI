@@ -241,7 +241,23 @@ socket.onAny((event, data) => {
 
   // Render for search result items
   const renderSearchItem = ({ item }) => (
-     <TouchableOpacity style={styles.fMessage}>
+      <TouchableOpacity
+    style={styles.fMessage}
+    onPress={async () => {
+      try {
+        const resp = await axios.post(`/api/conversations/individuals/${item._id}`);
+        const conversation = resp.data;
+
+        navigation.navigate('ChatScreen', {
+          conversation,
+          userId,
+        });
+      } catch (err) {
+        console.error('Error opening chat:', err);
+        Alert.alert('Không thể mở trò chuyện', err.message);
+      }
+    }}
+  >
       {item.avatar ? <Image source={{uri:item.avatar}} style={styles.imgAG}/> : <View style={[styles.avatarCl,{backgroundColor:item.avatarColor||'#086DC0'}]}><Text style={styles.avatarText}>{item.name.charAt(0)}</Text></View>}
       <View style={styles.fInfoText}>
         <Text style={styles.name}>{item.name}</Text>
