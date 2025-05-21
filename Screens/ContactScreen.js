@@ -42,7 +42,9 @@ export default function ContactScreen({ navigation }) {
         `/api/conversations/individuals/${contactUser._id}`
       );
       const conversation = resp.data;
-
+              if (typeof conversation.type === 'undefined') {
+          conversation.type = false;
+        }
       navigation.navigate('ChatScreen', {
         conversation,
         userId,

@@ -256,6 +256,7 @@ socket.onAny((event, data) => {
         navigation.navigate('ChatScreen', {
           conversation,
           userId,
+          
         });
       } catch (err) {
         console.error('Error opening chat:', err);
@@ -285,41 +286,32 @@ socket.onAny((event, data) => {
   );
 
   // Render for existing friend list
-  const renderFriend = ({ item: user }) => (
-   <TouchableOpacity
-      style={styles.fMessage}
-      onLongPress={() => { setSelectedFriend(user); setShowModal(true); }}
-     onPress={async () => {
-        try {
-          // 1) Create or fetch the 1:1 conversation
-          const resp = await axios.post(
-            `/api/conversations/individuals/${user._id}`
-          );
-          const conversation = resp.data;
+const renderFriend = ({ item: user }) => (
+  <TouchableOpacity
+    style={styles.fMessage}
+    onLongPress={() => {
+      setSelectedFriend(user);
+      setShowModal(true);
+    }}
+    onPress={() => {
+      navigation.navigate('YourFriendScreen', {          
+        userId: user._id, // friend's user ID
+      });
+    }}
+  >
+    <Image
+      source={user.avatar ? { uri: user.avatar } : require('../Images/avt.png')}
+      style={styles.imgAG}
+    />
+    <View style={styles.fInfor}>
+      <Text style={styles.name}>{user.name}</Text>
+      <Text style={styles.phoneNumber} numberOfLines={1}>
+        {user.username}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
 
-          // 2) Navigate to ChatScreen
-          navigation.navigate('ChatScreen', {
-            conversation,
-            userId,
-          });
-        } catch (err) {
-          console.error('Error opening chat:', err);
-          Alert.alert('Không thể mở trò chuyện', err.message);
-       }
-      }}
-    >
-      <Image
-        source={user.avatar ? { uri: user.avatar } : require('../Images/avt.png')}
-        style={styles.imgAG}
-      />
-      <View style={styles.fInfor}>
-        <Text style={styles.name}>{user.name}</Text>
-        <Text style={styles.phoneNumber} numberOfLines={1}>
-          {user.username}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
 
   return (
     <View style={styles.container}>
