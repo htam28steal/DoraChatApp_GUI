@@ -167,7 +167,7 @@ useEffect(() => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Image source={require('../icons/back.png')} style={styles.btnBack} />
         </TouchableOpacity>
-        <Text style={styles.title}>Friend profile</Text>
+        <Text style={styles.title}>Profile</Text>
         <View style={styles.fEdit}>
         </View>
       </View>
@@ -262,7 +262,7 @@ useEffect(() => {
             </View>
             <View style={styles.fRowS}>
               <Image source={require('../icons/house.png')} style={styles.iconDe} />
-              <Text style ={styles.fText}>Gender: {gender ? 'Male' : 'Female'}</Text>
+              <Text style={styles.fText}>Gender: {gender ? 'Female' : 'Male'}</Text>
             </View>
             <View style={styles.fRowS}>
               <View style={styles.iconD}>
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     marginTop:25,
   },
   btnBack: { width: 25, height: 18, marginLeft:10 },
-  title: { fontSize: 18, fontWeight: 'bold', color: '#086DC0' },
+  title: { fontSize: 18, fontWeight: 'bold', color: '#086DC0', marginLeft:-38 },
   btnEdit: { flexDirection: 'row', alignItems: 'center',width:30, height:30, marginRight:5, backgroundColor:'#086DC0', borderRadius:15, justifyContent:'center'},
   iconEdit: { width: 18, height: 18,tintColor:'white'},
   fProfile: {
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     
   },
-  txtMT: { fontSize: 14, fontWeight: '600' },
+  txtMT: { fontSize: 17, fontWeight: '600' },
   fDetailInfor: { paddingLeft: 28, marginBottom: 20 },
   fRowS: {
     flexDirection: 'row',
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  txtHobbies: { fontSize: 12, color: '#086DC0' },
+  txtHobbies: { fontSize: 14, color: '#086DC0' },
   fText:{
     fontSize:16
   }
