@@ -32,6 +32,29 @@ const [pinModalVisible, setPinModalVisible] = useState(false);
   const [recentImages, setRecentImages] = useState([]);
   
   
+useEffect(() => {
+  const handleNewMessage = (message) => {
+    // Only handle images and make sure it's for this conversation
+    if (
+      message.conversationId === conversationId &&
+      message.type === 'IMAGE'
+    ) {
+      setRecentImages(prev => {
+        const updated = [message, ...prev];
+        const unique = updated.filter(
+          (img, index, self) => self.findIndex(i => i._id === img._id) === index
+        );
+        return unique.slice(0, 6); // Keep only latest 6
+      });
+    }
+  };
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+  };
+}, [conversationId]);
 
 const fetchPinnedMessages = async () => {
   try {

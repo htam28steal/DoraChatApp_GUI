@@ -688,6 +688,7 @@ const messageInputStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#ccc",
     backgroundColor: "#fff",
+    marginBottom:37
   },
   iconButton: { padding: 8 },
   icon: { width: 24, height: 24, resizeMode: "contain" },
@@ -705,6 +706,7 @@ const messageInputStyles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 8,
     color: "#000",
+
   },
   sendButton: { padding: 8 },
   sendIcon: { width: 24, height: 24, resizeMode: "contain" },
@@ -1171,11 +1173,12 @@ const handleReadMessage = async () => {
 const openForwardModal = async () => {
   try {
     const { data: conversations } = await axios.get("/api/conversations");
-    console.log("Fetched all conversations:", conversations);
+    const filteredConversations = conversations.filter(c => c._id !== conversationId);
+
 
     // split out groups vs. private
-    const groupConvs   = conversations.filter(c => c.type === true);
-    const privateConvs = conversations.filter(c => c.type !== true);
+    const groupConvs   = filteredConversations.filter(c => c.type === true);
+    const privateConvs = filteredConversations.filter(c => c.type !== true);
 
     // 1️⃣ build group→channels list exactly as you had it
     const channelPromises = groupConvs.map(async (conv) => {

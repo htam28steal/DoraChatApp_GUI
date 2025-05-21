@@ -834,6 +834,7 @@ txtFillterChosen: { fontSize: 16, fontWeight: '600', color: '#F49300' },
     justifyContent: 'space-around',
     alignItems: 'center',
     alignSelf: 'center',
+    marginBottom:20
   },
   btnTags: {
     width: 66,

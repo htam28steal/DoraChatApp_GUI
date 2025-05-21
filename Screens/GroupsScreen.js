@@ -1288,7 +1288,7 @@ useEffect(() => {
     
       fInfor: { flex: 1, justifyContent: 'center', paddingLeft: 10 },
       name: { fontSize: 17, fontWeight: 'bold' , color:'#086dc0'},
-      email: { fontSize: 14, fontWeight: '400' },
+      email: { fontSize: 14, fontWeight: '400', maxWidth:'80%' },
       fbtn: { position: 'absolute', right: 0, top: 5, width: 13, height: 30 },
       btnDetail: { width: 13, height: '100%' },
     
@@ -1302,6 +1302,7 @@ useEffect(() => {
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
+        marginBottom:20
       },
       btnTags: {
         width: 66,

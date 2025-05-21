@@ -57,6 +57,38 @@ export default function ConversationScreen({ navigation }) {
       const [friends, setFriends] = useState([]);
 
 
+      useEffect(() => {
+  const handleNewMessage = (message) => {
+    if (!message || !message.conversationId) return;
+
+    setConversations(prev => {
+      const updated = prev.map(conv => {
+        if (conv._id === message.conversationId) {
+          return {
+            ...conv,
+            lastMessageId: message, // Replace with the latest message
+          };
+        }
+        return conv;
+      });
+
+      // Optional: Move the updated conversation to the top
+      const updatedConv = updated.find(c => c._id === message.conversationId);
+      const others = updated.filter(c => c._id !== message.conversationId);
+      return [updatedConv, ...others];
+    });
+  };
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+  console.log('✅ Subscribed to RECEIVE_MESSAGE on ConversationScreen');
+
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+    console.log('❌ Unsubscribed from RECEIVE_MESSAGE on ConversationScreen');
+  };
+}, []);
+
+
      useEffect(() => {
   const fetchUserInfo = async () => {
     try {
@@ -1232,7 +1264,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    alignSelf:'center'
+    alignSelf:'center',
+    marginBottom:20
   },
   btnTags: {
     width: 66,
@@ -1278,5 +1311,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
       },
       favatarG: { width: 25, height: 25, borderRadius: 12.5 },    
-
+      
+      email:{
+        maxWidth:'80%'
+      }
 });

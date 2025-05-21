@@ -105,7 +105,10 @@ const renderSearchItem = ({ item }) => (
       try {
         const resp = await axios.post(`/api/conversations/individuals/${item._id}`);
         const conversation = resp.data;
-
+        
+        if (typeof conversation.type === 'undefined') {
+          conversation.type = false;
+        }
         navigation.navigate('ChatScreen', {
           conversation,
           userId,
@@ -483,6 +486,7 @@ fMessage: {
     justifyContent: 'space-around',
     alignItems: 'center',
     alignSelf: 'center',
+    marginBottom:20
   },
   btnTags:     { width: 66, height: 45, backgroundColor: 'white', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
   btnTag:      { width: 66, height: 45, backgroundColor: '#086DC0', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },

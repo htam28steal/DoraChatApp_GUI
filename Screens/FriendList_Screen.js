@@ -241,12 +241,17 @@ socket.onAny((event, data) => {
 
   // Render for search result items
   const renderSearchItem = ({ item }) => (
-      <TouchableOpacity
+  <TouchableOpacity
     style={styles.fMessage}
     onPress={async () => {
       try {
         const resp = await axios.post(`/api/conversations/individuals/${item._id}`);
         const conversation = resp.data;
+
+        // 🛠️ Patch missing type if undefined
+        if (typeof conversation.type === 'undefined') {
+          conversation.type = false;
+        }
 
         navigation.navigate('ChatScreen', {
           conversation,
@@ -258,6 +263,7 @@ socket.onAny((event, data) => {
       }
     }}
   >
+  
       {item.avatar ? <Image source={{uri:item.avatar}} style={styles.imgAG}/> : <View style={[styles.avatarCl,{backgroundColor:item.avatarColor||'#086DC0'}]}><Text style={styles.avatarText}>{item.name.charAt(0)}</Text></View>}
       <View style={styles.fInfoText}>
         <Text style={styles.name}>{item.name}</Text>
@@ -464,6 +470,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     alignSelf: 'center',
+    marginBottom:20
   },
   btnTags: { width: 66, height: 45, backgroundColor: 'white', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
   iconfooter: { width: 25, height: 25 },
