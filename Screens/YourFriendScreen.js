@@ -315,8 +315,8 @@ const styles = StyleSheet.create({
   btnEdit: { flexDirection: 'row', alignItems: 'center',width:30, height:30, marginRight:5, backgroundColor:'#086DC0', borderRadius:15, justifyContent:'center'},
   iconEdit: { width: 18, height: 18,tintColor:'white'},
   fProfile: {
-    marginTop: 20,
-    height: 145,
+    marginTop: 10,
+    height: 170,
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
     borderBottomLeftRadius: 30,

@@ -378,7 +378,7 @@ const renderFriend = ({ item: user }) => (
         <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('FriendList_Screen')}>
           <Image source={friendIcon} style={styles.iconfooter} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnTags}>
+        <TouchableOpacity style={styles.btnTags}  onPress={()=>navigation.navigate('ProfileScreen')} >
          {currentUser?.avatar ? (
            <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
          ) : (

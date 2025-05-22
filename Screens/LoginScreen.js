@@ -20,16 +20,22 @@ const LoginScreen = () => {
     }
     try {
       setLoading(true);
-      const response = await authService.login(username, password);
-      if (response && response.data?.token) {
-        const id = response.data?.user._id;
-        const accessToken = response.data?.token;
-        const refreshToken = response.data?.refreshToken;
-        await AsyncStorage.setItem('userToken', accessToken);
-        await AsyncStorage.setItem('userId', id);
-        console.log('Logged in userId:', id);
-        navigation.navigate("GroupsScreen", { token: accessToken, uID: id });
-      }
+const response = await authService.login(username, password);
+if (response && response.data?.token) {
+  const user = response.data?.user;
+  const id = user._id;
+  const accessToken = response.data?.token;
+  const refreshToken = response.data?.refreshToken;
+
+  await AsyncStorage.setItem('userToken', accessToken);
+  await AsyncStorage.setItem('userId', id);
+  await AsyncStorage.setItem('refreshToken', refreshToken); // ✅ Required
+  await AsyncStorage.setItem('userInfo', JSON.stringify(user)); // ✅ Fix here
+
+  console.log('Logged in userId:', id);
+  navigation.navigate("GroupsScreen", { token: accessToken, uID: id });
+}
+
     } catch (error) {
       console.log('Login error:', error);
     } finally {

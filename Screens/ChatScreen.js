@@ -13,7 +13,9 @@ import {
   Modal,
   Linking,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  SafeAreaView
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -33,6 +35,8 @@ import UserService from "../api/userService";
 import { Audio } from "expo-av";
 
 
+const urlRegex = /(https?:\/\/[^\s]+)/g;
+
 // ASSETS
 const AvatarImage = require("../Images/avt.png");
 const CallIcon = require("../icons/call.png");
@@ -46,6 +50,31 @@ const FileSent = require("../icons/filesent.png");
 const Return = require("../icons/back.png");
 
 const screenWidth = Dimensions.get("window").width;
+
+
+function renderTextWithLinks(content) {
+  // Split on URLs
+  const parts = content.split(urlRegex);
+  return parts.map((part, i) => {
+    if (urlRegex.test(part)) {
+      return (
+        <Text
+          key={i}
+          style={[messageItemStyles.textContent, messageItemStyles.linkText]}
+          onPress={() => Linking.openURL(part).catch(() => Alert.alert('Error', 'Cannot open link'))}
+        >
+          {part}
+        </Text>
+      );
+    } else {
+      return (
+        <Text key={i} style={messageItemStyles.textContent}>
+          {part}
+        </Text>
+      );
+    }
+  });
+}
 
 /**
  * Message Bubble Component with support for onLongPress to show message options.
@@ -75,6 +104,22 @@ const MessageItem = forwardRef(function MessageItem(
 const [imgLoading, setImgLoading] = useState(true);
 
   const navigation = useNavigation();
+
+  const downloadFile = async (url, fileName = 'downloaded_file') => {
+  try {
+    const downloadResumable = FileSystem.createDownloadResumable(
+      url,
+      FileSystem.documentDirectory + fileName
+    );
+
+    const { uri } = await downloadResumable.downloadAsync();
+    Alert.alert("Success", `File downloaded to:\n${uri}`);
+  } catch (error) {
+    console.error("Download error:", error);
+    Alert.alert("Error", "Failed to download the file.");
+  }
+};
+
 
   const isMe = msg.memberId?.userId === currentUserId;
   const content = msg.content || "";
@@ -256,6 +301,14 @@ const Container = onLongPress ? TouchableOpacity : View;
  <View style={{ position: "relative" }}
   
  >
+  <TouchableOpacity
+     style={{ position: "relative" }}
+     activeOpacity={0.8}
+     onPress={() =>
+       navigation.navigate("FullScreenImage", { uri: msg.content })
+     }
+     onLongPress={onLongPress}
+   >
   <Image
     source={{ uri: msg.content }}
     style={messageItemStyles.imageContent}
@@ -270,7 +323,9 @@ const Container = onLongPress ? TouchableOpacity : View;
       <ActivityIndicator size="small" color="#086DC0" />
     </View>
   )}
+  </TouchableOpacity>
 </View>
+
 
         ) : msg.type === "VIDEO" ? (
           <Video
@@ -282,16 +337,18 @@ const Container = onLongPress ? TouchableOpacity : View;
              onLoad={() => onMediaLoad?.()}
           />
         ) : msg.type === "FILE" ? (
-          <TouchableOpacity
-            style={messageItemStyles.fileContainer}
-            onLongPress={onLongPress}
-            activeOpacity={0.7}
-          >
-            <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
-            <Text style={messageItemStyles.fileText}>
-              {msg.fileName || "Open File"}
-            </Text>
-          </TouchableOpacity>
+<TouchableOpacity
+  style={messageItemStyles.fileContainer}
+  onPress={() => downloadFile(msg.content, msg.fileName)}
+  onLongPress={onLongPress}
+  activeOpacity={0.7}
+>
+  <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
+  <Text style={messageItemStyles.fileText}>
+    {msg.fileName || "Open File"}
+  </Text>
+</TouchableOpacity>
+
         ) : (
          <Text
   style={[
@@ -308,7 +365,7 @@ const Container = onLongPress ? TouchableOpacity : View;
     ? "Message has been recalled"
     : content.length > MAX_TEXT_LENGTH
     ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-    : content}
+    : renderTextWithLinks(content)}
 </Text>
         )}
          {msg.reacts && msg.reacts.length > 0 && (
@@ -426,7 +483,10 @@ imageOverlay: {
   borderRadius: 6,
   marginBottom: 4,
 },
-
+  linkText: {
+    color: '#086DC0',
+    textDecorationLine: 'underline',
+  },
 replyAuthor: {
   fontSize: 12,
   fontWeight: "bold",
@@ -688,7 +748,7 @@ const messageInputStyles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#ccc",
     backgroundColor: "#fff",
-    marginBottom:37
+    marginBottom:20
   },
   iconButton: { padding: 8 },
   icon: { width: 24, height: 24, resizeMode: "contain" },
@@ -1715,7 +1775,12 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
 
 
   return (
-    <View style={chatScreenStyles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#D8EDFF' }}>
+     <KeyboardAvoidingView
+       style={{ flex: 1 }}
+       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+       >
+
 <HeaderSingleChat
   conversation={conversation}
   conversationId={conversationId}
@@ -1837,7 +1902,14 @@ selectedMessage?.isPinned
         handlePinMessages(selectedMessage);
       },
     },
-          { icon: require('../icons/mic.png'),label: 'Read Message',   onPress: handleReadMessage },
+...(selectedMessage?.type === 'TEXT'
+  ? [{
+      icon: require('../icons/mic.png'),
+      label: 'Read Message',
+      onPress: handleReadMessage,
+    }]
+  : []),
+
 
         ].map((opt, i) => (
           <TouchableOpacity
@@ -1992,7 +2064,8 @@ selectedMessage?.isPinned
                         </View>
                     </View>
                 </Modal>
-    </View>
+    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -2541,10 +2614,11 @@ closeModalButton: {
 },
 
 closeModalIcon: {
-  width: 20,
-  height: 20,
+  width: 25,
+  height: 25,
   tintColor: "#FF0000", // Optional: match your theme
   resizeMode: "contain",
+
 },
 
 });

@@ -8,17 +8,25 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  ImageBackground,
+  Alert
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { updatePassword } from '../api/meSevice';
 import { updateAvatarUser } from '../api/meSevice';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "../api/apiConfig";
+import { getUserById } from '../api/meSevice';
+import dayjs from 'dayjs';
 
-export default function Screen_04({ navigation, route }) {
+
+
+export default function ProfileScreen({ navigation }) {
   const [screen, setScreen] = useState('home');
-  const { userInfo } = route.params;
-  const { token } = route.params;
+const [userInfo, setUserInfo] = useState(null);
+const [token, setToken] = useState(null);
+
 
   const [uId, setUId] = useState('');
   const [avatarColor, setAvatarColor] = useState(true);
@@ -35,8 +43,74 @@ export default function Screen_04({ navigation, route }) {
   const [successMessage, setSuccessMessage] = useState('');
 
 
+const handleLogout = async () => {
+  try {
+    const userRaw = await AsyncStorage.getItem('userInfo');
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+
+    if (!userRaw || !refreshToken) {
+      console.warn('Missing user or refreshToken');
+      Alert.alert('Logout Failed', 'Missing user session info.');
+      return;
+    }
+
+    const user = JSON.parse(userRaw);
+
+    console.log('Sending to logout:', {
+      user,
+      refreshToken,
+    });
+
+    const response = await axios.post('/api/auth/logout', {
+      user,
+      refreshToken,
+    });
+
+    console.log('Logout response:', response.data);
+
+    await AsyncStorage.multiRemove([
+      'userId',
+      'userToken',
+      'refreshToken',
+      'userInfo',
+    ]);
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'LoginScreen' }],
+    });
+  } catch (error) {
+    console.error('Logout failed:', error.response?.data || error.message);
+    Alert.alert('Logout Failed', error.response?.data?.message || 'Unexpected error');
+  }
+};
 
 
+useEffect(() => {
+  const fetchUserData = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      const storedToken = await AsyncStorage.getItem('userToken');
+
+      if (!storedUserId || !storedToken) {
+        console.warn('Missing userId or token');
+        return;
+      }
+
+      setToken(storedToken);
+
+      const user = await getUserById(storedUserId, storedToken);
+      setUserInfo(user);
+      setUId(user._id);
+      setAvatarColor(user.avatarColor || 'gray');
+      setAvatarUrl(user.avatar || '');
+    } catch (error) {
+      console.error('Failed to load user info:', error);
+    }
+  };
+
+  fetchUserData();
+}, []);
 
 
   useEffect(() => {
@@ -153,7 +227,7 @@ export default function Screen_04({ navigation, route }) {
   }
 
   return (
-    <View style={styles.container}>
+    <ImageBackground style={styles.container} source={require('../Images/bground.png')}>
       <View style={styles.fTop}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Image
@@ -163,7 +237,6 @@ export default function Screen_04({ navigation, route }) {
         <Text style={styles.title}>My profile</Text>
         <View style={styles.fEdit}>
           <TouchableOpacity style={styles.btnEdit}>
-            <Text style={styles.txtEdit}>Chỉnh sửa</Text>{' '}
             <Image
               source={require('../icons/edit.png')}
               style={styles.iconEdit}></Image>
@@ -191,15 +264,10 @@ export default function Screen_04({ navigation, route }) {
           </View>
 
           <View style={styles.fName}>
-            <Text style={styles.txtName}>{userInfo?.name}</Text>
+
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text>Have a nice day !</Text>
-              <TouchableOpacity>
-                <Image
-                  source={require('../icons/edit.png')}
-                  style={styles.iconEdit}
-                />
-              </TouchableOpacity>
+            <Text style={styles.txtName}>{userInfo?.name}</Text>
+
             </View>
           </View>
         </View>
@@ -207,52 +275,6 @@ export default function Screen_04({ navigation, route }) {
         <Image source={require('../icons/QR.png')} style={styles.qR}></Image>
       </View>
 
-      <View style={styles.fFunction}>
-        <TouchableOpacity
-          style={[
-            styles.btnTab,
-            screen === 'home' ? styles.btnActive : styles.btnInactive
-          ]} onPress={() => setScreen('home')}>
-          <Image
-            source={require('../icons/profile.png')}
-            style={styles.iconEdit}
-          />
-          <Text style={[
-            styles.txtTab,
-            screen === 'home' ? styles.txtActive : styles.txtInactive
-          ]}>Information</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.btnTab,
-            screen === 'friends' ? styles.btnActive : styles.btnInactive
-          ]}
-          onPress={() => setScreen('friends')}>
-          <Image
-            source={require('../icons/friends.png')}
-            style={styles.iconEdit}
-          />
-          <Text style={[
-            styles.txtTab,
-            screen === 'friends' ? styles.txtActive : styles.txtInactive
-          ]}>Friends (10)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.btnTab,
-            screen === 'account' ? styles.btnActive : styles.btnInactive
-          ]}
-          onPress={() => setScreen('account')}>
-          <Image
-            source={require('../icons/setting.png')}
-            style={styles.iconEdit}
-          />
-          <Text style={[
-            styles.txtTab,
-            screen === 'account' ? styles.txtActive : styles.txtInactive
-          ]}>Account</Text>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.fDetailInfor}>
         {screen === 'home' && (
@@ -260,32 +282,45 @@ export default function Screen_04({ navigation, route }) {
             <View style={styles.fRow}>
               <View style={styles.fHalfRow}>
                 <View style={styles.fPro}>
-                  <Text style={styles.txtPro}>First Name</Text>
+                  <Text style={styles.txtPro}>Name</Text>
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>User</Text>
+                  <Text style={styles.txtInput} numberOfLines={1}>{userInfo?.name}</Text>
                 </View>
               </View>
 
               <View style={styles.fHalfRow}>
                 <View style={styles.fPro}>
-                  <Text style={styles.txtPro}>Last Name</Text>
+                  <Text style={styles.txtPro}>Email</Text>
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>Admin</Text>
+                  <Text style={styles.txtInput} numberOfLines={1}>{userInfo?.username}</Text>
                 </View>
               </View>
             </View>
             <View style={styles.fRow}>
               <View style={styles.fHalfRow}>
                 <View style={styles.fPro}>
-                  <Text style={styles.txtPro}>Date of birth</Text>
+
+                  {(() => {
+                    const rawDate = userInfo?.dateOfBirth;
+                    const parsedDate = rawDate?.$date || rawDate;
+                    return (
+                      <Text style={styles.txtPro}>       
+                        Date of birth:
+                      </Text>
+                    );
+                  })()}
+
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  {/* <Text style={styles.txtInput}>{userInfo.dateOfBirth.day}/{userInfo.dateOfBirth.month}/{userInfo.dateOfBirth.year}</Text> */}
+                   <Text style={styles.txtInput}>  
+                          {userInfo?.dateOfBirth
+  ? dayjs(`${userInfo.dateOfBirth.year}-${userInfo.dateOfBirth.month}-${userInfo.dateOfBirth.day}`).format('MMMM D, YYYY')
+  : '—'}</Text> 
                 </View>
               </View>
 
@@ -295,28 +330,38 @@ export default function Screen_04({ navigation, route }) {
                 </View>
 
                 <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput}>{userInfo?.gender === true ? 'Nữ' : 'Nam'}</Text>
+                  <Text style={styles.txtInput}>{userInfo?.gender === true ? 'Female' : 'Male'}</Text>
                 </View>
               </View>
             </View>
 
             <View style={styles.fRow}>
               <View style={styles.fPro}>
-                <Text style={styles.txtPro}>Email</Text>
+                <Text style={styles.txtPro}>Phone number</Text>
               </View>
 
               <View style={styles.fTxtInput}>
-                <Text style={styles.txtInput}>{userInfo?.username}</Text>
+                <Text style={styles.txtInput}>{userInfo?.phoneNumber}</Text>
               </View>
             </View>
             <View style={styles.fRow}>
               <View style={styles.fPro}>
                 <Text style={styles.txtPro}>Your hobbies</Text>
               </View>
+<View style={styles.fHobbies}>
+{userInfo?.hobbies?.length > 0 ? (
+  userInfo.hobbies.map((hobby, i) => (
+    <View key={i} style={styles.fHobbie}>
+      <Text style={styles.txtHobbies}>{hobby}</Text>
+    </View>
+  ))
+) : (
+  <Text style={{ marginLeft: 20, color: '#666' }}>
+    No hobbies listed.
+  </Text>
+)}
 
-              <View style={styles.fTxtInput}>
-                <Text style={styles.txtInput}>{userInfo?.hobbies}</Text>
-              </View>
+        </View>
             </View>
           </View>
         )}
@@ -330,7 +375,7 @@ export default function Screen_04({ navigation, route }) {
                   style={styles.avatar}
                 />
                 <View style={styles.fInfor}>
-                  <Text style={styles.name}>John Nguyen</Text>
+                  <Text style={styles.name}></Text>
                   <Text style={styles.email}>johnNguyen@gmail.com</Text>
                   <View style={styles.fbtn}>
                     <TouchableOpacity style={styles.btnDetail}>
@@ -435,13 +480,15 @@ export default function Screen_04({ navigation, route }) {
         )}
       </View>
 
-      <TouchableOpacity style={styles.btnLogout}>
-        <Image
-          source={require('../icons/logout.png')}
-          style={styles.iconLogout}></Image>
-        <Text style={styles.txtInput}>Đăng Xuất</Text>
-      </TouchableOpacity>
-    </View>
+<TouchableOpacity style={styles.btnLogout} onPress={handleLogout}>
+  <Image
+    source={require('../icons/logout.png')}
+    style={styles.iconLogout}
+  />
+  <Text style={styles.txtInput}>Sign out</Text>
+</TouchableOpacity>
+
+    </ImageBackground>
   );
 }
 
@@ -451,14 +498,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: 'white',
-    padding: 10,
+    alignItems:'center'
   },
   fTop: {
-    width: '100%',
+    width: '90%',
     height: 25,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop:30,
+
   },
   btnBack: {
     width: 25,
@@ -473,42 +522,42 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#086DC0',
+    marginLeft:40
   },
   iconEdit: {
-    width: 11,
-    height: 11,
+    width: 15,
+    height: 15,
+    tintColor:'white'
   },
   txtEdit: {
-    fontSize: 11,
+    fontSize: 15,
     color: '#086DC0',
   },
   btnEdit: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+ alignItems: 'center',width:30, height:30, backgroundColor:'#086DC0', borderRadius:15, justifyContent:'center', alignSelf:'flex-end'
   },
   fProfile: {
-    width: '100%',
+    width: '95%',
     height: 145,
     marginTop: 20,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    borderRadius:20,
     flexDirection: 'row',
+    alignSelf:'center'
   },
   imgProfile: {
     width: '100%',
     height: '100%',
     overflow: 'hidden',
+    borderRadius:10
   },
   detailProfile: {
     position: 'absolute',
     width: 290,
-    height: 70,
-    bottom: 10,
+    height: 80,
+    bottom: -20,
     left: 10,
-    flexDirection: 'row',
+
+    
   },
   favatar: {
     width: 65,
@@ -523,15 +572,14 @@ const styles = StyleSheet.create({
   }
   ,
   fName: {
-    width: '75%',
     height: 50,
-    alignSelf: 'flex-end',
-    marginLeft: 20
+
   },
   txtName: {
     fontSize: 18,
     color: '#086DC0',
     fontWeight: 'bold',
+    marginTop:15,
   },
   qR: {
     position: 'absolute',
@@ -575,9 +623,11 @@ const styles = StyleSheet.create({
     fontWeight: 600,
   },
   fDetailInfor: {
-    width: '100%',
+    width: '95%',
     height: 350,
-    marginTop: 10,
+    marginTop: 60,
+    
+    alignContent:'center',
   },
   fRow: {
     width: '100%',
@@ -624,9 +674,9 @@ const styles = StyleSheet.create({
     bottom: 20,
     width: 110,
     alignItems: 'center',
-    justifyContent: 'space-between',
     flexDirection: 'row',
     left: '38%',
+    marginBottom:20.
   },
   fInfor: {
     width: '82%',
@@ -742,5 +792,18 @@ const styles = StyleSheet.create({
   txtInactive: {
     color: '#086DC0',
   },
-
+fHobbies: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingLeft: 28,
+  },
+  fHobbie: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 17,
+    backgroundColor: '#D3EBFF',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  txtHobbies: { fontSize: 14, color: '#086DC0' },
 });

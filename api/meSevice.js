@@ -1,19 +1,17 @@
-import api from './apiConfig';
+import axios from "../api/apiConfig";
 import { Platform } from 'react-native';
 
-export const getUserInfo = async (userId, token) => {
-    try {
-        const response = await api.get(`/api/me/profile/${userId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error('Error getting user info:', error);
-        throw error;
-    }
+
+// /api/me/profile should NOT include userId as param
+export const getUserById = async (token) => {
+  const res = await axios.get('/api/me/profile', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return res.data;
 };
+
 export const updatePassword = async (userId, oldPassword, newPassword, token) => {
     try {
         const response = await api.put(`/api/me/password`, {
