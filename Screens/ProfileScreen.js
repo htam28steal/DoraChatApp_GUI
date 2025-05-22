@@ -19,6 +19,31 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "../api/apiConfig";
 import { getUserById } from '../api/meSevice';
 import dayjs from 'dayjs';
+import SectionedMultiSelect from 'react-native-sectioned-multi-select';
+import { MaterialIcons } from '@expo/vector-icons';
+
+
+
+
+const hobbiesOptions = [
+  // sectioning is optional but matches your screenshot
+  {
+    name: 'Hobbies',
+    id: 0,
+    children: [
+      { id: 'Photography', name: 'Photography' },
+      { id: 'Cooking', name: 'Cooking' },
+      { id: 'Gardening', name: 'Gardening' },
+      { id: 'Traveling', name: 'Traveling' },
+      { id: 'Sports', name: 'Sports' },
+      { id: 'Singing', name: 'Singing' },
+      { id: 'Dancing', name: 'Dancing' },
+      { id: 'Reading', name: 'Reading' },
+      { id: 'Writing', name: 'Writing' },
+      { id: 'Painting', name: 'Painting' },
+    ],
+  }
+];
 
 
 
@@ -26,6 +51,9 @@ export default function ProfileScreen({ navigation }) {
   const [screen, setScreen] = useState('home');
 const [userInfo, setUserInfo] = useState(null);
 const [token, setToken] = useState(null);
+const [editMode, setEditMode] = useState(false);
+const [editedProfile, setEditedProfile] = useState(null);
+const [selectedHobbies, setSelectedHobbies] = useState([]);
 
 
   const [uId, setUId] = useState('');
@@ -41,6 +69,26 @@ const [token, setToken] = useState(null);
 
   // State for success message
   const [successMessage, setSuccessMessage] = useState('');
+
+const handleSaveProfile = async () => {
+  try {
+    // Remove dateOfBirth from editedProfile before sending
+    const { dateOfBirth, ...profileWithoutDOB } = editedProfile;
+
+    const payload = {
+      ...profileWithoutDOB,
+      hobbies: selectedHobbies,
+      phoneNumber: userInfo.phoneNumber,
+    };
+    
+    await axios.put('/api/me/profile', payload);
+    setUserInfo({ ...userInfo, ...payload }); // Keep the old dateOfBirth
+    Alert.alert('Success', 'Profile updated!');
+  } catch (e) {
+    Alert.alert('Error', e.response?.data?.message || 'Failed to update profile');
+  }
+  setEditMode(false);
+};
 
 
 const handleLogout = async () => {
@@ -235,13 +283,26 @@ useEffect(() => {
             style={styles.btnBack}></Image>
         </TouchableOpacity>
         <Text style={styles.title}>My profile</Text>
-        <View style={styles.fEdit}>
-          <TouchableOpacity style={styles.btnEdit}>
-            <Image
-              source={require('../icons/edit.png')}
-              style={styles.iconEdit}></Image>
-          </TouchableOpacity>
-        </View>
+<View style={styles.fEdit}>
+  <TouchableOpacity
+    style={styles.btnEdit}
+    onPress={() => {
+      if (!editMode) {
+        setEditedProfile({ ...userInfo });
+        setSelectedHobbies(userInfo?.hobbies || []);
+      } else {
+        handleSaveProfile();
+      }
+      setEditMode(!editMode);
+    }}
+  >
+    <Image
+      source={editMode ? require('../icons/check.png') : require('../icons/edit.png')}
+      style={styles.iconEdit}
+    />
+  </TouchableOpacity>
+</View>
+
       </View>
 
       <View style={styles.fProfile}>
@@ -279,27 +340,21 @@ useEffect(() => {
       <View style={styles.fDetailInfor}>
         {screen === 'home' && (
           <View>
-            <View style={styles.fRow}>
-              <View style={styles.fHalfRow}>
-                <View style={styles.fPro}>
-                  <Text style={styles.txtPro}>Name</Text>
-                </View>
+<View style={styles.fRow}>
+  <View style={styles.fPro}><Text style={styles.txtPro}>Name</Text></View>
+  <View style={styles.fTxtInput}>
+    {editMode ? (
+      <TextInput
+        style={styles.txtInput}
+        value={editedProfile?.name}
+        onChangeText={t => setEditedProfile(p => ({ ...p, name: t }))}
+      />
+    ) : (
+      <Text style={styles.txtInput} numberOfLines={1}>{userInfo?.name}</Text>
+    )}
+  </View>
+</View>
 
-                <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput} numberOfLines={1}>{userInfo?.name}</Text>
-                </View>
-              </View>
-
-              <View style={styles.fHalfRow}>
-                <View style={styles.fPro}>
-                  <Text style={styles.txtPro}>Email</Text>
-                </View>
-
-                <View style={styles.fTxtInput}>
-                  <Text style={styles.txtInput} numberOfLines={1}>{userInfo?.username}</Text>
-                </View>
-              </View>
-            </View>
             <View style={styles.fRow}>
               <View style={styles.fHalfRow}>
                 <View style={styles.fPro}>
@@ -316,12 +371,14 @@ useEffect(() => {
 
                 </View>
 
-                <View style={styles.fTxtInput}>
-                   <Text style={styles.txtInput}>  
-                          {userInfo?.dateOfBirth
-  ? dayjs(`${userInfo.dateOfBirth.year}-${userInfo.dateOfBirth.month}-${userInfo.dateOfBirth.day}`).format('MMMM D, YYYY')
-  : '—'}</Text> 
-                </View>
+  <View style={styles.fTxtInput}>
+    <Text style={styles.txtInput}>
+      {userInfo?.dateOfBirth
+        ? dayjs(`${userInfo.dateOfBirth.year}-${userInfo.dateOfBirth.month}-${userInfo.dateOfBirth.day}`).format('MMMM D, YYYY')
+        : '—'}
+    </Text>
+  </View>
+
               </View>
 
               <View style={styles.fHalfRow}>
@@ -335,34 +392,43 @@ useEffect(() => {
               </View>
             </View>
 
-            <View style={styles.fRow}>
-              <View style={styles.fPro}>
-                <Text style={styles.txtPro}>Phone number</Text>
-              </View>
+<View style={styles.fRow}>
+  <View style={styles.fPro}><Text style={styles.txtPro}>Phone number</Text></View>
+  <View style={styles.fTxtInput}>
+    <Text style={styles.txtInput}>{userInfo?.phoneNumber}</Text>
+  </View>
+</View>
 
-              <View style={styles.fTxtInput}>
-                <Text style={styles.txtInput}>{userInfo?.phoneNumber}</Text>
-              </View>
-            </View>
-            <View style={styles.fRow}>
-              <View style={styles.fPro}>
-                <Text style={styles.txtPro}>Your hobbies</Text>
-              </View>
-<View style={styles.fHobbies}>
-{userInfo?.hobbies?.length > 0 ? (
-  userInfo.hobbies.map((hobby, i) => (
-    <View key={i} style={styles.fHobbie}>
-      <Text style={styles.txtHobbies}>{hobby}</Text>
-    </View>
-  ))
-) : (
-  <Text style={{ marginLeft: 20, color: '#666' }}>
-    No hobbies listed.
-  </Text>
-)}
-
+<View style={styles.fRow}>
+  <View style={styles.fPro}><Text style={styles.txtPro}>Your hobbies</Text></View>
+  <View style={styles.fHobbies}>
+    {editMode ? (
+      <SectionedMultiSelect
+        items={hobbiesOptions}
+        uniqueKey="id"
+        subKey="children"
+        selectText="Choose your hobbies..."
+        showDropDowns={true}
+        readOnlyHeadings={true}
+        onSelectedItemsChange={setSelectedHobbies}
+        selectedItems={selectedHobbies}
+        styles={{
+          selectToggle: { padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#086DC0' },
+        }}
+        IconRenderer={MaterialIcons}
+      />
+    ) : userInfo?.hobbies?.length > 0 ? (
+      userInfo.hobbies.map((hobby, i) => (
+        <View key={i} style={styles.fHobbie}>
+          <Text style={styles.txtHobbies}>{hobby}</Text>
         </View>
-            </View>
+      ))
+    ) : (
+      <Text style={{ marginLeft: 20, color: '#666' }}>No hobbies listed.</Text>
+    )}
+  </View>
+</View>
+
           </View>
         )}
 
