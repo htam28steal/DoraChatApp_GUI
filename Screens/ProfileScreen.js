@@ -13,14 +13,16 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { updatePassword } from '../api/meSevice';
-import { updateAvatarUser } from '../api/meSevice';
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "../api/apiConfig";
-import { getUserById } from '../api/meSevice';
+import { updateAvatarUser, updateCoverUser, updatePassword, getUserById } from '../api/meSevice';
+
 import dayjs from 'dayjs';
 import SectionedMultiSelect from 'react-native-sectioned-multi-select';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+
 
 
 
@@ -48,6 +50,8 @@ const hobbiesOptions = [
 
 
 export default function ProfileScreen({ navigation }) {
+  const [coverUrl, setCoverUrl] = useState('');
+
   const [screen, setScreen] = useState('home');
 const [userInfo, setUserInfo] = useState(null);
 const [token, setToken] = useState(null);
@@ -151,7 +155,8 @@ useEffect(() => {
       setUserInfo(user);
       setUId(user._id);
       setAvatarColor(user.avatarColor || 'gray');
-      setAvatarUrl(user.avatar || '');
+       setAvatarUrl(user.avatar || '');
+      setCoverUrl(user.coverImage || '');
     } catch (error) {
       console.error('Failed to load user info:', error);
     }
@@ -160,13 +165,16 @@ useEffect(() => {
   fetchUserData();
 }, []);
 
+useEffect(() => {
+  if (userInfo) {
+    setAvatarColor(userInfo.avatarColor || 'gray');
+    console.log('Setting avatar from userInfo:', userInfo.avatar);
+    setAvatarUrl(userInfo.avatar || '');
+    console.log('Setting cover from userInfo:', userInfo.coverImage);
+    setCoverUrl(userInfo.coverImage || '');
+  }
+}, [userInfo]);
 
-  useEffect(() => {
-    if (userInfo) {
-      setAvatarColor(userInfo.avatarColor || 'gray');
-
-    }
-  }, [userInfo]);
 
   useEffect(() => {
     if (userInfo && userInfo._id) {
@@ -189,48 +197,76 @@ useEffect(() => {
   const [avatarUrl, setAvatarUrl] = useState(userInfo?.avatar || userInfo?.userInfo);
   const [timestamp, setTimestamp] = useState(Date.now());
 
-  const handleChooseAvatar = () => {
-    ({ mediaType: 'photo', includeBase64: true }, async (response) => {
-      const asset = response.assets?.[0];
-      if (!asset) {
-        console.error('Không có ảnh nào được chọn');
-        return;
-      }
+const pickImage = async (type = 'avatar') => {
+  const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const cameraResult = await ImagePicker.requestCameraPermissionsAsync();
 
-      // Tạo đối tượng file cho việc upload
-      const file = {
-        uri: asset.uri,
-        name: asset.fileName || `avatar-${Date.now()}.jpg`, // Tạo tên file nếu không có
-        type: asset.type || 'image/jpeg', // Loại file mặc định là 'image/jpeg'
-      };
+  if (!permissionResult.granted || !cameraResult.granted) {
+    Alert.alert('Permission required', 'Camera and photo library permissions are required.');
+    return;
+  }
 
-
-      try {
-        const res = await updateAvatarUser(userInfo._id, file, token);
-        console.log('Cập nhật avatar thành công:', res);
-        setTimestamp(Date.now());
-        if (res && res.avatar) {
-          setAvatarUrl(res.avatar);
-        } else {
-          setAvatarUrl(`${userInfo.avatar}?t=${Date.now()}`);
+  Alert.alert(
+    "Update Image",
+    "Choose an option",
+    [
+      {
+        text: "Take Photo",
+        onPress: async () => {
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 1,
+          });
+          if (!result.canceled) {
+            handleImageUpload(result.assets[0], type);
+          }
         }
-
-      } catch (e) {
-        console.error('Lỗi khi cập nhật avatar:', e);
-        console.error('Lỗi khi cập nhật avatar:', e.response?.data || e.message);
-
-      }
-    });
+      },
+      {
+        text: "Choose from Gallery",
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 1,
+          });
+          if (!result.canceled) {
+            handleImageUpload(result.assets[0], type);
+          }
+        }
+      },
+      { text: "Cancel", style: "cancel" }
+    ]
+  );
+};
+const handleImageUpload = async (asset, type) => {
+  const file = {
+    uri: asset.uri,
+    name: `image-${Date.now()}.jpg`,
+    type: 'image/jpeg'
   };
-  const getAvatarUrlWithTimestamp = () => {
-    if (!avatarUrl) return null;
 
-    if (avatarUrl.includes('?')) {
-      return `${avatarUrl}&t=${timestamp}`;
-    } else {
-      return `${avatarUrl}?t=${timestamp}`;
+  console.log(`Uploading ${type} image from URI:`, file.uri);
+
+  try {
+    let res;
+if (type === 'avatar') {
+  res = await updateAvatarUser(userInfo._id, file, token);
+  console.log('Avatar upload response:', res);
+  const updatedUser = await getUserById(userInfo._id, token);
+  setUserInfo(updatedUser); // 👈 refresh user state including avatar
+}
+else if (type === 'cover') {
+      res = await updateCoverUser(userInfo._id, file, token);
+      console.log('Cover upload response:', res);
+      setCoverUrl(res.cover);
     }
-  };
+  } catch (e) {
+    console.error(`Error uploading ${type} image:`, e);
+    Alert.alert('Error', `Failed to upload ${type} image`);
+  }
+};
+
+
 
   const handleUpdatePassword = async () => {
     // Clear previous error messages
@@ -306,22 +342,33 @@ useEffect(() => {
       </View>
 
       <View style={styles.fProfile}>
-        <Image
-          source={require('../Images/backgroundProfile.png')}
-          style={styles.imgProfile}></Image>
+   
+ <Image
+  source={
+    coverUrl
+      ? { uri: `${coverUrl}?t=${timestamp}` }
+      : require('../Images/backgroundProfile.png')
+  }
+  style={styles.imgProfile}
+/>
+<TouchableOpacity style={styles.btnEditCover} onPress={() => pickImage('cover')}>
+    <Image source={require('../icons/edit.png')} style={styles.iconEditCover}></Image>
+
+</TouchableOpacity>
+
 
         <View style={styles.detailProfile}>
           <View style={styles.favatar}>
-            <TouchableOpacity onPress={handleChooseAvatar}>
-              {getAvatarUrlWithTimestamp() ? (
-                <Image
-                  source={{ uri: getAvatarUrlWithTimestamp() }}
-                  style={styles.imgAvatar}
-                />
-              ) : (
-                <View style={[styles.imgAvatar, { backgroundColor: avatarColor }]} />
-              )}
-            </TouchableOpacity>
+        <TouchableOpacity onPress={() => pickImage('avatar')}>
+{avatarUrl ? (
+  <Image source={{ uri: avatarUrl }} style={styles.imgAvatar} />
+) : (
+  <View style={[styles.imgAvatar, { backgroundColor: avatarColor }]} />
+)}
+
+</TouchableOpacity>
+
+
           </View>
 
           <View style={styles.fName}>
@@ -333,7 +380,6 @@ useEffect(() => {
           </View>
         </View>
 
-        <Image source={require('../icons/QR.png')} style={styles.qR}></Image>
       </View>
 
 
@@ -594,6 +640,24 @@ const styles = StyleSheet.create({
     width: 15,
     height: 15,
     tintColor:'white'
+  },
+    iconEditCover: {
+    width: 15,
+    height: 15,
+    tintColor:'white'
+  },
+   btnEditCover: {
+    alignItems: 'center',
+    width:30,
+    height:30,
+    backgroundColor:'#086DC0',
+    borderRadius:15,
+    justifyContent:'center',
+    alignSelf:'flex-end',
+    position:'absolute',
+    bottom:10,
+    right:10
+
   },
   txtEdit: {
     fontSize: 15,
