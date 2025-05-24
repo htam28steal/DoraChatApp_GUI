@@ -409,7 +409,7 @@ useEffect(() => {
 
       {/* FOOTER */}
 <View style={styles.fFooter}>
-        <TouchableOpacity style={styles.btnTags}>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('ConversationScreen')}>
           <Image source={messIcon} style={styles.iconfooter} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>

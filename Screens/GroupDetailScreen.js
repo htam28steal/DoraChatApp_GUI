@@ -81,7 +81,8 @@ useEffect(() => {
     try {
       const res = await axios.get(`/api/messages/${conversationId}`);
       const latestImages = res.data
-        .filter(m => m.type === 'IMAGE')
+        .filter(m => m && m.type === 'IMAGE')
+
         .sort((a, b) => new Date(b.createdAt?.$date || b.createdAt) - new Date(a.createdAt?.$date || a.createdAt))
         .reverse()
         .slice(0, 6);
@@ -762,18 +763,20 @@ onPress={async () => {
     <FlatList
       data={recentImages}
       keyExtractor={item => item._id}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('FullScreenImage', { uri: item.content })
-          }
-        >
-          <Image
-            source={{ uri: item.content }}
-            style={styles.recentImage}
-          />
-        </TouchableOpacity>
-      )}
+      
+       renderItem={({ item }) => {
+    if (!item) return null; // guard against undefined
+    return (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('FullScreenImage', { uri: item.content })}
+      >
+        <Image
+          source={{ uri: item.content }}
+          style={styles.recentImage}
+        />
+      </TouchableOpacity>
+    );
+  }}
       numColumns={3}
       scrollEnabled={false}
       contentContainerStyle={styles.recentList}

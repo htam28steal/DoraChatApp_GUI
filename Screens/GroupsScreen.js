@@ -69,6 +69,9 @@ const [editingConversations, setEditingConversations] = useState([]);
 const [filtered, setFiltered] = useState([]);
   const [selectedFilters, setSelectedFilters] = useState([]);
 
+const canCreateGroup = groupName.trim() && selectedFriendIds.length >= 2 && !creatingGroup;
+
+
       useEffect(() => {
   const handleNewMessage = (message) => {
     if (!message || !message.conversationId) return;
@@ -795,7 +798,7 @@ useEffect(() => {
 
         {/* FOOTER */}
 <View style={styles.fFooter}>
-        <TouchableOpacity style={styles.btnTags}>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('ConversationScreen')}>
           <Image source={messIcon} style={styles.iconfooter} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>
@@ -865,19 +868,21 @@ useEffect(() => {
                 >
                   <Text style={styles.modalCloseText}>Close</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-    style={[
-      styles.modalCreateButton,
-      (creatingGroup || !groupName.trim()) && { backgroundColor: '#ccc' }
-    ]}
-    onPress={createGroup}
-    disabled={creatingGroup || !groupName.trim()}
-  >
-    {creatingGroup
-      ? <ActivityIndicator size="small" color="white" />
-      : <Text style={styles.modalCreateText}>Create Group</Text>
-    }
-  </TouchableOpacity>
+<TouchableOpacity
+  style={[
+    styles.modalCreateButton,
+    !canCreateGroup && { backgroundColor: '#ccc' }
+  ]}
+  onPress={createGroup}
+  disabled={!canCreateGroup}
+>
+  {creatingGroup
+    ? <ActivityIndicator size="small" color="white" />
+    : <Text style={styles.modalCreateText}>Create Group</Text>
+  }
+</TouchableOpacity>
+
+
 
 
               </View>

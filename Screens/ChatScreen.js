@@ -756,7 +756,11 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
           onChangeText={setInput}
           onSubmitEditing={handleSend}
           returnKeyType="send"
+          numberOfLines={1}
         />
+        <TouchableOpacity style={messageInputStyles.iconButton}>
+          <Image source={require('../icons/mic.png')} style={messageInputStyles.icon} />
+        </TouchableOpacity>
         <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickMedia}>
           <Image source={PictureIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
@@ -898,6 +902,7 @@ const [userIdReady, setUserIdReady] = useState(false);
 const [replyTo, setReplyTo] = useState(null);
 const [pinnedMessages, setPinnedMessages] = useState([]);
 
+const [inviteToken, setInviteToken] = useState('');
 
 
   const [messages, setMessages] = useState([]);
@@ -923,22 +928,30 @@ const [hasMore, setHasMore] = useState(true);
 
 const handleShowInviteModal = async (inviteLink) => {
   // Example link: https://dora.chat/join/8a379855
-  const match = inviteLink.match(/\/join\/([a-f0-9]+)/);
-  if (!match) return;
-  const token = match[1];
-  setInviteModalVisible(true);
-  setInviteLoading(true);
-  setInviteError(null);
+const match = inviteLink.match(/\/join\/([a-f0-9]+)/);
+if (!match) return;
+const token = match[1];
+setInviteToken(token); // <--- Save it!
+setInviteModalVisible(true);
+setInviteLoading(true);
+setInviteError(null);
+
+  
+  console.log("[Invite] Opening invite modal for token:", token, "from link:", inviteLink);
+
   try {
     const res = await axios.get(`/api/conversations/invite/${token}`);
+    console.log("[Invite] Invite info fetched:", res.data);
     setInviteInfo(res.data);
   } catch (e) {
+    console.log("[Invite] Failed to fetch invite info:", e.response?.data || e);
     setInviteError(e.response?.data?.message || e.message);
     setInviteInfo(null);
   } finally {
     setInviteLoading(false);
   }
 };
+
 
 
   const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
@@ -2188,10 +2201,12 @@ selectedMessage?.isPinned
     setJoining(true);
     setJoinError(null);
     try {
-      // Use the inviteInfo.token or save the token to state when opening modal!
-      const token = inviteInfo.token || inviteInfo._id || ''; // Make sure you save the token you used to fetch info!
-      const response = await axios.post(`/api/conversations/join/${token}`);
-      // Success: Can check response.data.status for auto-join or request-pending
+      console.log("[Invite] Attempting to join group with token:", inviteToken);
+      const response = await axios.post(`/api/conversations/join/${inviteToken}`);
+
+
+      console.log("[Invite] Join response:", response.data);
+
       if (response.data.status === "joined") {
         setInviteModalVisible(false);
         Alert.alert("Thành công", "Bạn đã tham gia nhóm!");
@@ -2200,6 +2215,7 @@ selectedMessage?.isPinned
         Alert.alert("Yêu cầu gửi", "Yêu cầu tham gia nhóm đã được gửi. Vui lòng chờ duyệt!");
       }
     } catch (err) {
+      console.log("[Invite] Join failed:", err.response?.data || err);
       setJoinError(err.response?.data?.message || "Lỗi khi tham gia nhóm");
     } finally {
       setJoining(false);
