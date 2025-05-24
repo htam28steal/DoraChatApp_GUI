@@ -54,6 +54,27 @@ const [membersModalVisible, setMembersModalVisible] = useState(false);
 const [memberSearchText, setMemberSearchText] = useState('');
 const [recentImages, setRecentImages] = useState([]);
 
+const [inviteLinkModalVisible, setInviteLinkModalVisible] = useState(false);
+const [inviteLink, setInviteLink] = useState('');
+const [sendingLinkTo, setSendingLinkTo] = useState(''); // Friend ID while sending
+
+// returns the conversationId for a 1-on-1 chat between me and friendId
+// ——————————————————————————————
+// Helper: get or create a 1-on-1 DM with friendId
+// ——————————————————————————————
+const getOrCreateDMChannel = async (friendId) => {
+  const userId = await AsyncStorage.getItem('userId');
+  console.log('🔹 Requesting individual convo for:', userId, friendId);
+
+  // POST /api/conversations/individuals/:userId
+  const res = await axios.post(`/api/conversations/individuals/${friendId}`);
+  console.log('✅ Individual convo response:', res.data);
+
+  // Backend returns the full conversation object; extract its ID:
+  return res.data._id || res.data.id || res.data.conversationId;
+};
+
+
 
 useEffect(() => {
   const fetchRecentImages = async () => {
@@ -667,9 +688,9 @@ const fetchGroupCurrentMembers = async () => {
           />
         </TouchableOpacity>
       </View>
- 
 
-        <View style={styles.options}>
+
+              <View style={styles.options}>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
@@ -686,6 +707,48 @@ const fetchGroupCurrentMembers = async () => {
     alignItems: 'center',
   }}
   onPress={() => navigation.navigate('MediaScreen', { conversationId })}
+>
+  <Image
+    source={require('../icons/arrow.png')}
+    style={{ width: 18, height: 18 }}
+  />
+</TouchableOpacity>
+
+        </View>
+ 
+
+        <View style={styles.options}>
+        <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
+          <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
+          borderRadius:15, justifyContent:'center', marginRight:10
+          }}><Image source={require('../icons/link.png')} style={{alignSelf:'center',  width:18, height:18}} /></View>
+          <Text style={{color:'#086DC0', fontSize:15}}>Create group's invitation link</Text>
+        </View>
+        <TouchableOpacity
+  style={{
+    width: 30,
+    height: 30,
+    backgroundColor: '#D8EDFF',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }}
+onPress={async () => {
+  console.log('🔹 Creating invitation link for conversation:', conversationId);
+  try {
+    const res = await axios.post(
+      `/api/conversations/${conversationId}/invite/link`
+    );
+    console.log('✅ Link creation response:', res.data);
+    setInviteLink(res.data.inviteLink); // <-- ONLY the string!
+    await fetchModalData();
+    setInviteLinkModalVisible(true);
+  } catch (err) {
+    console.error('❌ Error creating invitation link:', err.response?.data || err.message);
+    Alert.alert('Error', 'Could not create invitation link');
+  }
+}}
+
 >
   <Image
     source={require('../icons/arrow.png')}
@@ -1337,6 +1400,130 @@ const fetchGroupCurrentMembers = async () => {
       <TouchableOpacity
         style={[styles.modalCloseButton, { marginTop: 16, alignSelf: 'center' }]}
         onPress={() => setMembersModalVisible(false)}
+      >
+        <Text style={styles.modalCloseText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+<Modal
+  visible={inviteLinkModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setInviteLinkModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      {/* Top: Invite Link Block (like your image) */}
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e4e4e4',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        backgroundColor: '#f9fcff',
+        marginBottom: 18,
+      }}>
+        <Text
+          style={{
+            flex: 1,
+            color: '#222',
+            fontSize: 15,
+          }}
+          numberOfLines={1}
+        >
+          {inviteLink}
+        </Text>
+        <TouchableOpacity
+          onPress={() => {
+            // Copy to clipboard (React Native Clipboard API)
+            if (inviteLink) {
+              if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                navigator.clipboard.writeText(inviteLink);
+              }
+              // Fallback for expo-clipboard
+              // Clipboard.setStringAsync(inviteLink);
+              Alert.alert('Copied!', 'Invitation link copied.');
+            }
+          }}
+          style={{
+            backgroundColor: '#32c86e',
+            borderRadius: 8,
+            paddingVertical: 8,
+            paddingHorizontal: 18,
+          }}
+        >
+          <Text style={{ color: 'white', fontWeight: 'bold' }}>Sao chép</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Friend List */}
+      <Text style={{ fontWeight: 'bold', marginBottom: 8, fontSize: 16 }}>Send link to friends:</Text>
+      {friends.length === 0 ? (
+        <Text style={{ color: '#999', textAlign: 'center' }}>No friends to invite.</Text>
+      ) : (
+        <FlatList
+          data={friends}
+          keyExtractor={item => item._id}
+          renderItem={({ item }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Image source={{ uri: item.avatar }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 8 }} />
+              <Text style={{ flex: 1 }}>{item.name}</Text>
+            <TouchableOpacity
+  style={{
+                  backgroundColor: '#086DC0',
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  opacity: sendingLinkTo === item._id ? 0.6 : 1,}}
+  disabled={!!sendingLinkTo}
+  onPress={async () => {
+    setSendingLinkTo(item._id);
+
+    try {
+      // 1) get/create the DM channel
+      const dmChannelId = await getOrCreateDMChannel(item._id);
+
+    console.log('🔹 Sending invite link in DM channel:', dmChannelId);
+
+      // 2) send the text in that channel
+      const { data } = await axios.post('/api/messages/text', {
+        conversationId: dmChannelId,
+        content: inviteLink,
+        type: 'TEXT'
+      });
+
+      console.log('✅ Message send response:', data);
+      Alert.alert('Sent!', `Invitation link sent to ${item.name}.`);
+    } catch (err) {
+      console.error('❌ Send link failed:', err.response?.data || err.message);
+      Alert.alert(
+        'Error',
+        err.response?.data?.message || 'Could not send link.'
+      );
+    } finally {
+      setSendingLinkTo('');
+    }
+  }}
+>
+  {sendingLinkTo === item._id
+    ? <ActivityIndicator color="white" size="small" />
+    : <Text style={{ color: 'white', fontWeight: 'bold' }}>Send</Text>
+  }
+</TouchableOpacity>
+
+            </View>
+          )}
+          style={{ maxHeight: 220 }}
+        />
+      )}
+
+      {/* Close Button */}
+      <TouchableOpacity
+        style={[styles.modalCloseButton, { marginTop: 18, alignSelf: 'center' }]}
+        onPress={() => setInviteLinkModalVisible(false)}
       >
         <Text style={styles.modalCloseText}>Close</Text>
       </TouchableOpacity>

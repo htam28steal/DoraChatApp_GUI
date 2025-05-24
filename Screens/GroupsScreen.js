@@ -65,6 +65,37 @@ const [editingConversations, setEditingConversations] = useState([]);
 const [filtered, setFiltered] = useState([]);
   const [selectedFilters, setSelectedFilters] = useState([]);
 
+      useEffect(() => {
+  const handleNewMessage = (message) => {
+    if (!message || !message.conversationId) return;
+
+    setConversations(prev => {
+      const updated = prev.map(conv => {
+        if (conv._id === message.conversationId) {
+          return {
+            ...conv,
+            lastMessageId: message, // Replace with the latest message
+          };
+        }
+        return conv;
+      });
+
+      // Optional: Move the updated conversation to the top
+      const updatedConv = updated.find(c => c._id === message.conversationId);
+      const others = updated.filter(c => c._id !== message.conversationId);
+      return [updatedConv, ...others];
+    });
+  };
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+
+  };
+}, []);
+
+
     useEffect(() => {
       if (!query) {
         setFiltered(conversations);
@@ -191,7 +222,7 @@ const updateTag = async () => {
 const deleteClassify = async (id) => {
   try {
     await axios.delete(`/api/classifies/${id}`);
-    console.log('🗑️ Deleted classify:', id);
+
     // remove it from local state so UI updates immediately
     setClassifies(prev => prev.filter(c => c._id !== id));
   } catch (err) {
@@ -225,7 +256,7 @@ const createTag = async () => {
     const { data } = await axios.post('/api/classifies', body);
 
 
-    console.log('✅ Added new classify:', data);
+
 
     const { data: latest } = await axios.get('/api/classifies');
     setClassifies(latest);
@@ -252,8 +283,7 @@ const createTag = async () => {
         axios.get('/api/friends')
      
       ]);
-      console.log('📥 openConvPicker loaded conversations:', convRes.data);
-      console.log('📥 openConvPicker loaded memberships:', friendRes.data);
+
       setAllConversations(convRes.data);
       setFriends(friendRes.data);
       setConvPickerVisible(true);
@@ -296,7 +326,7 @@ const createTag = async () => {
     };
 
     const applyClassification = (optionKey) => {
-      console.log(`Classifying ${targetConversationId} as ${optionKey}`);
+
       // TODO: call API to save classification
       setClassifyOptionsVisible(false);
       setTargetConversationId(null);
@@ -307,15 +337,14 @@ const createTag = async () => {
         const token = await AsyncStorage.getItem('userToken');
         if (!token) throw new Error("No auth token found");
     
-        console.log("📡 Fetching classifies with token:", token);
+
     
         const res = await axios.get('/api/classifies', {
           headers: {
             Authorization: `Bearer ${token}`,
           }
         });
-    
-        console.log("✅ Received classifies:", res.data);
+
     
         setClassifies(res.data);
         setClassifyModalVisible(true);
@@ -327,13 +356,13 @@ const createTag = async () => {
     
 
     const fetchAllConversations = useCallback(async () => {
-      console.log('🔄 fetchAllConversations() start');
+
       try {
         const { data } = await axios.get('/api/conversations');
-        console.log('✅ fetchAllConversations() got:', data.map(c => c._id));
+
         setConversations(data);
       } catch (err) {
-        console.error('❌ fetchAllConversations() error:', err);
+
       }
     }, []);
     
@@ -349,30 +378,29 @@ const createTag = async () => {
     
       // 🔧 Debug: log every incoming event
       socket.onAny((event, payload) => {
-        console.log('📡 socket.onAny:', event, payload);
       });
     
       // 🔌 Subscribe to global list updates
       socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-      console.log('📡 Emitted JOIN_CONVERSATIONS');
+
     
       // 🔔 NEW GROUP → prepend it
       const onNew = payload => {
-        console.log('📥 NEW_GROUP_CONVERSATION:', payload);
+
         fetchAllConversations();
       };
       socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
     
       // 🔔 LEAVE → refetch
       const onLeave = payload => {
-        console.log('📥 LEAVE_CONVERSATION:', payload);
+
         fetchAllConversations();
       };
       socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
     
       // 🔔 DISBAND → remove locally
       const onDisband = ({ conversationId }) => {
-        console.log('📥 CONVERSATION_DISBANDED:', conversationId);
+
         setConversations(prev =>
           prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId))
         );
@@ -400,7 +428,7 @@ const createTag = async () => {
   };
 
   socket.on(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
-  console.log("✅ Subscribed to UPDATE_AVATAR_GROUP_CONVERSATION");
+
 
   return () => {
     socket.off(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
@@ -413,10 +441,10 @@ const createTag = async () => {
 
     useEffect(() => {
       if (conversations.length === 0) return;
-      console.log('🔌 joining individual conversation rooms…');
+
       conversations.forEach(conv => {
         socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conv._id);
-        console.log('📡 JOIN_CONVERSATION:', conv._id);
+
       });
     }, [conversations]);
     
@@ -438,7 +466,7 @@ useEffect(() => {
     SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
     onNameUpdated
   );
-  console.log('✅ Subscribed to UPDATE_NAME_CONVERSATION in GroupsScreen');
+
 
   return () => {
     socket.off(
@@ -451,14 +479,14 @@ useEffect(() => {
     
     
     useEffect(() => {
-      console.log("🧩 Mount: setting up CONVERSATION_DISBANDED listener");
+
     
       // Join conversations room (broadcast updates to the user)
       socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-      console.log("📡 Emitted JOIN_CONVERSATIONS");
+
     
       const handleDisband = ({ conversationId }) => {
-        console.log("📥 Received CONVERSATION_DISBANDED:", conversationId);
+
     
         if (!conversationId) {
           console.warn("⚠️ Missing conversationId in CONVERSATION_DISBANDED payload");
@@ -467,17 +495,17 @@ useEffect(() => {
     
         setConversations(prev => {
           const updated = prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId));
-          console.log(`🧹 Removed disbanded conversation. Remaining:`, updated.map(c => c._id));
+
           return updated;
         });
       };
     
       socket.on(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
-      console.log("✅ Subscribed to CONVERSATION_DISBANDED");
+
     
       return () => {
         socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
-        console.log("🛑 Unsubscribed from CONVERSATION_DISBANDED");
+
       };
     }, []);
 
@@ -485,7 +513,7 @@ useEffect(() => {
     
     useFocusEffect(
       useCallback(() => {
-        console.log('⚡️ Screen focused – re-fetching conversations');
+
         fetchAllConversations();
       }, [fetchAllConversations])
     );
@@ -497,7 +525,7 @@ useEffect(() => {
     const receiveConversation = useCallback((payload) => {
       const newConv = payload.conversation || payload;
     
-      console.log("📥 Processed NEW_GROUP_CONVERSATION:", newConv);
+
     
       if (!newConv._id) return;
     
@@ -517,7 +545,7 @@ useEffect(() => {
           try {
             const id = await AsyncStorage.getItem('userId');
             if (id) {
-              console.log("✅ Loaded userId from AsyncStorage:", id);
+
               setUserId(id);
             } else {
               console.log("⚠️ No userId found in AsyncStorage");
@@ -532,13 +560,11 @@ useEffect(() => {
       useEffect(() => {
         if (!userId) return;
       
-        console.log("✅ Emitting JOIN_USER and JOIN_CONVERSATIONS", userId);
       
         socket.emit(SOCKET_EVENTS.JOIN_USER, userId);
         socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
       
         const onNewGroup = (newConv) => {
-          console.log("📥 Received NEW_GROUP_CONVERSATION via socket:", newConv);
           receiveConversation(newConv);
         };
       
@@ -572,12 +598,10 @@ useEffect(() => {
 
 
       const friendsById = useMemo(() => {
-        console.log('🗺️ building friendsById map from memberships:', friends);
           const map = {};
           friends.forEach(f => {
             map[normalizeId(f._id)] = f;
           });
-          console.log('🗺️ friendsById:', map);
           return map;
         }, [friends]);
     
@@ -585,7 +609,6 @@ useEffect(() => {
       const fetchConversations = async () => {
         try {
           const res = await axios.get('/api/conversations');
-          console.log(res.data);
           setConversations(res.data);
         } catch (err) {
           console.error(err);
@@ -1098,7 +1121,6 @@ useEffect(() => {
              } else {
                // single chat → find the membership whose userId ≠ current user
                          const otherMember = item.members.find(m => m.userId !== userId);
-                         console.log('🌟 otherMember for convo', item._id, otherMember);
                          displayName = otherMember?.name || 'Unknown';
              }
     return (
