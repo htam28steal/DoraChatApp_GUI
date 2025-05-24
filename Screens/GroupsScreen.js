@@ -144,23 +144,30 @@ useEffect(() => {
     );
   }, []);
 
-  const filteredConversations = useMemo(() => {
-    // start from all conversations
-    let convs = conversations;
-  
-    // apply your existing “tag” filters
-    if (selectedFilters.length > 0) {
-      const allIds = selectedFilters.flatMap(tagId => {
-        const tag = classifies.find(c => c._id === tagId);
-        return tag?.conversationIds || [];
-      });
-      const uniq = [...new Set(allIds)];
-      convs = convs.filter(c => uniq.includes(c._id));
-    }
-  
-    // *** NEW: only keep those with type === true ***
-    return convs.filter(c => c.type === true);
-  }, [conversations, classifies, selectedFilters]);
+const filteredConversations = useMemo(() => {
+  let convs = conversations;
+
+  // Only filter by conversation name:
+  if (query.trim()) {
+    const q = query.toLowerCase();
+    convs = convs.filter(conv => (conv.name || '').toLowerCase().includes(q));
+  }
+
+  // Only show groups (type === true)
+  convs = convs.filter(c => c.type === true);
+
+  // Tag filter (optional, if you want to keep it)
+  if (selectedFilters.length > 0) {
+    const allIds = selectedFilters.flatMap(tagId => {
+      const tag = classifies.find(c => c._id === tagId);
+      return tag?.conversationIds || [];
+    });
+    const uniq = [...new Set(allIds)];
+    convs = convs.filter(c => uniq.includes(c._id));
+  }
+  return convs;
+}, [conversations, query, selectedFilters, classifies]);
+
   
     
 
@@ -783,35 +790,27 @@ useEffect(() => {
         )}
 
         {/* FOOTER */}
-        <View style={styles.fFooter}>
-          <TouchableOpacity 
-            style={styles.btnTags}
-              onPress={() => navigation.navigate('ConversationScreen')}
-           >
-          
-            <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-            <Image source={require('../icons/member.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
-            <Image source={require('../icons/QR.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
-            <Image source={require('../icons/friend.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-          {currentUser?.avatar ? (
-          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
-        ) : (
-          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
-        )}
-          </TouchableOpacity>
-
-
-
-
-        </View>
+<View style={styles.fFooter}>
+        <TouchableOpacity style={styles.btnTags}>
+          <Image source={messIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>
+          <Image source={memberIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
+          <Image source={homeIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('FriendList_Screen')}>
+          <Image source={friendIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags}  onPress={()=>navigation.navigate('ProfileScreen')} >
+         {currentUser?.avatar ? (
+           <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+         ) : (
+           <Image source={userIcon} style={styles.avatarFooter} />
+         )}
+        </TouchableOpacity>
+      </View>
 
         {/* MODAL TẠO NHÓM */}
         <Modal

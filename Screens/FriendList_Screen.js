@@ -34,6 +34,8 @@ export default function ListFriendScreen({ navigation }) {
   const [currentUser, setCurrentUser]     = useState(null);
   const [showModal, setShowModal]         = useState(false);
   const [selectedFriend, setSelectedFriend] = useState(null);
+  const [searchError, setSearchError] = useState('');
+
 
   // Search & Friend-request state
   const [userId, setUserId]       = useState(null);
@@ -53,46 +55,64 @@ export default function ListFriendScreen({ navigation }) {
 
  
 
-  // Handle phone-number search
-  const handleSearch = async (phoneNumber) => {
-  if (!phoneNumber) {
-    Alert.alert('Vui lòng nhập số điện thoại');
-    return;
-  }
+const handleSearch = async (searchValue) => {
+  setSearchError('');
+  const phoneRegex = /^(0[0-9]{9})$/;
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-  let user;
-  try {
-    // 1) Pull the actual user object out of whatever the service returns
-    const resp = await UserService.getUserByPhoneNumber(phoneNumber);
-    // if your service is axios-style you might need:
-    //    user = resp.data;
-    // or resp.data.user;
-    user = resp.data ?? resp;                  
-    if (!user._id) throw new Error('Không nhận được dữ liệu người dùng');
-    setListSearch([user]);
-  } catch (err) {
-    console.error('Error fetching user by phone:', err);
-    Alert.alert('Không tìm thấy người dùng');
+  if (!searchValue) {
     setListSearch([]);
+    setSearchError('Vui lòng nhập số điện thoại hoặc email');
     return;
   }
 
-  // 2) These secondary calls can now fail harmlessly
+  let user = null;
   try {
-    const isF = await FriendService.isFriend(userId, user._id);
-    setStateFriend(isF);
-  } catch (err) {
-    console.warn('Could not check friendship status:', err);
-  }
+    if (phoneRegex.test(searchValue)) {
+      const resp = await UserService.getUserByPhoneNumber(searchValue);
+      user = resp.data ?? resp;
+    } else if (emailRegex.test(searchValue)) {
+      const resp = await UserService.getUserByEmail(searchValue);
+      user = resp.data ?? resp;
+    } else {
+      setListSearch([]);
+      setSearchError('User not found.');
+      return;
+    }
 
-  try {
-    const invites = await FriendService.getListFriendInviteMe();
-    const pending = invites.some(inv => inv._id === user._id);
-    setSentInvites(pending ? 'pending' : null);
+    // Not found by API
+    if (!user || !user._id) {
+      setListSearch([]);
+      setSearchError('User not found.');
+      return;
+    }
+
+    setListSearch([user]);
+    setSearchError('');
+
+    // Check friend status...
+    try {
+      const isF = await FriendService.isFriend(userId, user._id);
+      setStateFriend(isF === true ? true : isF?.data ?? false);
+    } catch (err) {
+      setStateFriend(false);
+    }
+
+    // Check pending invites...
+    try {
+      const invites = await FriendService.getListFriendInviteMe();
+      const pending = invites.some(inv => inv._id === user._id);
+      setSentInvites(pending ? 'pending' : null);
+    } catch (err) {
+      setSentInvites(null);
+    }
   } catch (err) {
-    console.warn('Could not load pending invites:', err);
+    setListSearch([]);
+    setSearchError('User not found.');
   }
 };
+
+
 
 
   // Send friend invite
@@ -276,11 +296,11 @@ socket.onAny((event, data) => {
           style={styles.btnAccept}
           onPress={() => handleAddFriend(item._id)}
         >
-          <Text style={styles.txtAccecpt}>Kết bạn</Text>
+          <Text style={styles.txtAccecpt}>Add friend</Text>
         </TouchableOpacity>
       )}
-        {stateFriend===true  && <View style={styles.btnDisabled}><Text style={styles.txtAccecpt}>Đã kết bạn</Text></View>}
-        {sentInvites==='pending' && <TouchableOpacity style={styles.btnPending} onPress={()=>handleThuHoi(item._id)}><Text style={styles.txtAccecpt}>Đã gửi lời mời</Text></TouchableOpacity>}
+        {stateFriend===true  && <View style={styles.btnDisabled}><Text style={styles.txtAccecpt}>Friend</Text></View>}
+        {sentInvites==='pending' && <TouchableOpacity style={styles.btnPending} onPress={()=>handleThuHoi(item._id)}><Text style={styles.txtAccecpt}>Request sent</Text></TouchableOpacity>}
       </View>
     </TouchableOpacity>
   );
@@ -319,17 +339,18 @@ const renderFriend = ({ item: user }) => (
 
       {/* Search bar: toggles between phone-search and name-filter */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => handleSearch(txtSearch)}>
-          <Image source={searchIcon} style={styles.icon} />
-        </TouchableOpacity>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search friends"
-          placeholderTextColor="#aaa"
-          value={txtSearch}
-          onChangeText={text => { setTxtSearch(text); setQuery(''); }}
-          onSubmitEditing={() => handleSearch(txtSearch)}
-        />
+<TouchableOpacity onPress={() => handleSearch(txtSearch)}>
+  <Image source={searchIcon} style={styles.icon} />
+</TouchableOpacity>
+<TextInput
+  style={styles.searchInput}
+  placeholder="Search by phone or email"
+  placeholderTextColor="#aaa"
+  value={txtSearch}
+  onChangeText={text => { setTxtSearch(text); setQuery(''); }}
+  onSubmitEditing={() => handleSearch(txtSearch)}
+/>
+
       </View>
 
       {/* Filters/Navigation */}
@@ -351,7 +372,11 @@ const renderFriend = ({ item: user }) => (
           data={listSearch}
           keyExtractor={item => item._id}
           renderItem={renderSearchItem}
-          ListEmptyComponent={<Text style={styles.emptyListText}>Không tìm thấy người dùng.</Text>}
+          ListEmptyComponent={
+  <Text style={styles.emptyListText}>
+    {searchError || 'No user found.'}
+  </Text>
+}
         />
       ) : filtered.length === 0 ? (
         <Text style={styles.placeholderText}>No friends found.</Text>

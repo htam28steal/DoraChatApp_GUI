@@ -427,18 +427,22 @@ if (!token) {
   }, []);
 
   // simple client‐side search filter
-  useEffect(() => {
-    if (!query) {
-      setFiltered(conversations);
-    } else {
-      const q = query.toLowerCase();
-      setFiltered(conversations.filter(c =>
+useEffect(() => {
+  if (!query.trim()) {
+    setFiltered(conversations);
+  } else {
+    const q = query.toLowerCase();
+    setFiltered(
+      conversations.filter(c =>
         c.members.some(m =>
-          (m.name || '').toLowerCase().includes(q)
+          ((m.name || '').toLowerCase().includes(q)) ||
+          ((m.username || '').toLowerCase().includes(q))
         )
-      ));
-    }
-  }, [query, conversations]);
+      )
+    );
+  }
+}, [query, conversations]);
+
 
     const renderItem = useCallback(
     ({ item: conv }) => {
@@ -540,32 +544,27 @@ if (!token) {
       )}
 
         {/* FOOTER */}
-        <View style={styles.fFooter}>
-          <TouchableOpacity 
-            style={styles.btnTags}
-
-          >
-            <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}
-           onPress={() => navigation.navigate('GroupsScreen')}>
-            <Image source={require('../icons/member.png')} style={styles.iconfooter}  />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')} >
-            <Image source={require('../icons/QR.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
-            <Image source={require('../icons/friend.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-          {currentUser?.avatar ? (
-          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
-        ) : (
-          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
-        )}
-          </TouchableOpacity>
-
-</View>
+<View style={styles.fFooter}>
+        <TouchableOpacity style={styles.btnTags}>
+          <Image source={messIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>
+          <Image source={memberIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
+          <Image source={homeIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('FriendList_Screen')}>
+          <Image source={friendIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags}  onPress={()=>navigation.navigate('ProfileScreen')} >
+         {currentUser?.avatar ? (
+           <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+         ) : (
+           <Image source={userIcon} style={styles.avatarFooter} />
+         )}
+        </TouchableOpacity>
+      </View>
        <Modal
                 visible={classifyMenuVisible}
                 transparent

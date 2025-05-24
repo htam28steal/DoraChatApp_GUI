@@ -1,4 +1,6 @@
 import api from "./apiConfig";
+import axios from './apiConfig'; // or wherever you import axios from
+
 
 const UserService = {
 
@@ -19,7 +21,13 @@ const UserService = {
             console.error('Lỗi khi lấy user :', error);
             throw error;
         }
-    }
+    },
+    
+
+    getUserByEmail: async (email) => {
+        const url = `api/users/search/username/${email}`;
+        return axios.get(url);
+    },
 
 };
 

@@ -41,41 +41,49 @@ const [searchResults, setSearchResults] = useState([]);
 const [stateFriend, setStateFriend] = useState(null);
 const [sentInvites, setSentInvites] = useState(null);
 
+const handleSearch = async (searchValue) => {
+  setNotFound(false); // reset for each new search
 
-const handleSearch = async (phoneNumber) => {
-  if (!phoneNumber) {
-    Alert.alert('Vui lòng nhập số điện thoại');
+  const phoneRegex = /^(0[0-9]{9})$/;
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  if (!searchValue) {
+    Alert.alert('Vui lòng nhập số điện thoại hoặc email');
     return;
   }
 
-  let user;
+  let user = null;
   try {
-    const resp = await UserService.getUserByPhoneNumber(phoneNumber);
-    user = resp.data ?? resp;
-    if (!user._id) throw new Error('Không nhận được dữ liệu người dùng');
+    if (phoneRegex.test(searchValue)) {
+      const resp = await UserService.getUserByPhoneNumber(searchValue);
+      user = resp.data ?? resp;
+    } else if (emailRegex.test(searchValue)) {
+      const resp = await UserService.getUserByEmail(searchValue);
+      user = resp.data ?? resp;
+    } else {
+      Alert.alert('Định dạng không hợp lệ', 'Vui lòng nhập số điện thoại hoặc email hợp lệ.');
+      setSearchResults([]);
+      setNotFound(false);
+      return;
+    }
+
+    if (!user || !user._id) {
+      setSearchResults([]);
+      setNotFound(true);
+      return;
+    }
+
     setSearchResults([user]);
+    setNotFound(false);
+
+    // ... (friend status logic) ...
   } catch (err) {
-    console.error('Error fetching user by phone:', err);
-    Alert.alert('Không tìm thấy người dùng');
     setSearchResults([]);
-    return;
-  }
-
-  try {
-    const isF = await FriendService.isFriend(userId, user._id);
-    setStateFriend(isF);
-  } catch (err) {
-    console.warn('Could not check friendship status:', err);
-  }
-
-  try {
-    const invites = await FriendService.getListFriendInviteMe();
-    const pending = invites.some(inv => inv._id === user._id);
-    setSentInvites(pending ? 'pending' : null);
-  } catch (err) {
-    console.warn('Could not load pending invites:', err);
+    setNotFound(true);
   }
 };
+
+
 const handleAddFriend = async (friendId) => {
   try {
     const response = await FriendService.sendFriendInvite(friendId);
@@ -363,14 +371,17 @@ const renderFriend = ({ item }) => (
                   </View>
 {loading ? (
   <ActivityIndicator size="large" color="#086DC0" style={{ marginTop: 150 }} />
-) : txtSearch && searchResults.length > 0 ? (
-  <FlatList
-    contentContainerStyle={styles.list}
-    data={searchResults}
-    keyExtractor={item => item._id}
-    renderItem={renderSearchItem}
-    ListEmptyComponent={<Text style={styles.placeholderText}>Không tìm thấy người dùng.</Text>}
-  />
+) : txtSearch ? (
+  searchResults.length > 0 ? (
+    <FlatList
+      contentContainerStyle={styles.list}
+      data={searchResults}
+      keyExtractor={item => item._id}
+      renderItem={renderSearchItem}
+    />
+  ) : notFound ? (
+    <Text style={styles.placeholderText}>User not found.</Text>
+  ) : null
 ) : (
   <FlatList
     contentContainerStyle={styles.list}
@@ -383,34 +394,28 @@ const renderFriend = ({ item }) => (
 
 
 
-      <View style={styles.fFooter}>
-              <TouchableOpacity style={styles.btnTags}>
-                <Image source={messIcon} style={styles.iconfooter} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.btnTags}
-                onPress={() => navigation.navigate('GroupsScreen')}
-              >
-                <Image source={memberIcon} style={styles.iconfooter} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
-                <Image source={homeIcon} style={styles.iconfooter} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.btnTags}
-                onPress={() => navigation.navigate('FriendList_Screen')}
-              >
-                <Image source={friendIcon} style={styles.iconfooter} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnTags}>
-               {currentUser?.avatar ? (
-        <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
-      ) : (
-        <Image source={userIcon} style={styles.avatarFooter} />
-      )}
-      
-              </TouchableOpacity>
-            </View>
+
+<View style={styles.fFooter}>
+        <TouchableOpacity style={styles.btnTags}>
+          <Image source={messIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>
+          <Image source={memberIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
+          <Image source={homeIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('FriendList_Screen')}>
+          <Image source={friendIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags}  onPress={()=>navigation.navigate('ProfileScreen')} >
+         {currentUser?.avatar ? (
+           <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+         ) : (
+           <Image source={userIcon} style={styles.avatarFooter} />
+         )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
