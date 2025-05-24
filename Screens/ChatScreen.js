@@ -15,7 +15,9 @@ import {
   FlatList,
   ActivityIndicator,
   KeyboardAvoidingView,
-  SafeAreaView
+  SafeAreaView,
+  Animated,
+  Easing
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -53,6 +55,212 @@ const screenWidth = Dimensions.get("window").width;
 
 
 
+// Messenger-style constants
+const BUBBLE_WIDTH = 220;
+const LINE_WIDTH = 140; // Adjust for duration/spacing
+const LINE_HEIGHT = 3;
+const BUTTON_SIZE = 40;
+
+export function AudioBubble({ url}) {
+  const [playing, setPlaying] = useState(false);
+  const [sound, setSound] = useState(null);
+  const [position, setPosition] = useState(0);
+  const [durationSec, setDurationSec] = useState(0); 
+
+  const animated = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+  let mounted = true;
+  let loader;
+
+  async function loadMetadata() {
+    // create the Sound, but don’t start playing
+    const { sound: s, status } = await Audio.Sound.createAsync(
+      { uri: url },
+      { shouldPlay: false }
+    );
+    if (!mounted) {
+      return s.unloadAsync();
+    }
+    if (status.durationMillis) {
+      setDurationSec(status.durationMillis / 1000);
+    }
+    // we don’t need to keep it loaded until play
+    await s.unloadAsync();
+  }
+
+  loadMetadata();
+
+  return () => {
+    mounted = false;
+  };
+}, [url]);
+
+
+  // Clean up sound when unmount
+  React.useEffect(() => {
+    return () => {
+      if (sound) sound.unloadAsync();
+    };
+  }, [sound]);
+
+  const playAudio = async () => {
+    if (sound) {
+      await sound.replayAsync();
+      setPlaying(true);
+      animateButton(0, 1, durationSec);
+      return;
+    }
+     const { sound: snd, status } = await Audio.Sound.createAsync(
+      { uri: url },
+      { shouldPlay: true }
+    );
+    setSound(snd);
+    setPlaying(true);
+
+    if (status.durationMillis) {
+      setDurationSec(status.durationMillis / 1000);
+    }
+
+    animateButton(0, 1, (status.durationMillis || 0) / 1000);
+
+    snd.setOnPlaybackStatusUpdate((status) => {
+      if (status.didJustFinish) {
+        setPlaying(false);
+        animated.setValue(0);
+      }
+    });
+  };
+
+  const pauseAudio = async () => {
+    if (sound) {
+      await sound.pauseAsync();
+      setPlaying(false);
+      Animated.timing(animated).stop();
+    }
+  };
+
+  const animateButton = (from, to, dur) => {
+    animated.setValue(from);
+    Animated.timing(animated, {
+      toValue: to,
+      duration: dur * 1000,
+      useNativeDriver: false,
+      easing: Easing.linear,
+    }).start();
+  };
+
+  // Position for button
+  const translateX = animated.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, LINE_WIDTH],
+  });
+
+  const shownDuration = (() => {
+    const total = Math.round(durationSec);
+    const m = Math.floor(total/60).toString().padStart(2,'0');
+    const s = (total%60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  })();
+
+  return (
+    <View style={audioStyles.bubble}>
+      <View style={audioStyles.inner}>
+        {/* Audio Line and Play Button */}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ width: LINE_WIDTH + BUTTON_SIZE, height: BUTTON_SIZE, justifyContent: "center" }}>
+            {/* The Line */}
+            <View
+              style={{
+                position: "absolute",
+                left: BUTTON_SIZE / 2,
+                top: BUTTON_SIZE / 2 - LINE_HEIGHT / 2,
+                width: LINE_WIDTH,
+                height: LINE_HEIGHT,
+                backgroundColor: "#369CFF",
+                borderRadius: 2,
+                opacity: 0.8,
+              }}
+            />
+            {/* Play Button (moves along the line) */}
+            <Animated.View
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                transform: [{ translateX }],
+                zIndex: 2,
+              }}
+            >
+              <TouchableOpacity
+                onPress={playing ? pauseAudio : playAudio}
+                activeOpacity={0.8}
+                style={{
+                  width: BUTTON_SIZE,
+                  height: BUTTON_SIZE,
+                  backgroundColor: "#2380F7",
+                  borderRadius: BUTTON_SIZE / 2,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  elevation: 2,
+                  shadowColor: "#2380F7",
+                  shadowOpacity: 0.12,
+                  shadowRadius: 8,
+                }}
+              >
+                <View style={{
+                  width: 0,
+                  height: 0,
+                  borderLeftWidth: 16,
+                  borderTopWidth: 11,
+                  borderBottomWidth: 11,
+                  borderLeftColor: "#fff",
+                  borderTopColor: "transparent",
+                  borderBottomColor: "transparent",
+                  marginLeft: 3,
+                }} />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+          {/* Timer */}
+          <Text style={{
+            marginLeft: 8,
+            color: "#444",
+            fontWeight: "100",
+            fontSize: 10,
+            alignSelf: "center",
+            minWidth: 28,
+          }}>
+            {shownDuration}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// Style
+const audioStyles = StyleSheet.create({
+  bubble: {
+    backgroundColor: "#D8F1FF",
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginVertical: 2,
+    minWidth: 160,
+    maxWidth: 270,
+    alignSelf: "flex-start",
+    // Optional shadow
+    shadowColor: "#51b8ff",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  inner: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+});
 
 
 function renderTextWithLinks(content, onInvitePress) {
@@ -132,6 +340,15 @@ const MessageItem = forwardRef(function MessageItem(
 const [imgLoading, setImgLoading] = useState(true);
 
   const navigation = useNavigation();
+  const [recordingModal, setRecordingModal] = useState(false);
+  const audioExtensions = ['mp3', 'wav', 'aac', 'ogg', 'm4a'];
+
+const isAudioFile = (fileName = '', url = '') => {
+  // Simple extension check (could enhance with mimetype if you have it)
+  const name = (fileName || url).toLowerCase();
+  return audioExtensions.some(ext => name.endsWith(`.${ext}`));
+};
+
 
   const downloadFile = async (url, fileName = 'downloaded_file') => {
   try {
@@ -364,6 +581,8 @@ const Container = onLongPress ? TouchableOpacity : View;
             isLooping={false}
              onLoad={() => onMediaLoad?.()}
           />
+          ) : msg.type === "FILE" && isAudioFile(msg.fileName, msg.content) ? (
+         <AudioBubble url={msg.content} />
         ) : msg.type === "FILE" ? (
 <TouchableOpacity
   style={messageItemStyles.fileContainer}
@@ -736,7 +955,7 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress }) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onStartRecording}) {
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -758,7 +977,8 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
           returnKeyType="send"
           numberOfLines={1}
         />
-        <TouchableOpacity style={messageInputStyles.iconButton}>
+        <TouchableOpacity style={messageInputStyles.iconButton}  onPress={onStartRecording}
+>
           <Image source={require('../icons/mic.png')} style={messageInputStyles.icon} />
         </TouchableOpacity>
         <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickMedia}>
@@ -889,6 +1109,14 @@ const [inviteError, setInviteError] = useState(null);
 const [joining, setJoining] = useState(false);
 const [joinError, setJoinError] = useState(null);
 
+const [recording, setRecording] = useState(null);
+const [recordingModal, setRecordingModal] = useState(false);
+const [recordedUri, setRecordedUri] = useState(null);
+const [recordingDuration, setRecordingDuration] = useState(0);
+const [isRecording, setIsRecording] = useState(false);
+const [playing, setPlaying] = useState(false);
+const [sound, setSound] = useState(null);
+
   
       const [selectedReactors, setSelectedReactors] = useState([]);
       const [reactDetailModalVisible, setReactDetailModalVisible] = useState(false);
@@ -949,6 +1177,141 @@ setInviteError(null);
     setInviteInfo(null);
   } finally {
     setInviteLoading(false);
+  }
+};
+
+const startRecording = async () => {
+  try {
+    if (recording) {
+      // Try to stop previous recording if it exists
+      try {
+        await recording.stopAndUnloadAsync();
+      } catch (e) {
+        // Already stopped, do nothing
+      }
+      setRecording(null); // Clear out previous
+    }
+
+    const permission = await Audio.requestPermissionsAsync();
+    if (permission.status !== 'granted') {
+      Alert.alert('Permission required', 'Please grant audio permission');
+      return;
+    }
+
+    setRecordingModal(true);
+    setRecordedUri(null);
+    setRecordingDuration(0);
+
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+    });
+
+    // DOUBLE-CHECK: If any previous recording, do NOT proceed
+    if (recording) {
+      return; // Defensive: should never happen
+    }
+
+    const { recording: newRecording } = await Audio.Recording.createAsync(
+      Audio.RecordingOptionsPresets.HIGH_QUALITY
+    );
+    setRecording(newRecording);
+    setIsRecording(true);
+
+    newRecording.setOnRecordingStatusUpdate(status => {
+      if (status.isRecording) setRecordingDuration(Math.floor(status.durationMillis / 1000));
+    });
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Lỗi', err.message || 'Không thể bắt đầu ghi âm.');
+  }
+};
+
+const stopRecording = async () => {
+  if (!recording) return;
+  try {
+    await recording.stopAndUnloadAsync();
+    const uri = recording.getURI();
+    setRecordedUri(uri);
+  } catch (e) {
+    // Already stopped or error
+  } finally {
+    setIsRecording(false);
+    setRecording(null);
+  }
+};
+
+
+
+
+
+const resetRecording = () => {
+  setRecording(null);
+  setRecordedUri(null);
+  setRecordingModal(false);
+  setRecordingDuration(0);
+  setIsRecording(false);
+};
+
+const playRecording = async () => {
+  if (!recordedUri) return;
+  const { sound } = await Audio.Sound.createAsync({ uri: recordedUri });
+  setSound(sound);
+  setPlaying(true);
+  sound.playAsync();
+  sound.setOnPlaybackStatusUpdate(status => {
+    if (status.didJustFinish) {
+      setPlaying(false);
+      sound.unloadAsync();
+    }
+  });
+};
+
+const sendRecording = async () => {
+  if (!recordedUri) {
+    console.log("[Audio] No recorded URI!");
+    return;
+  }
+  setRecordingModal(false);
+  const fileName = `audio_${Date.now()}.aac`;
+
+  // Log out the URI and fileName for debugging
+  console.log("[Audio] Preparing to upload file:", recordedUri, "as", fileName);
+
+  const formData = new FormData();
+  formData.append("id", userId);
+  formData.append("conversationId", conversationId);
+  formData.append("file", {
+    uri: recordedUri,
+    name: fileName,
+    type: "audio/aac",
+  });
+
+  // Log out the FormData for debugging (works only in Chrome debugger, not in Hermes)
+  // This will print FormData keys, not values. It's a limitation of React Native.
+  for (let [key, value] of formData._parts || []) {
+    console.log(`[Audio] FormData field: ${key}`, value);
+  }
+
+  try {
+    console.log("[Audio] Sending POST /api/messages/file...");
+    await axios.post("/api/messages/file", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 20000,
+    });
+    console.log("[Audio] Upload successful!");
+    resetRecording();
+  } catch (error) {
+    // Axios error can have response, request, or message
+    if (error.response) {
+      console.error("[Audio] Axios upload failed – response error:", error.response.data);
+    } else if (error.request) {
+      console.error("[Audio] Axios upload failed – request error:", error.request);
+    } else {
+      console.error("[Audio] Axios upload failed – unknown error:", error.message);
+    }
+    Alert.alert("Gửi thất bại", "Không gửi được bản ghi âm.");
+    resetRecording();
   }
 };
 
@@ -1460,6 +1823,17 @@ useEffect(() => {
       ]);
 
       const all = msgRes.data || [];
+
+      console.log(
+  "🔍 fetched messages:",
+  all.map(m => ({
+    _id: m._id,
+    type: m.type,
+    fileName: m.fileName,
+    createdAt: m.createdAt
+  }))
+);
+
       const pinned = pinRes.data || [];
 
       setAllMessages(all);
@@ -1613,6 +1987,7 @@ const uploadMediaAndSendMessage = async () => {
   });
 
   if (result.canceled || !result.assets || result.assets.length === 0) return;
+  
 
   const selectedMedia = result.assets[0];
   const mediaUri = selectedMedia.uri;
@@ -1906,7 +2281,7 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
         setInput={setInput}
         onSend={handleSendMessage}
         onPickMedia={uploadMediaAndSendMessage}
-
+          onStartRecording={() => setRecordingModal(true)} 
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
       />
@@ -2239,6 +2614,131 @@ selectedMessage?.isPinned
     </View>
   </View>
 </Modal>
+<Modal
+  visible={recordingModal}
+  transparent
+  animationType="slide"
+  onRequestClose={resetRecording}
+>
+  <View style={{
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  }}>
+    <View style={{
+      backgroundColor: '#fff',
+      borderRadius: 28,
+      width: '88%',
+      alignItems: 'center',
+      paddingVertical: 40,
+      paddingHorizontal: 12,
+      maxWidth: 340
+    }}>
+      {/* ========== NOT RECORDING YET ========== */}
+      {!isRecording && !recordedUri && (
+        <>
+          <Text style={{ color: '#666', fontSize: 16, marginBottom: 26 }}>
+            Bấm để ghi âm
+          </Text>
+          <TouchableOpacity
+            style={{
+              width: 70, height: 70,
+              backgroundColor: '#086DC0',
+              borderRadius: 35,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 10,
+              shadowColor: "#086DC0",
+              shadowOpacity: 0.17,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 3,
+            }}
+            onPress={startRecording}
+          >
+            <Image source={require('../icons/mic.png')} style={{ width: 38, height: 38, tintColor: '#fff' }} />
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* ========== RECORDING ========== */}
+      {isRecording && !recordedUri && (
+        <>
+          <Text style={{ fontSize: 18, color: '#555', marginBottom: 16 }}>
+            Đang ghi âm... {recordingDuration}s
+          </Text>
+          <TouchableOpacity
+            style={{
+              width: 70, height: 70,
+              backgroundColor: '#E33',
+              borderRadius: 35,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 18,
+            }}
+            onPress={stopRecording}
+          >
+            <Image source={require('../icons/stop.png')} style={{ width: 38, height: 38, tintColor: '#fff' }} />
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* ========== RECORDED (READY TO SEND) ========== */}
+      {recordedUri && (
+        <>
+          {/* Action buttons row */}
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 0, gap: 28 }}>
+            {/* Xóa */}
+            <TouchableOpacity onPress={resetRecording} style={{ alignItems: 'center' }}>
+              <View style={{
+                width: 50, height: 50,
+                backgroundColor: '#f5f6fa',
+                borderRadius: 25,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 4
+              }}>
+                <Image source={require('../icons/Trash.png')} style={{ width: 25, height: 25, tintColor: '#222' }} />
+              </View>
+              <Text style={{ color: '#222', fontSize: 15 }}>Xóa</Text>
+            </TouchableOpacity>
+            {/* Gửi */}
+            <TouchableOpacity onPress={sendRecording} style={{ alignItems: 'center' }}>
+              <View style={{
+                width: 50, height: 50,
+                backgroundColor: '#086DC0',
+                borderRadius: 25,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 4
+              }}>
+                <Image source={require('../icons/play.png')} style={{ width: 25, height: 25, tintColor: '#fff' }} />
+              </View>
+              <Text style={{ color: '#086DC0', fontSize: 15, fontWeight: 'bold' }}>Gửi</Text>
+            </TouchableOpacity>
+            {/* Nghe lại */}
+            <TouchableOpacity onPress={playRecording} style={{ alignItems: 'center' }}>
+              <View style={{
+                width: 50, height: 50,
+                backgroundColor: '#f5f6fa',
+                borderRadius: 25,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 4
+              }}>
+                <Image source={require('../icons/wave.png')} style={{ width: 25, height: 25, tintColor: '#222' }} />
+              </View>
+              <Text style={{ color: '#222', fontSize: 15 }}>Nghe lại</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={{ marginTop: 18, fontSize: 18, color: '#555' }}>{`${recordingDuration}s`}</Text>
+        </>
+      )}
+    </View>
+  </View>
+</Modal>
+
 
     </KeyboardAvoidingView>
     </SafeAreaView>
@@ -2796,5 +3296,6 @@ closeModalIcon: {
   resizeMode: "contain",
 
 },
+
 
 });
