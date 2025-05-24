@@ -19,7 +19,7 @@
 
   const Add = require('../icons/plus.png');
 
-
+const messIcon   = require('../icons/mess.png');
 
   export default function GroupsScreen({ navigation }) {
     const [query, setQuery] = useState('');

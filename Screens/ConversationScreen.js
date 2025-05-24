@@ -24,7 +24,7 @@ export default function ConversationScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [userId, setUserId] = useState(null);
-
+const messIcon   = require('../icons/mess.png');
   const [currentUser, setCurrentUser] = useState(null);
 
       const [manageModalVisible, setManageModalVisible] = useState(false);
