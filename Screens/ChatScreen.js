@@ -52,11 +52,40 @@ const Return = require("../icons/back.png");
 const screenWidth = Dimensions.get("window").width;
 
 
+
+
+
 function renderTextWithLinks(content) {
-  // Split on URLs
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const inviteLinkRegex = /(https?:\/\/[^\s]+\/join\/[a-f0-9]+)/g;
+
+  // Split by ALL URLs
   const parts = content.split(urlRegex);
+
   return parts.map((part, i) => {
-    if (urlRegex.test(part)) {
+    // Check if part is a group invite link
+    if (inviteLinkRegex.test(part)) {
+      return (
+        <TouchableOpacity
+          key={i}
+          style={{
+            backgroundColor: "#4285f4",
+            borderRadius: 6,
+            paddingVertical: 5,
+            paddingHorizontal: 16,
+            alignSelf: "flex-start",
+
+          }}
+          onPress={() => Linking.openURL(part)}
+        >
+          <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 15 }}>
+            Lời mời tham gia nhóm
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    // If normal link, render as a normal clickable link
+    else if (urlRegex.test(part)) {
       return (
         <Text
           key={i}
@@ -66,7 +95,9 @@ function renderTextWithLinks(content) {
           {part}
         </Text>
       );
-    } else {
+    }
+    // Plain text
+    else {
       return (
         <Text key={i} style={messageItemStyles.textContent}>
           {part}

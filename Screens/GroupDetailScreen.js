@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as Camera from 'expo-camera';
 import bg from '../Images/bground.png';
-
+import * as Clipboard from 'expo-clipboard';
 
 
 
@@ -1436,27 +1436,23 @@ onPress={async () => {
         >
           {inviteLink}
         </Text>
-        <TouchableOpacity
-          onPress={() => {
-            // Copy to clipboard (React Native Clipboard API)
-            if (inviteLink) {
-              if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                navigator.clipboard.writeText(inviteLink);
-              }
-              // Fallback for expo-clipboard
-              // Clipboard.setStringAsync(inviteLink);
-              Alert.alert('Copied!', 'Invitation link copied.');
-            }
-          }}
-          style={{
-            backgroundColor: '#32c86e',
-            borderRadius: 8,
-            paddingVertical: 8,
-            paddingHorizontal: 18,
-          }}
-        >
-          <Text style={{ color: 'white', fontWeight: 'bold' }}>Sao chép</Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+  onPress={async () => {
+    if (inviteLink) {
+      await Clipboard.setStringAsync(inviteLink);
+      Alert.alert('Copied!', 'Invitation link copied to clipboard.');
+    }
+  }}
+  style={{
+    backgroundColor: '#32c86e',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+  }}
+>
+  <Text style={{ color: 'white', fontWeight: 'bold' }}>Copy</Text>
+</TouchableOpacity>
+
       </View>
 
       {/* Friend List */}
