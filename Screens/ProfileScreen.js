@@ -22,6 +22,8 @@ import dayjs from 'dayjs';
 import SectionedMultiSelect from 'react-native-sectioned-multi-select';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import QRCode from 'react-native-qrcode-svg';
+
 
 
 
@@ -376,9 +378,16 @@ else if (type === 'cover') {
         </View>
 
       </View>
-
 <View style={styles.fQR}>
-  <Image source={require('../icons/QR.png')} style={styles.qrImg} />
+  <QRCode
+    value={JSON.stringify({
+      userId: userInfo?._id,
+      name: userInfo?.name,
+      email: userInfo?.email, // or whatever info you want
+    })}
+    size={145}
+    backgroundColor="white"
+  />
 
   {/* 4 overlay corner borders */}
   <View style={[styles.qrCorner, styles.topLeft]} />
@@ -386,6 +395,7 @@ else if (type === 'cover') {
   <View style={[styles.qrCorner, styles.bottomLeft]} />
   <View style={[styles.qrCorner, styles.bottomRight]} />
 </View>
+
 
       <View style={styles.fDetailInfor}>
         {screen === 'home' && (
@@ -942,8 +952,8 @@ fHobbies: {
   txtHobbies: { fontSize: 14, color: '#086DC0' },
   fQR: {
   marginTop: 50,
-  width: 200,
-  height: 200,
+  width: 160,
+  height: 160,
   justifyContent: 'center',
   alignItems: 'center',
   position: 'relative',
@@ -958,8 +968,8 @@ qrImg: {
 
 qrCorner: {
   position: 'absolute',
-  width: 30,
-  height: 30,
+  width: 70,
+  height: 70,
   borderColor: '#000',
 },
 
