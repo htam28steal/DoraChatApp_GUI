@@ -55,15 +55,13 @@ const screenWidth = Dimensions.get("window").width;
 
 
 
-function renderTextWithLinks(content) {
+function renderTextWithLinks(content, onInvitePress) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const inviteLinkRegex = /(https?:\/\/[^\s]+\/join\/[a-f0-9]+)/g;
 
-  // Split by ALL URLs
   const parts = content.split(urlRegex);
 
   return parts.map((part, i) => {
-    // Check if part is a group invite link
     if (inviteLinkRegex.test(part)) {
       return (
         <TouchableOpacity
@@ -74,18 +72,18 @@ function renderTextWithLinks(content) {
             paddingVertical: 5,
             paddingHorizontal: 16,
             alignSelf: "flex-start",
-
           }}
-          onPress={() => Linking.openURL(part)}
+            onPress={() => {
+      console.log('[InviteLink] User pressed invite link:', part);
+      onInvitePress && onInvitePress(part);
+    }}
         >
           <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 15 }}>
-            Lời mời tham gia nhóm
+            Group invitation
           </Text>
         </TouchableOpacity>
       );
-    }
-    // If normal link, render as a normal clickable link
-    else if (urlRegex.test(part)) {
+    } else if (urlRegex.test(part)) {
       return (
         <Text
           key={i}
@@ -95,9 +93,7 @@ function renderTextWithLinks(content) {
           {part}
         </Text>
       );
-    }
-    // Plain text
-    else {
+    } else {
       return (
         <Text key={i} style={messageItemStyles.textContent}>
           {part}
@@ -106,6 +102,7 @@ function renderTextWithLinks(content) {
     }
   });
 }
+
 
 /**
  * Message Bubble Component with support for onLongPress to show message options.
@@ -396,7 +393,8 @@ const Container = onLongPress ? TouchableOpacity : View;
     ? "Message has been recalled"
     : content.length > MAX_TEXT_LENGTH
     ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-    : renderTextWithLinks(content)}
+     : renderTextWithLinks(content, props.onInvitePress)
+  }
 </Text>
         )}
          {msg.reacts && msg.reacts.length > 0 && (
@@ -614,7 +612,8 @@ function ChatBox({
   loadMoreMessages,
   loadingMore,
   allMessages, 
-  scrollToMessageId
+  scrollToMessageId,
+    onInvitePress, 
 }) {
 
 
@@ -712,6 +711,7 @@ const scrollToMessage = useCallback((messageId) => {
            otherUserAvatar={otherUserAvatar}
 onLongPress={() => onMessageLongPress(msg)}
         onReplyPress={scrollToMessage}
+          onInvitePress={onInvitePress}
 
         handlePressEmoji={handlePressEmoji}
          onMediaLoad={() => {
@@ -878,6 +878,12 @@ const headerStyles = StyleSheet.create({
 export default function ChatScreen({ route, navigation }) {
   // Extract the conversation object from route parameters.
   const [channelsList, setChannelsList] = useState([]);
+const [inviteModalVisible, setInviteModalVisible] = useState(false);
+const [inviteInfo, setInviteInfo] = useState(null);
+const [inviteLoading, setInviteLoading] = useState(false);
+const [inviteError, setInviteError] = useState(null);
+const [joining, setJoining] = useState(false);
+const [joinError, setJoinError] = useState(null);
 
   
       const [selectedReactors, setSelectedReactors] = useState([]);
@@ -914,6 +920,25 @@ const [allMessages, setAllMessages] = useState([]);
 
 const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
 const [hasMore, setHasMore] = useState(true);
+
+const handleShowInviteModal = async (inviteLink) => {
+  // Example link: https://dora.chat/join/8a379855
+  const match = inviteLink.match(/\/join\/([a-f0-9]+)/);
+  if (!match) return;
+  const token = match[1];
+  setInviteModalVisible(true);
+  setInviteLoading(true);
+  setInviteError(null);
+  try {
+    const res = await axios.get(`/api/conversations/invite/${token}`);
+    setInviteInfo(res.data);
+  } catch (e) {
+    setInviteError(e.response?.data?.message || e.message);
+    setInviteInfo(null);
+  } finally {
+    setInviteLoading(false);
+  }
+};
 
 
   const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
@@ -1832,6 +1857,7 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
   loadMoreMessages={loadMoreMessages}
   loadingMore={loadingMore} 
    scrollToMessageId={scrollToMessageId}  
+    onInvitePress={handleShowInviteModal}
 />
 
 
@@ -2095,6 +2121,109 @@ selectedMessage?.isPinned
                         </View>
                     </View>
                 </Modal>
+                <Modal
+  visible={inviteModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setInviteModalVisible(false)}
+>
+  <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}>
+    <View style={{
+      backgroundColor: '#fff',
+      borderRadius: 20,
+      width: '92%',
+      paddingHorizontal: 0,
+      alignItems: 'center',
+      paddingBottom: 24,
+      maxWidth: 400
+    }}>
+      <TouchableOpacity
+        style={{ alignSelf: "flex-start", margin: 14 }}
+        onPress={() => setInviteModalVisible(false)}
+      >
+        <Text style={{ fontSize: 30, color: '#888' }}>×</Text>
+      </TouchableOpacity>
+      {inviteLoading ? (
+        <ActivityIndicator size="large" color="#4285f4" style={{ marginTop: 40 }} />
+      ) : inviteError ? (
+        <Text style={{ color: "#E33", padding: 16 }}>{inviteError}</Text>
+      ) : inviteInfo ? (
+        <>
+          {/* Avatar */}
+          <View style={{ marginTop: -16, marginBottom: 16 }}>
+            <Image
+              source={inviteInfo.avatar ? { uri: inviteInfo.avatar } : AvatarImage}
+              style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#e9e9e9' }}
+            />
+          </View>
+          {/* Name and Info */}
+          <Text style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 2 }}>
+            {inviteInfo.name}
+          </Text>
+          <Text style={{ fontSize: 15, color: '#333', marginBottom: 8 }}>
+            {inviteInfo.members?.length || 0} members
+          </Text>
+
+
+<Text style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>
+ Created {inviteInfo.createdAt ? dayjs(inviteInfo.createdAt).fromNow() : 'một thời gian trước'}
+</Text>
+          {/* Join Button */}
+<TouchableOpacity
+  style={{
+    backgroundColor: "#086DC0",
+    borderRadius: 24,
+    width: 230,
+    alignItems: "center",
+    paddingVertical: 12,
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.16,
+    shadowRadius: 3,
+    elevation: 2
+  }}
+  disabled={joining}
+  onPress={async () => {
+    setJoining(true);
+    setJoinError(null);
+    try {
+      // Use the inviteInfo.token or save the token to state when opening modal!
+      const token = inviteInfo.token || inviteInfo._id || ''; // Make sure you save the token you used to fetch info!
+      const response = await axios.post(`/api/conversations/join/${token}`);
+      // Success: Can check response.data.status for auto-join or request-pending
+      if (response.data.status === "joined") {
+        setInviteModalVisible(false);
+        Alert.alert("Thành công", "Bạn đã tham gia nhóm!");
+      } else {
+        setInviteModalVisible(false);
+        Alert.alert("Yêu cầu gửi", "Yêu cầu tham gia nhóm đã được gửi. Vui lòng chờ duyệt!");
+      }
+    } catch (err) {
+      setJoinError(err.response?.data?.message || "Lỗi khi tham gia nhóm");
+    } finally {
+      setJoining(false);
+    }
+  }}
+>
+  {joining ? (
+    <ActivityIndicator color="#fff" />
+  ) : (
+    <Text style={{ color: "#fff", fontWeight: 'bold', fontSize: 16 }}>Join</Text>
+  )}
+</TouchableOpacity>
+{joinError && (
+  <Text style={{ color: "#E33", padding: 10, marginTop: 5, textAlign: "center" }}>
+    {joinError}
+  </Text>
+)}
+
+        </>
+      ) : null}
+    </View>
+  </View>
+</Modal>
+
     </KeyboardAvoidingView>
     </SafeAreaView>
   );

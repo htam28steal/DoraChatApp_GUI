@@ -693,10 +693,6 @@ useEffect(() => {
             onPress={() =>
               navigation.navigate('ChatGroupScreen', { conversationId: group._id })
             }
-            onLongPress={() => {
-              setTargetConversationId(group._id);
-              setClassifyMenuVisible(true);
-            }}
           >
             <View style={styles.fMessage}>
               {/* AVATAR GROUP */}
