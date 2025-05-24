@@ -18,8 +18,12 @@
   import { useFocusEffect } from '@react-navigation/native';
 
   const Add = require('../icons/plus.png');
+  const userIcon   = require('../Images/avt.png');
 
 const messIcon   = require('../icons/mess.png');
+const memberIcon = require('../icons/member.png');
+const homeIcon   = require('../icons/QR.png');
+const friendIcon = require('../icons/friend.png');
 
   export default function GroupsScreen({ navigation }) {
     const [query, setQuery] = useState('');

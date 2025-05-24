@@ -19,6 +19,11 @@ import * as Contacts from 'expo-contacts';
 import FriendService from '../api/friendService'; // adjust path if needed
 
 const addFrIcon = require('../icons/addFriend.png');
+const messIcon   = require('../icons/mess.png');
+const userIcon   = require('../Images/avt.png');
+const memberIcon = require('../icons/member.png');
+const homeIcon   = require('../icons/QR.png');
+const friendIcon = require('../icons/friend.png');
 
 export default function ContactScreen({ navigation }) {
   const [filtered, setFiltered] = useState([]);

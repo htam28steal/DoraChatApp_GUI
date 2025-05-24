@@ -17,6 +17,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 
+const userIcon   = require('../Images/avt.png');
+const messIcon   = require('../icons/mess.png');
+const memberIcon = require('../icons/member.png');
+const homeIcon   = require('../icons/QR.png');
+const friendIcon = require('../icons/friend.png');
 
 export default function ConversationScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
