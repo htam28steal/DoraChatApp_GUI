@@ -409,7 +409,7 @@ const messageItemStyles = StyleSheet.create({
     rightAlign: { flexDirection: "row-reverse" },
     avatar: { width: 40, height: 40, borderRadius: 20 },
     avatarPlaceholder: { width: 40, height: 40 },
-    contentContainer: { maxWidth: 468, marginHorizontal: 8 },
+    contentContainer: { maxWidth: 200, marginHorizontal: 8 },
     imageContent: {
         width: 250,
         height: 250,
@@ -1119,6 +1119,7 @@ export default function ChatScreen({ route, navigation }) {
             height: 'auto'
         },
         headerContent: {
+            paddingTop: 8,
             flexDirection: 'row',
             alignItems: 'center',
             marginBottom: 10,
@@ -1135,9 +1136,9 @@ export default function ChatScreen({ route, navigation }) {
             height: '80%',
             resizeMode: 'contain',
         },
-        avatar: { width: 55, height: 55, borderRadius: 35 },
+        avatar: { width: 45, height: 45, borderRadius: 35 },
         infoContainer: { marginLeft: 12, flex: 1 },
-        name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
+        name: { fontSize: 16, fontWeight: "600", color: "#086DC0" },
         statusContainer: {
             flexDirection: "row",
             alignItems: "center",
@@ -1173,7 +1174,7 @@ export default function ChatScreen({ route, navigation }) {
 
         iconsContainer: { flexDirection: "row" },
         iconButton: { padding: 8, marginLeft: 8 },
-        icon: { width: 24, height: 24, resizeMode: "contain" },
+        icon: { width: 20, height: 20, resizeMode: "contain" },
     });
 
 
