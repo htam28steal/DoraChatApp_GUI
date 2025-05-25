@@ -1211,6 +1211,7 @@ const [inviteToken, setInviteToken] = useState('');
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
+const [sendAudioBtn, setSendAudioBtn] = useState(false);
 
 
 const [loadingMore, setLoadingMore] = useState(false);
@@ -1221,6 +1222,12 @@ const [allMessages, setAllMessages] = useState([]);
 const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
 const [hasMore, setHasMore] = useState(true);
 
+useEffect(() => {
+if(recordingModal){
+  setSendAudioBtn(false)
+}
+
+},[recordingModal])
 
 const createOptimisticMediaMsg = ({ type, localUri }) => ({
   _id: String(Date.now()) + '_' + Math.random(), // unique
@@ -1347,6 +1354,7 @@ const playRecording = async () => {
 
 const sendRecording = async () => {
   if (!recordedUri) return;
+  setSendAudioBtn(true)
 
   // 1️⃣ create an optimistic placeholder
   const tempId = `tmp_audio_${Date.now()}`;
@@ -2832,7 +2840,7 @@ selectedMessage?.isPinned
               <Text style={{ color: '#222', fontSize: 15 }}>Xóa</Text>
             </TouchableOpacity>
             {/* Gửi */}
-            <TouchableOpacity onPress={sendRecording} style={{ alignItems: 'center' }}>
+            <TouchableOpacity onPress={sendRecording} style={{ alignItems: 'center' }} disabled={sendAudioBtn} >
               <View style={{
                 width: 50, height: 50,
                 backgroundColor: '#086DC0',
