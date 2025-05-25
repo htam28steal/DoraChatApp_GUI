@@ -62,6 +62,8 @@ const messIcon   = require('../icons/mess.png');
       const [friends, setFriends] = useState([]);
 
 
+      
+
       useEffect(() => {
   const handleNewMessage = (message) => {
     if (!message || !message.conversationId) return;
@@ -170,9 +172,11 @@ const messIcon   = require('../icons/mess.png');
         const storedUserId = await AsyncStorage.getItem('userId');
         setUserId(storedUserId);
         const res = await axios.get('/api/conversations', { params: { userId: storedUserId } });
-        const onlyFalse = Array.isArray(res.data)
-          ? res.data.filter(c => c.type === false)
-          : [];
+const onlyFalse = Array.isArray(res.data)
+  ? res.data.filter(c => c.type === false)
+  : []
+
+
         setConversations(onlyFalse);
         setFiltered(onlyFalse);
       } catch (e) {
@@ -192,23 +196,23 @@ const messIcon   = require('../icons/mess.png');
           );
         }, []);
       
-        const filteredConversations = useMemo(() => {
-          // start from all conversations
-          let convs = conversations;
-        
-          // apply your existing “tag” filters
-          if (selectedFilters.length > 0) {
-            const allIds = selectedFilters.flatMap(tagId => {
-              const tag = classifies.find(c => c._id === tagId);
-              return tag?.conversationIds || [];
-            });
-            const uniq = [...new Set(allIds)];
-            convs = convs.filter(c => uniq.includes(c._id));
-          }
-        
-          // *** NEW: only keep those with type === true ***
-          return convs.filter(c => c.type === true);
-        }, [conversations, classifies, selectedFilters]);
+const filteredConversations = useMemo(() => {
+  const base = Array.isArray(conversations) ? conversations : []
+  
+  // apply tag filters (if any)
+  let convs = selectedFilters.length > 0
+    ? base.filter(c => c && selectedFilters
+         .flatMap(tagId => classifies
+           .find(t => t._id === tagId)
+           ?.conversationIds || [])
+         .includes(c._id)
+      )
+    : base
+
+  // finally only keep those with type===true, but guard c
+   return base.filter(c => c?.type === false)
+}, [conversations, classifies, selectedFilters])
+
         
           
       
@@ -542,7 +546,7 @@ useEffect(() => {
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
-          data={filtered}
+          data={filteredConversations}
           keyExtractor={item => item._id.toString()}
           renderItem={renderItem}
         />

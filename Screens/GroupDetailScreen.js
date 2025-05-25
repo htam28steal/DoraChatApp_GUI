@@ -194,23 +194,29 @@ useEffect(() => {
   // ask the server to put us in the right room
   socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId });
 }, [conversationId]);
-
 useEffect(() => {
-  const onMemberRemoved = ({ conversationId: convId, userId: removedUserId }) => {
+  const handleMemberRemoved = async ({ conversationId: convId, userId: removedUserId }) => {
+    // only care about this conversation
     if (convId !== conversationId) return;
-    console.log("📥 Received LEAVE_CONVERSATION:", removedUserId);
-    setGroupMembers(prev =>
-      prev.filter(m => m.userId !== removedUserId)
-    );
+
+    const myUserId = await AsyncStorage.getItem('userId');
+
+    if (removedUserId === myUserId) {
+      // 🌴 I’ve been kicked out—tear down this screen
+      Alert.alert('Removed', 'You have been removed from this group.');
+      navigation.navigate('GroupsScreen');    // or navigation.goBack()
+    } else {
+      // someone else left, just update your local list
+      setGroupMembers(prev => prev.filter(m => m.userId !== removedUserId));
+    }
   };
 
-  socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onMemberRemoved);
-  console.log("✅ Subscribed to LEAVE_CONVERSATION");
-
+  socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, handleMemberRemoved);
   return () => {
-    socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, onMemberRemoved);
+    socket.off(SOCKET_EVENTS.LEAVE_CONVERSATION, handleMemberRemoved);
   };
-}, [conversationId]);
+}, [conversationId, navigation]);
+
 
 useEffect(() => {
   const onNameUpdated = ({ conversationId: convId, newName, name }) => {
@@ -951,10 +957,10 @@ onPress={async () => {
         `/api/conversations/members/leave/${conversationId}`,
         { data: { userId } }
       );
-      socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
-        conversationId,
-        userId
-      });
+socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
+  conversationId,
+  userId: item.userId
+});
       console.log("📤 Emitted leave‑conversation:", { conversationId, userId });
 
       Alert.alert('Thành công', 'Bạn đã rời nhóm.');
@@ -1094,7 +1100,7 @@ onPress={async () => {
               console.log("📤 Emitting LEAVE_CONVERSATION for removed member:", selectedMemberId);
               socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
                 conversationId,
-                userId: selectedMemberId
+                userId
               });
             } catch (err) {
               console.error('Error removing member:', err);
