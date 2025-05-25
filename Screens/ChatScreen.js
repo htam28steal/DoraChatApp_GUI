@@ -61,6 +61,22 @@ const LINE_WIDTH = 140; // Adjust for duration/spacing
 const LINE_HEIGHT = 3;
 const BUTTON_SIZE = 40;
 
+
+function dedupeMessages(msgs) {
+  // Keeps only the last occurrence of each _id
+  const seen = new Set();
+  const out = [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (!seen.has(m._id)) {
+      out.unshift(m); // Keep latest
+      seen.add(m._id);
+    }
+  }
+  return out;
+}
+
+
 export function AudioBubble({ url}) {
   const [playing, setPlaying] = useState(false);
   const [sound, setSound] = useState(null);
@@ -543,60 +559,60 @@ const Container = onLongPress ? TouchableOpacity : View;
 
         
 {msg.type === "IMAGE" ? (
- <View style={{ position: "relative" }}
-  
- >
-  <TouchableOpacity
-     style={{ position: "relative" }}
-     activeOpacity={0.8}
-     onPress={() =>
-       navigation.navigate("FullScreenImage", { uri: msg.content })
-     }
-     onLongPress={onLongPress}
-   >
-  <Image
-    source={{ uri: msg.content }}
-    style={messageItemStyles.imageContent}
-    onLoadStart={() => setImgLoading(true)}
-    onLoadEnd={() => {
-      setImgLoading(false);
-      onMediaLoad?.();
-    }}
-  />
-  {imgLoading && (
-    <View style={messageItemStyles.imageOverlay}>
-      <ActivityIndicator size="small" color="#086DC0" />
-    </View>
-  )}
-  </TouchableOpacity>
-</View>
-
-
-        ) : msg.type === "VIDEO" ? (
-          <Video
-            source={{ uri: content }}
-            style={messageItemStyles.videoContent}
-            useNativeControls
-            resizeMode="cover"
-            isLooping={false}
-             onLoad={() => onMediaLoad?.()}
-          />
-          ) : msg.type === "FILE" && isAudioFile(msg.fileName, msg.content) ? (
-         <AudioBubble url={msg.content} />
-        ) : msg.type === "FILE" ? (
-<TouchableOpacity
-  style={messageItemStyles.fileContainer}
-  onPress={() => downloadFile(msg.content, msg.fileName)}
-  onLongPress={onLongPress}
-  activeOpacity={0.7}
->
-  <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
-  <Text style={messageItemStyles.fileText}>
-    {msg.fileName || "Open File"}
-  </Text>
-</TouchableOpacity>
-
-        ) : (
+  <View style={{ position: "relative" }}>
+    <TouchableOpacity
+      style={{ position: "relative" }}
+      activeOpacity={0.8}
+      disabled={msg.pending}
+      onPress={() => !msg.pending && navigation.navigate("FullScreenImage", { uri: msg.content })}
+      onLongPress={onLongPress}
+    >
+      <Image
+        source={{ uri: msg.content }}
+        style={messageItemStyles.imageContent}
+        onLoadStart={() => setImgLoading(true)}
+        onLoadEnd={() => {
+          setImgLoading(false);
+          onMediaLoad?.();
+        }}
+        blurRadius={msg.pending ? 8 : 0}
+      />
+      {(imgLoading || msg.pending) && (
+        <View style={messageItemStyles.imageOverlay}>
+          <ActivityIndicator size="small" color="#086DC0" />
+        </View>
+      )}
+    </TouchableOpacity>
+    {msg.pending && (
+      <Text style={{
+        position: "absolute",
+        top: 8, right: 16, color: "#888", fontWeight: "bold", fontSize: 13, backgroundColor: "#FFF7",
+        borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2
+      }}>
+        Sending...
+      </Text>
+    )}
+  </View>
+) : msg.type === "VIDEO" ? (
+  <View style={{ position: "relative" }}>
+    <Video
+      source={{ uri: msg.content }}
+      style={messageItemStyles.videoContent}
+      useNativeControls={!msg.pending}
+      resizeMode="cover"
+      isLooping={false}
+      onLoad={() => onMediaLoad?.()}
+      shouldPlay={false}
+      isMuted={msg.pending}
+    />
+    {(msg.pending) && (
+      <View style={[messageItemStyles.imageOverlay, { justifyContent: "center" }]}>
+        <ActivityIndicator size="small" color="#086DC0" />
+        <Text style={{ color: "#888", marginTop: 8, fontWeight: "bold" }}>Đang gửi...</Text>
+      </View>
+    )}
+  </View>
+) : (
          <Text
   style={[
     messageItemStyles.textContent,
@@ -875,6 +891,12 @@ const scrollToMessage = useCallback((messageId) => {
 
   lastIdRef.current = newLastId;
   }, [messages]);
+    const ids = messages.map(m => m._id);
+  const idSet = new Set(ids);
+  if (idSet.size !== ids.length) {
+    console.warn("Duplicate message ids in chat!", ids);
+  }
+
 
   return (
     
@@ -1154,6 +1176,17 @@ const [allMessages, setAllMessages] = useState([]);
 const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
 const [hasMore, setHasMore] = useState(true);
 
+
+const createOptimisticMediaMsg = ({ type, localUri }) => ({
+  _id: String(Date.now()) + '_' + Math.random(), // unique
+  memberId: { userId },
+  type,
+  content: localUri, // Local file URI for immediate display
+  createdAt: new Date().toISOString(),
+  pending: true,
+  local: true, // just for your rendering
+});
+
 const handleShowInviteModal = async (inviteLink) => {
   // Example link: https://dora.chat/join/8a379855
 const match = inviteLink.match(/\/join\/([a-f0-9]+)/);
@@ -1322,12 +1355,19 @@ const sendRecording = async () => {
     // update pinnedMessages list
     setPinnedMessages(prev => [...prev, { messageId }]);
     // mark that message is pinned in your message list
-    setMessages(prev =>
-      prev.map(m => m._id === messageId
-        ? { ...m, isPinned: true }
-        : m
-      )
-    );
+setMessages(prev => {
+  // If optimistic message still exists, replace it.
+  const found = prev.some(m => m._id === tempId);
+  if (found) {
+    return prev.map(m => (m._id === tempId ? { ...responseData, pending: false } : m));
+  }
+  // If not, only add if not already present.
+  if (!prev.some(m => m._id === responseData._id)) {
+    return [...prev, { ...responseData, pending: false }];
+  }
+  return prev;
+});
+
   }, [conversationId]); 
 
     const handleUnpinSocket = useCallback(({ conversationId: convId, messageId }) => {
@@ -1836,24 +1876,23 @@ useEffect(() => {
 
       const pinned = pinRes.data || [];
 
-      setAllMessages(all);
+setAllMessages(dedupeMessages(all));
 
-      // Attach isPinned flag
-      const pinnedIds = new Set(pinned.map(p => p.messageId));
-      const decorated = all.map(msg =>
-        pinnedIds.has(msg._id)
-          ? { ...msg, isPinned: true }
-          : msg
-      );
+const pinnedIds = new Set(pinned.map(p => p.messageId));
+const decorated = all.map(msg =>
+  pinnedIds.has(msg._id)
+    ? { ...msg, isPinned: true }
+    : msg
+);
 
-      const initialLimit = 40;
-      const skip = Math.max(0, decorated.length - initialLimit);
-      const lastMessages = decorated.slice(skip);
+const initialLimit = 40;
+const skip = Math.max(0, decorated.length - initialLimit);
+const lastMessages = decorated.slice(skip);
 
-      setMessages(lastMessages);
-      setPagination({ skip, limit: 20 });
-      setHasMore(skip > 0);
-      setPinnedMessages(pinned);
+setMessages(dedupeMessages(lastMessages));
+setPagination({ skip, limit: 20 });
+setHasMore(skip > 0);
+setPinnedMessages(pinned);
 
     } catch (err) {
       console.error("Failed to load messages or pins", err);
@@ -1988,58 +2027,67 @@ const uploadMediaAndSendMessage = async () => {
 
   if (result.canceled || !result.assets || result.assets.length === 0) return;
   
-
   const selectedMedia = result.assets[0];
   const mediaUri = selectedMedia.uri;
   const fileName = mediaUri.split("/").pop();
-  const mimeType = selectedMedia.mimeType || (selectedMedia.type === "video" ? "video/mp4" : "image/jpeg");
+  const isVideo = selectedMedia.type === "video";
+  const type = isVideo ? "VIDEO" : "IMAGE";
+  const mimeType = selectedMedia.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
 
+  // 1. Insert optimistic placeholder message
+  const tempId = Date.now() + '_' + Math.random();
+  const optimisticMsg = {
+    _id: tempId,
+    memberId: { userId },
+    type,
+    content: mediaUri,
+    createdAt: new Date().toISOString(),
+    pending: true,
+    local: true,
+  };
+  setMessages(prev => [...prev, optimisticMsg]);
+
+  // 2. Do upload
   const formData = new FormData();
   formData.append("id", userId);
   formData.append("conversationId", conversationId);
-  formData.append(selectedMedia.type === "video" ? "video" : "image", {
+  formData.append(isVideo ? "video" : "image", {
     uri: mediaUri,
     name: fileName,
     type: mimeType,
   });
 
- try {
-  const endpoint = selectedMedia.type === "video"
-    ? "/api/messages/video"
-    : "/api/messages/images";
+  try {
+    const endpoint = isVideo
+      ? "/api/messages/video"
+      : "/api/messages/images";
 
-  const response = await axios.post(endpoint, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-    timeout: selectedMedia.type === "video" ? 30000 : 20000,
-  });
+    const response = await axios.post(endpoint, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: isVideo ? 30000 : 20000,
+    });
 
-  const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
+    // Get real message data from server
+    const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
 
-  const mediaUrl =
-    responseData?.file?.url ||
-    responseData?.url ||
-    responseData?.content ||
-    responseData?.message?.url ||
-    null;
+    // Replace the placeholder with the real message
+setMessages(prev => dedupeMessages(
+  prev.map(m =>
+    m._id === tempId
+      ? { ...responseData, pending: false }
+      : m
+  )
+));
 
-  if (!mediaUrl) {
-    console.warn("⚠️ Unexpected upload response:", response.data);
-    throw new Error("Server did not return a URL");
+  } catch (err) {
+    // On error: remove the placeholder
+    setMessages(prev => prev.filter(m => m._id !== tempId));
+    Alert.alert("Error", "Failed to upload media.");
   }
-
-  // sendOptimisticMediaMessage({
-  //   type: selectedMedia.type === "video" ? "VIDEO" : "IMAGE",
-  //   url: mediaUrl,
-  // });
-
-} catch (err) {
-  console.error("Upload error:", err);
-  Alert.alert("Error", "Failed to upload media.");
-}
-
 };
+
 
 
 
@@ -2104,7 +2152,9 @@ const uploadMediaAndSendMessage = async () => {
 const handleSendMessage = async (text) => {
   if (!text.trim()) return;
 
-  const tempId = String(Date.now());
+ const tempId = "tmp_" + Date.now() + "_" + Math.random();
+
+  
   const optimisticMsg = {
     _id: tempId,
     memberId: { userId },
@@ -2168,27 +2218,15 @@ useEffect(() => {
 
     
 
-  const receiveHandler = (message) => {
-    if (message.conversationId !== conversationId) return;
-    setMessages((prev) => {
-      // replace the optimistic placeholder if it matches
-      console.log("📨 Received message from server:", message);
+ const receiveHandler = (message) => {
+  if (message.conversationId !== conversationId) return;
+setMessages(prev => dedupeMessages([
+  ...prev, // Your message addition logic
+  message
+]));
 
-      if (message.memberId?.userId === userId) {
-        const idx = prev.findIndex(
-          m => m.pending && m.content === message.content
-        );
-        if (idx !== -1) {
-          const updated = [...prev];
-          updated[idx] = message;
-          return updated;
-        }
-      }
-      // otherwise skip if it’s already there by server _id
-      if (prev.some(m => m._id === message._id)) return prev;
-      return [...prev, message];
-    });
-  };
+};
+
   
 
   socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
