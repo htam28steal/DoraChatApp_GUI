@@ -18,8 +18,12 @@
   import { useFocusEffect } from '@react-navigation/native';
 
   const Add = require('../icons/plus.png');
+  const userIcon   = require('../Images/avt.png');
 
-
+const messIcon   = require('../icons/mess.png');
+const memberIcon = require('../icons/member.png');
+const homeIcon   = require('../icons/QR.png');
+const friendIcon = require('../icons/friend.png');
 
   export default function GroupsScreen({ navigation }) {
     const [query, setQuery] = useState('');
@@ -64,6 +68,40 @@ const [editingConversations, setEditingConversations] = useState([]);
   const [allConversations, setAllConversations] = useState([]);
 const [filtered, setFiltered] = useState([]);
   const [selectedFilters, setSelectedFilters] = useState([]);
+
+const canCreateGroup = groupName.trim() && selectedFriendIds.length >= 2 && !creatingGroup;
+
+
+      useEffect(() => {
+  const handleNewMessage = (message) => {
+    if (!message || !message.conversationId) return;
+
+    setConversations(prev => {
+      const updated = prev.map(conv => {
+        if (conv._id === message.conversationId) {
+          return {
+            ...conv,
+            lastMessageId: message, // Replace with the latest message
+          };
+        }
+        return conv;
+      });
+
+      // Optional: Move the updated conversation to the top
+      const updatedConv = updated.find(c => c._id === message.conversationId);
+      const others = updated.filter(c => c._id !== message.conversationId);
+      return [updatedConv, ...others];
+    });
+  };
+
+  socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+
+  return () => {
+    socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
+
+  };
+}, []);
+
 
     useEffect(() => {
       if (!query) {
@@ -113,23 +151,30 @@ useEffect(() => {
     );
   }, []);
 
-  const filteredConversations = useMemo(() => {
-    // start from all conversations
-    let convs = conversations;
-  
-    // apply your existing “tag” filters
-    if (selectedFilters.length > 0) {
-      const allIds = selectedFilters.flatMap(tagId => {
-        const tag = classifies.find(c => c._id === tagId);
-        return tag?.conversationIds || [];
-      });
-      const uniq = [...new Set(allIds)];
-      convs = convs.filter(c => uniq.includes(c._id));
-    }
-  
-    // *** NEW: only keep those with type === true ***
-    return convs.filter(c => c.type === true);
-  }, [conversations, classifies, selectedFilters]);
+const filteredConversations = useMemo(() => {
+  let convs = conversations;
+
+  // Only filter by conversation name:
+  if (query.trim()) {
+    const q = query.toLowerCase();
+    convs = convs.filter(conv => (conv.name || '').toLowerCase().includes(q));
+  }
+
+  // Only show groups (type === true)
+  convs = convs.filter(c => c.type === true);
+
+  // Tag filter (optional, if you want to keep it)
+  if (selectedFilters.length > 0) {
+    const allIds = selectedFilters.flatMap(tagId => {
+      const tag = classifies.find(c => c._id === tagId);
+      return tag?.conversationIds || [];
+    });
+    const uniq = [...new Set(allIds)];
+    convs = convs.filter(c => uniq.includes(c._id));
+  }
+  return convs;
+}, [conversations, query, selectedFilters, classifies]);
+
   
     
 
@@ -191,7 +236,7 @@ const updateTag = async () => {
 const deleteClassify = async (id) => {
   try {
     await axios.delete(`/api/classifies/${id}`);
-    console.log('🗑️ Deleted classify:', id);
+
     // remove it from local state so UI updates immediately
     setClassifies(prev => prev.filter(c => c._id !== id));
   } catch (err) {
@@ -225,7 +270,7 @@ const createTag = async () => {
     const { data } = await axios.post('/api/classifies', body);
 
 
-    console.log('✅ Added new classify:', data);
+
 
     const { data: latest } = await axios.get('/api/classifies');
     setClassifies(latest);
@@ -252,8 +297,7 @@ const createTag = async () => {
         axios.get('/api/friends')
      
       ]);
-      console.log('📥 openConvPicker loaded conversations:', convRes.data);
-      console.log('📥 openConvPicker loaded memberships:', friendRes.data);
+
       setAllConversations(convRes.data);
       setFriends(friendRes.data);
       setConvPickerVisible(true);
@@ -296,7 +340,7 @@ const createTag = async () => {
     };
 
     const applyClassification = (optionKey) => {
-      console.log(`Classifying ${targetConversationId} as ${optionKey}`);
+
       // TODO: call API to save classification
       setClassifyOptionsVisible(false);
       setTargetConversationId(null);
@@ -307,15 +351,14 @@ const createTag = async () => {
         const token = await AsyncStorage.getItem('userToken');
         if (!token) throw new Error("No auth token found");
     
-        console.log("📡 Fetching classifies with token:", token);
+
     
         const res = await axios.get('/api/classifies', {
           headers: {
             Authorization: `Bearer ${token}`,
           }
         });
-    
-        console.log("✅ Received classifies:", res.data);
+
     
         setClassifies(res.data);
         setClassifyModalVisible(true);
@@ -327,13 +370,13 @@ const createTag = async () => {
     
 
     const fetchAllConversations = useCallback(async () => {
-      console.log('🔄 fetchAllConversations() start');
+
       try {
         const { data } = await axios.get('/api/conversations');
-        console.log('✅ fetchAllConversations() got:', data.map(c => c._id));
+
         setConversations(data);
       } catch (err) {
-        console.error('❌ fetchAllConversations() error:', err);
+
       }
     }, []);
     
@@ -349,30 +392,29 @@ const createTag = async () => {
     
       // 🔧 Debug: log every incoming event
       socket.onAny((event, payload) => {
-        console.log('📡 socket.onAny:', event, payload);
       });
     
       // 🔌 Subscribe to global list updates
       socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-      console.log('📡 Emitted JOIN_CONVERSATIONS');
+
     
       // 🔔 NEW GROUP → prepend it
       const onNew = payload => {
-        console.log('📥 NEW_GROUP_CONVERSATION:', payload);
+
         fetchAllConversations();
       };
       socket.on(SOCKET_EVENTS.NEW_GROUP_CONVERSATION, onNew);
     
       // 🔔 LEAVE → refetch
       const onLeave = payload => {
-        console.log('📥 LEAVE_CONVERSATION:', payload);
+
         fetchAllConversations();
       };
       socket.on(SOCKET_EVENTS.LEAVE_CONVERSATION, onLeave);
     
       // 🔔 DISBAND → remove locally
       const onDisband = ({ conversationId }) => {
-        console.log('📥 CONVERSATION_DISBANDED:', conversationId);
+
         setConversations(prev =>
           prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId))
         );
@@ -400,7 +442,7 @@ const createTag = async () => {
   };
 
   socket.on(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
-  console.log("✅ Subscribed to UPDATE_AVATAR_GROUP_CONVERSATION");
+
 
   return () => {
     socket.off(SOCKET_EVENTS.UPDATE_AVATAR_GROUP_CONVERSATION, onAvatarUpdated);
@@ -413,10 +455,10 @@ const createTag = async () => {
 
     useEffect(() => {
       if (conversations.length === 0) return;
-      console.log('🔌 joining individual conversation rooms…');
+
       conversations.forEach(conv => {
         socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, conv._id);
-        console.log('📡 JOIN_CONVERSATION:', conv._id);
+
       });
     }, [conversations]);
     
@@ -438,7 +480,7 @@ useEffect(() => {
     SOCKET_EVENTS.UPDATE_NAME_CONVERSATION,
     onNameUpdated
   );
-  console.log('✅ Subscribed to UPDATE_NAME_CONVERSATION in GroupsScreen');
+
 
   return () => {
     socket.off(
@@ -451,14 +493,14 @@ useEffect(() => {
     
     
     useEffect(() => {
-      console.log("🧩 Mount: setting up CONVERSATION_DISBANDED listener");
+
     
       // Join conversations room (broadcast updates to the user)
       socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
-      console.log("📡 Emitted JOIN_CONVERSATIONS");
+
     
       const handleDisband = ({ conversationId }) => {
-        console.log("📥 Received CONVERSATION_DISBANDED:", conversationId);
+
     
         if (!conversationId) {
           console.warn("⚠️ Missing conversationId in CONVERSATION_DISBANDED payload");
@@ -467,17 +509,17 @@ useEffect(() => {
     
         setConversations(prev => {
           const updated = prev.filter(c => normalizeId(c._id) !== normalizeId(conversationId));
-          console.log(`🧹 Removed disbanded conversation. Remaining:`, updated.map(c => c._id));
+
           return updated;
         });
       };
     
       socket.on(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
-      console.log("✅ Subscribed to CONVERSATION_DISBANDED");
+
     
       return () => {
         socket.off(SOCKET_EVENTS.CONVERSATION_DISBANDED, handleDisband);
-        console.log("🛑 Unsubscribed from CONVERSATION_DISBANDED");
+
       };
     }, []);
 
@@ -485,7 +527,7 @@ useEffect(() => {
     
     useFocusEffect(
       useCallback(() => {
-        console.log('⚡️ Screen focused – re-fetching conversations');
+
         fetchAllConversations();
       }, [fetchAllConversations])
     );
@@ -497,7 +539,7 @@ useEffect(() => {
     const receiveConversation = useCallback((payload) => {
       const newConv = payload.conversation || payload;
     
-      console.log("📥 Processed NEW_GROUP_CONVERSATION:", newConv);
+
     
       if (!newConv._id) return;
     
@@ -517,7 +559,7 @@ useEffect(() => {
           try {
             const id = await AsyncStorage.getItem('userId');
             if (id) {
-              console.log("✅ Loaded userId from AsyncStorage:", id);
+
               setUserId(id);
             } else {
               console.log("⚠️ No userId found in AsyncStorage");
@@ -532,13 +574,11 @@ useEffect(() => {
       useEffect(() => {
         if (!userId) return;
       
-        console.log("✅ Emitting JOIN_USER and JOIN_CONVERSATIONS", userId);
       
         socket.emit(SOCKET_EVENTS.JOIN_USER, userId);
         socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS);
       
         const onNewGroup = (newConv) => {
-          console.log("📥 Received NEW_GROUP_CONVERSATION via socket:", newConv);
           receiveConversation(newConv);
         };
       
@@ -572,12 +612,10 @@ useEffect(() => {
 
 
       const friendsById = useMemo(() => {
-        console.log('🗺️ building friendsById map from memberships:', friends);
           const map = {};
           friends.forEach(f => {
             map[normalizeId(f._id)] = f;
           });
-          console.log('🗺️ friendsById:', map);
           return map;
         }, [friends]);
     
@@ -585,7 +623,6 @@ useEffect(() => {
       const fetchConversations = async () => {
         try {
           const res = await axios.get('/api/conversations');
-          console.log(res.data);
           setConversations(res.data);
         } catch (err) {
           console.error(err);
@@ -670,10 +707,6 @@ useEffect(() => {
             onPress={() =>
               navigation.navigate('ChatGroupScreen', { conversationId: group._id })
             }
-            onLongPress={() => {
-              setTargetConversationId(group._id);
-              setClassifyMenuVisible(true);
-            }}
           >
             <View style={styles.fMessage}>
               {/* AVATAR GROUP */}
@@ -764,35 +797,27 @@ useEffect(() => {
         )}
 
         {/* FOOTER */}
-        <View style={styles.fFooter}>
-          <TouchableOpacity 
-            style={styles.btnTags}
-              onPress={() => navigation.navigate('ConversationScreen')}
-           >
-          
-            <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-            <Image source={require('../icons/member.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
-            <Image source={require('../icons/QR.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
-            <Image source={require('../icons/friend.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-          {currentUser?.avatar ? (
-          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
-        ) : (
-          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
-        )}
-          </TouchableOpacity>
-
-
-
-
-        </View>
+<View style={styles.fFooter}>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('ConversationScreen')}>
+          <Image source={messIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>
+          <Image source={memberIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
+          <Image source={homeIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('FriendList_Screen')}>
+          <Image source={friendIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags}  onPress={()=>navigation.navigate('ProfileScreen')} >
+         {currentUser?.avatar ? (
+           <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+         ) : (
+           <Image source={userIcon} style={styles.avatarFooter} />
+         )}
+        </TouchableOpacity>
+      </View>
 
         {/* MODAL TẠO NHÓM */}
         <Modal
@@ -843,19 +868,21 @@ useEffect(() => {
                 >
                   <Text style={styles.modalCloseText}>Close</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-    style={[
-      styles.modalCreateButton,
-      (creatingGroup || !groupName.trim()) && { backgroundColor: '#ccc' }
-    ]}
-    onPress={createGroup}
-    disabled={creatingGroup || !groupName.trim()}
-  >
-    {creatingGroup
-      ? <ActivityIndicator size="small" color="white" />
-      : <Text style={styles.modalCreateText}>Create Group</Text>
-    }
-  </TouchableOpacity>
+<TouchableOpacity
+  style={[
+    styles.modalCreateButton,
+    !canCreateGroup && { backgroundColor: '#ccc' }
+  ]}
+  onPress={createGroup}
+  disabled={!canCreateGroup}
+>
+  {creatingGroup
+    ? <ActivityIndicator size="small" color="white" />
+    : <Text style={styles.modalCreateText}>Create Group</Text>
+  }
+</TouchableOpacity>
+
+
 
 
               </View>
@@ -1098,7 +1125,6 @@ useEffect(() => {
              } else {
                // single chat → find the membership whose userId ≠ current user
                          const otherMember = item.members.find(m => m.userId !== userId);
-                         console.log('🌟 otherMember for convo', item._id, otherMember);
                          displayName = otherMember?.name || 'Unknown';
              }
     return (

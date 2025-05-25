@@ -17,6 +17,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 
+const userIcon   = require('../Images/avt.png');
+const messIcon   = require('../icons/mess.png');
+const memberIcon = require('../icons/member.png');
+const homeIcon   = require('../icons/QR.png');
+const friendIcon = require('../icons/friend.png');
 
 export default function ConversationScreen({ navigation }) {
   const [conversations, setConversations] = useState([]);
@@ -24,7 +29,7 @@ export default function ConversationScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [userId, setUserId] = useState(null);
-
+const messIcon   = require('../icons/mess.png');
   const [currentUser, setCurrentUser] = useState(null);
 
       const [manageModalVisible, setManageModalVisible] = useState(false);
@@ -56,6 +61,8 @@ export default function ConversationScreen({ navigation }) {
       const [targetConversationId, setTargetConversationId] = useState(null);
       const [friends, setFriends] = useState([]);
 
+
+      
 
       useEffect(() => {
   const handleNewMessage = (message) => {
@@ -165,9 +172,11 @@ export default function ConversationScreen({ navigation }) {
         const storedUserId = await AsyncStorage.getItem('userId');
         setUserId(storedUserId);
         const res = await axios.get('/api/conversations', { params: { userId: storedUserId } });
-        const onlyFalse = Array.isArray(res.data)
-          ? res.data.filter(c => c.type === false)
-          : [];
+const onlyFalse = Array.isArray(res.data)
+  ? res.data.filter(c => c.type === false)
+  : []
+
+
         setConversations(onlyFalse);
         setFiltered(onlyFalse);
       } catch (e) {
@@ -187,23 +196,23 @@ export default function ConversationScreen({ navigation }) {
           );
         }, []);
       
-        const filteredConversations = useMemo(() => {
-          // start from all conversations
-          let convs = conversations;
-        
-          // apply your existing “tag” filters
-          if (selectedFilters.length > 0) {
-            const allIds = selectedFilters.flatMap(tagId => {
-              const tag = classifies.find(c => c._id === tagId);
-              return tag?.conversationIds || [];
-            });
-            const uniq = [...new Set(allIds)];
-            convs = convs.filter(c => uniq.includes(c._id));
-          }
-        
-          // *** NEW: only keep those with type === true ***
-          return convs.filter(c => c.type === true);
-        }, [conversations, classifies, selectedFilters]);
+const filteredConversations = useMemo(() => {
+  const base = Array.isArray(conversations) ? conversations : []
+  
+  // apply tag filters (if any)
+  let convs = selectedFilters.length > 0
+    ? base.filter(c => c && selectedFilters
+         .flatMap(tagId => classifies
+           .find(t => t._id === tagId)
+           ?.conversationIds || [])
+         .includes(c._id)
+      )
+    : base
+
+  // finally only keep those with type===true, but guard c
+   return base.filter(c => c?.type === false)
+}, [conversations, classifies, selectedFilters])
+
         
           
       
@@ -427,18 +436,22 @@ if (!token) {
   }, []);
 
   // simple client‐side search filter
-  useEffect(() => {
-    if (!query) {
-      setFiltered(conversations);
-    } else {
-      const q = query.toLowerCase();
-      setFiltered(conversations.filter(c =>
+useEffect(() => {
+  if (!query.trim()) {
+    setFiltered(conversations);
+  } else {
+    const q = query.toLowerCase();
+    setFiltered(
+      conversations.filter(c =>
         c.members.some(m =>
-          (m.name || '').toLowerCase().includes(q)
+          ((m.name || '').toLowerCase().includes(q)) ||
+          ((m.username || '').toLowerCase().includes(q))
         )
-      ));
-    }
-  }, [query, conversations]);
+      )
+    );
+  }
+}, [query, conversations]);
+
 
     const renderItem = useCallback(
     ({ item: conv }) => {
@@ -533,39 +546,34 @@ if (!token) {
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
-          data={filtered}
+          data={filteredConversations}
           keyExtractor={item => item._id.toString()}
           renderItem={renderItem}
         />
       )}
 
         {/* FOOTER */}
-        <View style={styles.fFooter}>
-          <TouchableOpacity 
-            style={styles.btnTags}
-
-          >
-            <Image source={require('../icons/mess.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}
-           onPress={() => navigation.navigate('GroupsScreen')}>
-            <Image source={require('../icons/member.png')} style={styles.iconfooter}  />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')} >
-            <Image source={require('../icons/QR.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('FriendList_Screen')}>
-            <Image source={require('../icons/friend.png')} style={styles.iconfooter} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.btnTags}>
-          {currentUser?.avatar ? (
-          <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
-        ) : (
-          <Image source={require('../Images/avt.png')} style={styles.avatarFooter} />
-        )}
-          </TouchableOpacity>
-
-</View>
+<View style={styles.fFooter}>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('ConversationScreen')}>
+          <Image source={messIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>
+          <Image source={memberIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
+          <Image source={homeIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('FriendList_Screen')}>
+          <Image source={friendIcon} style={styles.iconfooter} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnTags}  onPress={()=>navigation.navigate('ProfileScreen')} >
+         {currentUser?.avatar ? (
+           <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+         ) : (
+           <Image source={userIcon} style={styles.avatarFooter} />
+         )}
+        </TouchableOpacity>
+      </View>
        <Modal
                 visible={classifyMenuVisible}
                 transparent

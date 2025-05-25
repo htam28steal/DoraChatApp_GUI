@@ -19,6 +19,11 @@ import * as Contacts from 'expo-contacts';
 import FriendService from '../api/friendService'; // adjust path if needed
 
 const addFrIcon = require('../icons/addFriend.png');
+const messIcon   = require('../icons/mess.png');
+const userIcon   = require('../Images/avt.png');
+const memberIcon = require('../icons/member.png');
+const homeIcon   = require('../icons/QR.png');
+const friendIcon = require('../icons/friend.png');
 
 export default function ContactScreen({ navigation }) {
   const [filtered, setFiltered] = useState([]);
@@ -182,19 +187,7 @@ export default function ContactScreen({ navigation }) {
     fetchUserInfo();
   }, []);
   // when query or phoneBookUsers changes, re‐filter contacts
-  useEffect(() => {
-    if (!showContacts) return; // only run when in contacts mode
-    if (!query) {
-      setFilteredContacts(phoneBookUsers);
-    } else {
-      const q = query.toLowerCase();
-      setFilteredContacts(
-        phoneBookUsers.filter((u) => u.name.toLowerCase().includes(q))
-      );
-    }
-  }, [query, phoneBookUsers, showContacts]);
-
-  // you can keep your existing convos‐filter hook, but use filteredConvs there
+ 
 
   useEffect(() => {
     (async () => {
@@ -225,18 +218,16 @@ export default function ContactScreen({ navigation }) {
         .filter((num, i, arr) => num && arr.indexOf(num) === i); // unique, non-empty
 
       // 4) lookup each number on your API
-      const lookups = numbers.map((number) =>
-        axios
-          .get(`/api/users/search/phone-number/${number}`)
-          .then((res) => res.data)
-          .catch(() => null)
-      );
+const lookups = numbers.map((number) =>
+  axios
+    .get(`/api/users/search/phone-number/${number}`)
+    .then((res) => res.data ? { ...res.data, phoneNumber: number } : null) // <-- attach number!
+    .catch(() => null)
+);
+const results = await Promise.all(lookups);
+const foundUsers = results.filter((u) => u && u._id);
+setPhoneBookUsers(foundUsers);
 
-      const results = await Promise.all(lookups);
-
-      // 5) keep only those that exist
-      const foundUsers = results.filter((u) => u && u._id);
-      setPhoneBookUsers(foundUsers);
       setLookupLoading(false);
     })();
   }, []);
@@ -247,6 +238,36 @@ export default function ContactScreen({ navigation }) {
       console.log('🔍 Retrieved token in ConversationScreen:', token);
     })();
   }, []);
+
+useEffect(() => {
+  if (!query) {
+    setFilteredContacts(phoneBookUsers);
+  } else {
+    const q = query.toLowerCase();
+    const cleanQ = query.replace(/\D/g, '');
+
+    // Debug log!
+    phoneBookUsers.forEach(u => {
+      console.log(
+        'Contact:', u.name, '| phoneNumber:', u.phoneNumber, '| Digits:', u.phoneNumber && u.phoneNumber.replace(/\D/g, '')
+      );
+    });
+    console.log('Search input:', query, '| cleanQ:', cleanQ);
+
+    setFilteredContacts(
+      phoneBookUsers.filter(
+        (u) =>
+          (u.name && u.name.toLowerCase().includes(q)) ||
+          (u.username && u.username.toLowerCase().includes(q)) ||
+          (u.phoneNumber &&
+            u.phoneNumber.replace(/\D/g, '').includes(cleanQ))
+      )
+    );
+  }
+}, [query, phoneBookUsers]);
+
+
+
 
   const friendsById = useMemo(() => {
     const map = {};
@@ -366,68 +387,46 @@ export default function ContactScreen({ navigation }) {
       </View>
       {/* optionally, filter tabs could go here */}
       {/* <View style={styles.filterRow}>…</View> */}
+{lookupLoading ? (
+  <ActivityIndicator
+    size="large"
+    color="#086DC0"
+    style={{ marginTop: 150 }}
+  />
+) : filteredContacts.length === 0 ? (
+  <Text style={styles.placeholderText}>
+    No contacts found on the app.
+  </Text>
+) : (
+  <FlatList
+    contentContainerStyle={styles.list}
+    data={filteredContacts}
+    keyExtractor={(item) => item._id.toString()}
+    renderItem={renderContactItem}
+  />
+)}
 
-      {lookupLoading ? (
-        <ActivityIndicator
-          size="large"
-          color="#086DC0"
-          style={{ marginTop: 150 }}
-        />
-      ) : phoneBookUsers.length === 0 ? (
-        <Text style={styles.placeholderText}>
-          No contacts found on the app.
-        </Text>
-      ) : (
-        <FlatList
-          contentContainerStyle={styles.list}
-          data={phoneBookUsers}
-          keyExtractor={(item) => item._id.toString()}
-          renderItem={renderContactItem}
-        />
-      )}
 
       {/* FOOTER */}
-      <View style={styles.fFooter}>
-        <TouchableOpacity style={styles.btnTags}>
-          <Image
-            source={require('../icons/mess.png')}
-            style={styles.iconfooter}
-          />
+<View style={styles.fFooter}>
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('ConversationScreen')}>
+          <Image source={messIcon} style={styles.iconfooter} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.btnTags}
-          onPress={() => navigation.navigate('GroupsScreen')}>
-          <Image
-            source={require('../icons/member.png')}
-            style={styles.iconfooter}
-          />
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('GroupsScreen')}>
+          <Image source={memberIcon} style={styles.iconfooter} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnTags} onPress={() => navigation.navigate('QRScreen')}>
-          <Image
-            source={require('../icons/QR.png')}
-            style={styles.iconfooter}
-          />
+          <Image source={homeIcon} style={styles.iconfooter} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.btnTags}
-          onPress={() => navigation.navigate('FriendList_Screen')}>
-          <Image
-            source={require('../icons/friend.png')}
-            style={styles.iconfooter}
-          />
+        <TouchableOpacity style={styles.btnTags} onPress={()=>navigation.navigate('FriendList_Screen')}>
+          <Image source={friendIcon} style={styles.iconfooter} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnTags}>
-          {currentUser?.avatar ? (
-            <Image
-              source={{ uri: currentUser.avatar }}
-              style={styles.avatarFooter}
-            />
-          ) : (
-            <Image
-              source={require('../Images/avt.png')}
-              style={styles.avatarFooter}
-            />
-          )}
+        <TouchableOpacity style={styles.btnTags}  onPress={()=>navigation.navigate('ProfileScreen')} >
+         {currentUser?.avatar ? (
+           <Image source={{ uri: currentUser.avatar }} style={styles.avatarFooter} />
+         ) : (
+           <Image source={userIcon} style={styles.avatarFooter} />
+         )}
         </TouchableOpacity>
       </View>
     </View>

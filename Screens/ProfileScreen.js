@@ -22,6 +22,8 @@ import dayjs from 'dayjs';
 import SectionedMultiSelect from 'react-native-sectioned-multi-select';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import QRCode from 'react-native-qrcode-svg';
+
 
 
 
@@ -108,17 +110,12 @@ const handleLogout = async () => {
 
     const user = JSON.parse(userRaw);
 
-    console.log('Sending to logout:', {
-      user,
-      refreshToken,
-    });
-
     const response = await axios.post('/api/auth/logout', {
       user,
       refreshToken,
     });
 
-    console.log('Logout response:', response.data);
+
 
     await AsyncStorage.multiRemove([
       'userId',
@@ -168,9 +165,9 @@ useEffect(() => {
 useEffect(() => {
   if (userInfo) {
     setAvatarColor(userInfo.avatarColor || 'gray');
-    console.log('Setting avatar from userInfo:', userInfo.avatar);
+
     setAvatarUrl(userInfo.avatar || '');
-    console.log('Setting cover from userInfo:', userInfo.coverImage);
+
     setCoverUrl(userInfo.coverImage || '');
   }
 }, [userInfo]);
@@ -245,19 +242,19 @@ const handleImageUpload = async (asset, type) => {
     type: 'image/jpeg'
   };
 
-  console.log(`Uploading ${type} image from URI:`, file.uri);
+
 
   try {
     let res;
 if (type === 'avatar') {
   res = await updateAvatarUser(userInfo._id, file, token);
-  console.log('Avatar upload response:', res);
+
   const updatedUser = await getUserById(userInfo._id, token);
   setUserInfo(updatedUser); // 👈 refresh user state including avatar
 }
 else if (type === 'cover') {
       res = await updateCoverUser(userInfo._id, file, token);
-      console.log('Cover upload response:', res);
+
       setCoverUrl(res.cover);
     }
   } catch (e) {
@@ -381,6 +378,23 @@ else if (type === 'cover') {
         </View>
 
       </View>
+<View style={styles.fQR}>
+  <QRCode
+    value={JSON.stringify({
+      userId: userInfo?._id,
+      name: userInfo?.name,
+      email: userInfo?.email, // or whatever info you want
+    })}
+    size={145}
+    backgroundColor="white"
+  />
+
+  {/* 4 overlay corner borders */}
+  <View style={[styles.qrCorner, styles.topLeft]} />
+  <View style={[styles.qrCorner, styles.topRight]} />
+  <View style={[styles.qrCorner, styles.bottomLeft]} />
+  <View style={[styles.qrCorner, styles.bottomRight]} />
+</View>
 
 
       <View style={styles.fDetailInfor}>
@@ -755,7 +769,7 @@ const styles = StyleSheet.create({
   fDetailInfor: {
     width: '95%',
     height: 350,
-    marginTop: 60,
+    marginTop: 10,
     
     alignContent:'center',
   },
@@ -925,7 +939,7 @@ const styles = StyleSheet.create({
 fHobbies: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingLeft: 28,
+    marginTop:5
   },
   fHobbie: {
     paddingHorizontal: 12,
@@ -936,4 +950,55 @@ fHobbies: {
     marginBottom: 8,
   },
   txtHobbies: { fontSize: 14, color: '#086DC0' },
+  fQR: {
+  marginTop: 50,
+  width: 160,
+  height: 160,
+  justifyContent: 'center',
+  alignItems: 'center',
+  position: 'relative',
+  
+},
+
+qrImg: {
+  width: '100%',
+  height: '100%',
+  resizeMode: 'contain',
+},
+
+qrCorner: {
+  position: 'absolute',
+  width: 50,
+  height: 50,
+  borderColor: '#000',
+},
+
+topLeft: {
+  top: 0,
+  left: 0,
+  borderTopWidth: 4,
+  borderLeftWidth: 4,
+},
+
+topRight: {
+  top: 0,
+  right: 0,
+  borderTopWidth: 4,
+  borderRightWidth: 4,
+},
+
+bottomLeft: {
+  bottom: 0,
+  left: 0,
+  borderBottomWidth: 4,
+  borderLeftWidth: 4,
+},
+
+bottomRight: {
+  bottom: 0,
+  right: 0,
+  borderBottomWidth: 4,
+  borderRightWidth: 4,
+},
+
 });
