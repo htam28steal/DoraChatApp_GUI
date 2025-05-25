@@ -615,18 +615,33 @@ const Container = onLongPress ? TouchableOpacity : View;
    ) : msg.type === "FILE" && isAudioFile(msg.fileName, msg.content) ? (
          <AudioBubble url={msg.content} />
         ) : msg.type === "FILE" ? (
-<TouchableOpacity
-  style={messageItemStyles.fileContainer}
-  onPress={() => downloadFile(msg.content, msg.fileName)}
-  onLongPress={onLongPress}
-  activeOpacity={0.7}
->
-  <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
-  <Text style={messageItemStyles.fileText}>
-    {msg.fileName || "Open File"}
-  </Text>
-</TouchableOpacity>
-
+  msg.pending ? (
+    // ───── PENDING PLACEHOLDER ─────
+    <View
+      style={[
+        messageItemStyles.filePlaceholder,
+        { width: 150, height: 150 },
+      ]}
+    >
+      <ActivityIndicator size="large" color="#086DC0" />
+    </View>
+  ) : (
+    // ───── REAL FILE ─────
+    <TouchableOpacity
+      style={messageItemStyles.fileContainer}
+      onPress={() => downloadFile(msg.content, msg.fileName)}
+      onLongPress={onLongPress}
+      activeOpacity={0.7}
+    >
+      <Image
+        source={getFileIcon(msg.content)}
+        style={messageItemStyles.fileIcon}
+      />
+      <Text style={messageItemStyles.fileText}>
+        {msg.fileName || "Open File"}
+      </Text>
+    </TouchableOpacity>
+  )
 ) : (
          <Text
   style={[
@@ -682,7 +697,21 @@ const messageItemStyles = StyleSheet.create({
     flexDirection: "row",
     marginVertical: 4,
     alignItems: "flex-end",
-  },
+  },filePlaceholder: {
+  backgroundColor: "#F0F0F0",
+  borderRadius: 12,
+  justifyContent: "center",
+  alignItems: "center",
+  marginVertical: 2,
+  alignSelf: "flex-start",
+  // subtle shadow
+  shadowColor: "#000",
+  shadowOpacity: 0.05,
+  shadowOffset: { width: 0, height: 1 },
+  shadowRadius: 2,
+  elevation: 1,
+},
+
   leftAlign: { justifyContent: "flex-start" },
   rightAlign: { flexDirection: "row-reverse" },
   avatar: { width: 40, height: 40, borderRadius: 20 },
@@ -2106,16 +2135,13 @@ setMessages(prev => dedupeMessages(
 
 
 
- const pickDocument = async () => {
+const pickDocument = async () => {
   setUploading(true);
   try {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "*/*",
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
+    const result = await DocumentPicker.getDocumentAsync({ type: "*/*" });
+    console.log("[FilePicker] Result:", result);
 
-    if (result?.canceled || (!result.assets && result.type !== "success")) {
+    if (result.type !== "success" && !result.assets) {
       setUploading(false);
       return;
     }
@@ -2134,12 +2160,28 @@ setMessages(prev => dedupeMessages(
     }
 
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    console.log("[FilePicker] fileInfo:", fileInfo);
+
     if (!fileInfo.exists) {
       Alert.alert("Error", "File not found.");
       setUploading(false);
       return;
     }
 
+    // 1️⃣ Create optimistic placeholder
+    const tempId = `tmp_${Date.now()}`;
+    const optimisticMsg = {
+      _id: tempId,
+      memberId: { userId },
+      type: "FILE",
+      content: fileUri,
+      fileName,
+      pending: true,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
+    // 2️⃣ Log FormData fields
     const formData = new FormData();
     formData.append("id", userId);
     formData.append("conversationId", conversationId);
@@ -2149,21 +2191,50 @@ setMessages(prev => dedupeMessages(
       type: mimeType,
     });
 
-    await axios.post("/api/messages/file", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-        
-      },
-       timeout: 30000,
+    // Logging FormData keys (values not accessible directly in React Native)
+    if (formData._parts) {
+      for (let [k, v] of formData._parts) {
+        console.log(`[FormData] ${k}:`, v);
+      }
+    }
+
+    // 3️⃣ Do upload
+    console.log("[FileUpload] Sending file to server...");
+    const response = await axios.post("/api/messages/file", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 30000,
     });
+    console.log("[FileUpload] Server response:", response.data);
+
+    // 4️⃣ Swap out placeholder
+    const realMsg = Array.isArray(response.data) ? response.data[0] : response.data;
+setMessages(prev => dedupeMessages([
+  ...prev.filter(m => m._id !== tempId), // remove placeholder
+  { ...realMsg, pending: false },        // add the real message
+]));
 
   } catch (error) {
-    console.error("Full Axios Error:", JSON.stringify(error, null, 2));
-    Alert.alert("Upload error", error.message || "Không thể upload file.");
+    console.log("[FileUpload] ERROR sending file:", error);
+
+    if (error.response) {
+      console.log("[FileUpload] Error response data:", error.response.data);
+      Alert.alert("Upload error", error.response.data?.message || "Server error.");
+    } else if (error.request) {
+      console.log("[FileUpload] No response received:", error.request);
+      Alert.alert("Upload error", "No response from server.");
+    } else {
+      console.log("[FileUpload] General error:", error.message);
+      Alert.alert("Upload error", error.message);
+    }
+
+    // Remove placeholder if failed
+    setMessages(prev => prev.filter(m => !m._id.startsWith("tmp_")));
   } finally {
     setUploading(false);
   }
 };
+
+
 const handleSendMessage = async (text) => {
   if (!text.trim()) return;
 
