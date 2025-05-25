@@ -612,6 +612,21 @@ const Container = onLongPress ? TouchableOpacity : View;
       </View>
     )}
   </View>
+   ) : msg.type === "FILE" && isAudioFile(msg.fileName, msg.content) ? (
+         <AudioBubble url={msg.content} />
+        ) : msg.type === "FILE" ? (
+<TouchableOpacity
+  style={messageItemStyles.fileContainer}
+  onPress={() => downloadFile(msg.content, msg.fileName)}
+  onLongPress={onLongPress}
+  activeOpacity={0.7}
+>
+  <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
+  <Text style={messageItemStyles.fileText}>
+    {msg.fileName || "Open File"}
+  </Text>
+</TouchableOpacity>
+
 ) : (
          <Text
   style={[
