@@ -409,7 +409,7 @@ const messageItemStyles = StyleSheet.create({
     rightAlign: { flexDirection: "row-reverse" },
     avatar: { width: 40, height: 40, borderRadius: 20 },
     avatarPlaceholder: { width: 40, height: 40 },
-    contentContainer: { maxWidth: 200, marginHorizontal: 8 },
+    contentContainer: { maxWidth: 468, marginHorizontal: 8 },
     imageContent: {
         width: 250,
         height: 250,
@@ -627,11 +627,53 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress, onRecord }) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress, onRecord, membersinconversation }) {
+
+    const [showMentionList, setShowMentionList] = useState(false);
+    const [filteredMembers, setFilteredMembers] = useState([]);
+
+    console.log(`Nhan duoc roi ne`, membersinconversation);
+    const handleInputChange = (text) => {
+        setInput(text);
+
+        // Kiểm tra mention
+        const mentionMatch = text.toString().match(/@(\w*)$/);
+        if (mentionMatch) {
+            const query = mentionMatch[1].toLowerCase();
+            const filtered = membersinconversation.filter(member =>
+                member.name.toLowerCase().includes(query)
+            );
+            setFilteredMembers(filtered);
+            setShowMentionList(true);
+        } else {
+            setShowMentionList(false);
+        }
+    };
+
     const handleSend = () => {
         if (!input.trim()) return;
         onSend(input);
         setInput("");
+        setShowMentionList(false);
+    };
+
+    const handleSelectMention = (name) => {
+        const newText = input.replace(/@\w*$/, `@${name} `);
+        setInput(newText);
+        setShowMentionList(false);
+    };
+
+    const renderColoredText = () => {
+        return input.split(/(@\w+)/g).map((part, index) => {
+            if (part.startsWith('@')) {
+                return (
+                    <Text key={index} style={{ color: '#086DC0', fontWeight: 'bold' }}>
+                        {part}
+                    </Text>
+                );
+            }
+            return <Text key={index}>{part}</Text>;
+        });
     };
 
     return (
@@ -644,10 +686,28 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
                     style={messageInputStyles.textInput}
                     placeholder="Type a message..."
                     value={input}
-                    onChangeText={setInput}
+                    onChangeText={handleInputChange}
                     onSubmitEditing={handleSend}
                     returnKeyType="send"
                 />
+
+                {showMentionList && (
+                    <View style={messageInputStyles.mentionList}>
+                        <ScrollView>
+                            {filteredMembers.map(member => (
+                                <TouchableOpacity
+                                    key={member.id}
+                                    style={messageInputStyles.mentionItem}
+                                    onPress={() => { handleSelectMention(member.name) }}
+                                >
+                                    <Image source={{ uri: member.avatar }} style={{ width: 20, height: 20, borderRadius: '50%' }} />
+                                    <Text style={{ marginLeft: 10, fontWeight: 'bold', color: 'black' }}>{member.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
                 <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickMedia}>
                     <Image source={PictureIcon} style={messageInputStyles.icon} />
                 </TouchableOpacity>
@@ -693,6 +753,24 @@ const messageInputStyles = StyleSheet.create({
     },
     sendButton: { padding: 8 },
     sendIcon: { width: 24, height: 24, resizeMode: "contain" },
+    mentionList: {
+        position: 'absolute',
+        bottom: 70,
+        left: 50,
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        width: 200,
+        maxHeight: 150,
+        zIndex: 999,
+    },
+    mentionItem: {
+        padding: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        flexDirection: 'row',
+    },
 });
 
 /**
@@ -712,7 +790,6 @@ export default function ChatScreen({ route, navigation }) {
     const [input, setInput] = useState("");
     const [emojiOpen, setEmojiOpen] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState(null);
-    console.log(`Tin nhắn được chọn `, selectedMessage?._id)
     const [modalVisible, setModalVisible] = useState(false);
     const [currentChannelId, setCurrentChannelId] = useState(null);
     const [channels, setChannels] = useState([]);
@@ -725,8 +802,7 @@ export default function ChatScreen({ route, navigation }) {
     const [showRecordModal, setRecordModal] = useState(false);
 
     const [showAddChannel, setShowAddChannel] = useState(false);
-
-
+    const [members, setMembers] = useState(null)
 
     const emojiToType = {
         '❤️': 1,
@@ -1014,14 +1090,17 @@ export default function ChatScreen({ route, navigation }) {
         }
     });
 
-    const checkaddChannel = async (conversation, memberId) => {
-        conversation.managerIds.forEach(id => {
-            console.log('ID:', id);
-        });
-        console.log(`kkkkkkk`, memberId.toString());
-        console.log(`cccc`, conversation.managerIds.some(id => id === memberId.toString()))
+    const checkaddChannel = (conversation, memberId) => {
+        if (!conversation?.managerIds || conversation.managerIds.length === 0) {
+            console.log("Không có quản lý trong nhóm");
+            return false;
+        }
+        if (!memberId) {
+            console.log("Không có memberId");
+            return false;
+        }
 
-        return conversation.managerIds.some(id => id.toString() === memberId.toString());
+        return conversation.managerIds.some(id => id?.toString() === memberId?.toString());
     };
 
     function HeaderSingleChat({ handleAddChannel, checkaddChannel }) {
@@ -1119,7 +1198,6 @@ export default function ChatScreen({ route, navigation }) {
             height: 'auto'
         },
         headerContent: {
-            paddingTop: 8,
             flexDirection: 'row',
             alignItems: 'center',
             marginBottom: 10,
@@ -1136,9 +1214,9 @@ export default function ChatScreen({ route, navigation }) {
             height: '80%',
             resizeMode: 'contain',
         },
-        avatar: { width: 45, height: 45, borderRadius: 35 },
+        avatar: { width: 55, height: 55, borderRadius: 35 },
         infoContainer: { marginLeft: 12, flex: 1 },
-        name: { fontSize: 16, fontWeight: "600", color: "#086DC0" },
+        name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
         statusContainer: {
             flexDirection: "row",
             alignItems: "center",
@@ -1174,7 +1252,7 @@ export default function ChatScreen({ route, navigation }) {
 
         iconsContainer: { flexDirection: "row" },
         iconButton: { padding: 8, marginLeft: 8 },
-        icon: { width: 20, height: 20, resizeMode: "contain" },
+        icon: { width: 24, height: 24, resizeMode: "contain" },
     });
 
 
@@ -1646,6 +1724,23 @@ export default function ChatScreen({ route, navigation }) {
         setShowAddChannel(true);
     };
 
+    useEffect(() => {
+        const fetchMembersInConversation = async () => {
+
+            try {
+                const res = await axios.get(`/api/members/${conversationId}`);
+                const members = res.data.data;
+                setMembers(members);
+            } catch (err) {
+                console.error("Lỗi lấy memberId:", err);
+            }
+        };
+
+        fetchMembersInConversation();
+    }, [conversationId]);
+
+    console.log(`MEMBERSinConversation`, members)
+
     return (
 
         <View style={chatScreenStyles.container}>
@@ -1678,6 +1773,7 @@ export default function ChatScreen({ route, navigation }) {
                     onModalReact={handlePressEmoji}
                     onVotePress={() => setVoteShowModal(true)}
                     onRecord={() => setRecordModal(true)}
+                    membersinconversation={members}
 
                 />
                 <EmojiPicker

@@ -24,7 +24,6 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
         setOptions(updated);
     };
 
-    console.log(`Member là : `, memberId);
 
     const handleAddOption = () => {
         setOptions([...options, '']);
