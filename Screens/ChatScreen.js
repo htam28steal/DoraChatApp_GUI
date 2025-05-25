@@ -984,6 +984,7 @@ const scrollToMessage = useCallback((messageId) => {
   prevMsg?.type === "NOTIFY";
 
         return (
+          
         <MessageItem
             key={msg._id}
           ref={ref => (messageRefs.current[msg._id] = ref)}
@@ -1345,52 +1346,51 @@ const playRecording = async () => {
 };
 
 const sendRecording = async () => {
-  if (!recordedUri) {
-    console.log("[Audio] No recorded URI!");
-    return;
-  }
-  setRecordingModal(false);
-  const fileName = `audio_${Date.now()}.aac`;
+  if (!recordedUri) return;
 
-  // Log out the URI and fileName for debugging
-  console.log("[Audio] Preparing to upload file:", recordedUri, "as", fileName);
+  // 1️⃣ create an optimistic placeholder
+  const tempId = `tmp_audio_${Date.now()}`;
+  const optimisticMsg = {
+    _id: tempId,
+    memberId: { userId },
+    type: "FILE",
+    content: recordedUri,
+    fileName: tempId + ".aac",
+    pending: true,
+    createdAt: new Date().toISOString(),
+  };
+  setMessages(prev => [...prev, optimisticMsg]);
 
-  const formData = new FormData();
-  formData.append("id", userId);
-  formData.append("conversationId", conversationId);
-  formData.append("file", {
-    uri: recordedUri,
-    name: fileName,
-    type: "audio/aac",
-  });
-
-  // Log out the FormData for debugging (works only in Chrome debugger, not in Hermes)
-  // This will print FormData keys, not values. It's a limitation of React Native.
-  for (let [key, value] of formData._parts || []) {
-    console.log(`[Audio] FormData field: ${key}`, value);
-  }
-
+  // 2️⃣ upload
   try {
-    console.log("[Audio] Sending POST /api/messages/file...");
-    await axios.post("/api/messages/file", formData, {
+    const formData = new FormData();
+    formData.append("id", userId);
+    formData.append("conversationId", conversationId);
+    formData.append("file", {
+      uri: recordedUri,
+      name: optimisticMsg.fileName,
+      type: "audio/aac",
+    });
+    const response = await axios.post("/api/messages/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       timeout: 20000,
     });
-    console.log("[Audio] Upload successful!");
-    resetRecording();
+
+    // 3️⃣ replace placeholder with real data
+    const realMsg = Array.isArray(response.data) ? response.data[0] : response.data;
+    setMessages(prev =>
+      prev.map(m => m._id === tempId ? { ...realMsg, pending: false } : m)
+    );
+    setRecordingModal(false)
   } catch (error) {
-    // Axios error can have response, request, or message
-    if (error.response) {
-      console.error("[Audio] Axios upload failed – response error:", error.response.data);
-    } else if (error.request) {
-      console.error("[Audio] Axios upload failed – request error:", error.request);
-    } else {
-      console.error("[Audio] Axios upload failed – unknown error:", error.message);
-    }
+    // remove placeholder on error
+    setMessages(prev => prev.filter(m => m._id !== tempId));
     Alert.alert("Gửi thất bại", "Không gửi được bản ghi âm.");
+  } finally {
     resetRecording();
   }
 };
+
 
 
 
@@ -2303,15 +2303,19 @@ useEffect(() => {
     if (!socket || !conversationId || !userId) return;
 
     
-
- const receiveHandler = (message) => {
+// in your ChatScreen useEffect…
+const receiveHandler = (message) => {
   if (message.conversationId !== conversationId) return;
-setMessages(prev => dedupeMessages([
-  ...prev, // Your message addition logic
-  message
-]));
 
+  // ❌ skip messages sent by me
+  if (message.memberId.userId === userId) return;
+
+  setMessages(prev => [...prev, message]);
 };
+
+socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+
+
 
   
 
