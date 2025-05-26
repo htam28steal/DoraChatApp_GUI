@@ -38,6 +38,8 @@ import Media from './Screens/MediaScreen'
 import CheckMail from './Screens/CheckMailScreen'
 import FullScreenImage from './Screens/FullSreenImage';
 import QR from './Screens/QRScreen'
+import Call from './Screens/CallScreen'
+
 const Stack = createStackNavigator();
 
 // Component con để sử dụng các hook Redux (ví dụ useDispatch)
@@ -151,6 +153,12 @@ function AppContainer() {
         <Stack.Screen
           name="FullScreenImage"
           component={FullScreenImage}
+          options={{ headerShown: false }}
+
+        />
+              <Stack.Screen
+          name="CallScreen"
+          component={Call}
           options={{ headerShown: false }}
 
         />

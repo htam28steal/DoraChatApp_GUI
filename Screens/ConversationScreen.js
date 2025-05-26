@@ -87,11 +87,11 @@ const messIcon   = require('../icons/mess.png');
   };
 
   socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
-  console.log('✅ Subscribed to RECEIVE_MESSAGE on ConversationScreen');
+
 
   return () => {
     socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, handleNewMessage);
-    console.log('❌ Unsubscribed from RECEIVE_MESSAGE on ConversationScreen');
+
   };
 }, []);
 
@@ -125,7 +125,7 @@ const messIcon   = require('../icons/mess.png');
       useEffect(() => {
         const handleNameUpdate = (memberUpdate) => {
           const { conversationId, userId, name } = memberUpdate;
-          console.log("📥 [ConversationScreen] Received update-member-name:", memberUpdate);
+       
       
           // Update the name in the conversation list
           setConversations(prevConvs =>
@@ -140,11 +140,11 @@ const messIcon   = require('../icons/mess.png');
         };
       
         socket.on(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
-        console.log("✅ Subscribed to UPDATE_MEMBER_NAME in ConversationScreen");
+       
       
         return () => {
           socket.off(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
-          console.log("❌ Unsubscribed from UPDATE_MEMBER_NAME in ConversationScreen");
+         
         };
       }, []);
       
@@ -152,7 +152,7 @@ const messIcon   = require('../icons/mess.png');
       useEffect(() => {
         (async () => {
           const token = await AsyncStorage.getItem('userToken');
-          console.log("🔍 Retrieved token in ConversationScreen:", token);
+        
         })();
       }, []);
       
@@ -274,7 +274,7 @@ const filteredConversations = useMemo(() => {
       const deleteClassify = async (id) => {
         try {
           await axios.delete(`/api/classifies/${id}`);
-          console.log('🗑️ Deleted classify:', id);
+
           // remove it from local state so UI updates immediately
           setClassifies(prev => prev.filter(c => c._id !== id));
         } catch (err) {
@@ -308,7 +308,7 @@ const filteredConversations = useMemo(() => {
           const { data } = await axios.post('/api/classifies', body);
       
       
-          console.log('✅ Added new classify:', data);
+
       
           const { data: latest } = await axios.get('/api/classifies');
           setClassifies(latest);
@@ -376,17 +376,17 @@ const filteredConversations = useMemo(() => {
           };
       
           const applyClassification = (optionKey) => {
-            console.log(`Classifying ${targetConversationId} as ${optionKey}`);
+           
             // TODO: call API to save classification
             setClassifyOptionsVisible(false);
             setTargetConversationId(null);
           };
       
           const openClassifyModal = async () => {
-            console.log('👆 Classify button pressed');
+
             try {
               const token = await AsyncStorage.getItem('userToken');
-console.log("🔑 Token from AsyncStorage:", token);
+
 
 if (!token) {
   Alert.alert("Missing token", "Cannot open classify modal because userToken is missing.");
@@ -395,7 +395,7 @@ if (!token) {
 
               if (!token) throw new Error("No auth token found");
           
-              console.log("📡 Fetching classifies with token:", token);
+
           
               const res = await axios.get('/api/classifies', {
                 headers: {
@@ -403,7 +403,7 @@ if (!token) {
                 }
               });
           
-              console.log("✅ Received classifies:", res.data);
+
           
               setClassifies(res.data);
               setClassifyModalVisible(true);

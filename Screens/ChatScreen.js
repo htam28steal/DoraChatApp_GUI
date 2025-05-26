@@ -1121,7 +1121,7 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser
         </View>
       </View>
       <View style={headerStyles.iconsContainer}>
-        <TouchableOpacity style={headerStyles.iconButton}>
+        <TouchableOpacity style={headerStyles.iconButton} onPress={()=>navigation.navigate('CallScreen',{conversationId})}>
           <Image source={CallIcon} style={headerStyles.icon} />
         </TouchableOpacity>
         <TouchableOpacity style={headerStyles.iconButton}>
@@ -1915,16 +1915,6 @@ useEffect(() => {
       ]);
 
       const all = msgRes.data || [];
-
-      console.log(
-  "🔍 fetched messages:",
-  all.map(m => ({
-    _id: m._id,
-    type: m.type,
-    fileName: m.fileName,
-    createdAt: m.createdAt
-  }))
-);
 
       const pinned = pinRes.data || [];
 
