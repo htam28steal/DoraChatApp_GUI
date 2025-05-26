@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, BackHandler } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, BackHandler, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "../api/apiConfig";
-import { createMeetingToken } from "../api/createMeetingToken"; // thêm file API vừa viết
-import { PermissionsAndroid, Platform } from "react-native";
-
+import Toast from 'react-native-toast-message'
+import { createMeetingToken } from "../api/createMeetingToken";
+import { PermissionsAndroid } from "react-native";
 const CREATE_ROOM_URL = "/api/daily/create-room";
 
 export default function DailyVideoCallScreen({ navigation, route }) {
@@ -60,20 +60,32 @@ export default function DailyVideoCallScreen({ navigation, route }) {
         const user = userJson ? JSON.parse(userJson) : {};
         const name = user.name || "Guest";
         setUserName(name);
-        const  conversationRoomId = conversationId + channelId
-        // Gọi API tạo phòng (nếu cần)
-        const resp = await axios.post(CREATE_ROOM_URL, { conversationId: conversationRoomId });
-        const { url } = resp.data;
+        const conversationRoomId = conversationId + channelId;
+        try {
+          const token = await AsyncStorage.getItem("userToken");
+          const { data } = await axios.post(
+            `/api/daily/create-room`,
+            { conversationId: conversationRoomId },
+          );
 
-        // Lấy roomName từ URL
-        const roomName = url.split("/").at(-1);
 
-        // Gọi API Daily để lấy meeting token
-        const newToken = await createMeetingToken(roomName, name);
+          const resp = await axios.post(CREATE_ROOM_URL, { conversationId: conversationRoomId });
+          const { url } = resp.data;
 
-        // Lưu URL & Token
-        setRoomUrl(url);
-        setToken(newToken);
+          const roomName = url.split("/").at(-1);
+
+          const newToken = await createMeetingToken(roomName, name);
+
+          setRoomUrl(url);
+          setToken(newToken);
+        } catch (err) {
+          navigation.navigate('ConversationScreen');
+          Toast.show({
+            type: 'error',
+            text1: 'Fail to call'
+          });
+        }
+
       } catch (e) {
         console.error("Daily room error:", e);
         Alert.alert("Error", e.message || "Could not join call");
@@ -82,7 +94,7 @@ export default function DailyVideoCallScreen({ navigation, route }) {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [conversationId, channelId, navigation]);
 
   if (loading) {
     return (
