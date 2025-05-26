@@ -3,17 +3,20 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Bac
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "../api/apiConfig";
+import { createMeetingToken } from "../api/createMeetingToken"; // thêm file API vừa viết
+import { PermissionsAndroid, Platform } from "react-native";
 
 const CREATE_ROOM_URL = "/api/daily/create-room";
+
 export default function DailyVideoCallScreen({ navigation, route }) {
   const [userName, setUserName] = useState("");
   const [roomUrl, setRoomUrl] = useState(null);
+  const [token, setToken] = useState("");
   const [loading, setLoading] = useState(true);
   const webviewRef = useRef(null);
 
   const { conversationId } = route.params;
 
-    // 1) Helper to leave the call & navigate back
   const leaveCall = useCallback(() => {
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript(`
@@ -26,36 +29,55 @@ export default function DailyVideoCallScreen({ navigation, route }) {
     navigation.goBack();
   }, [navigation]);
 
-  // 2) Handle Android hardware back
-useEffect(() => {
-   const onBackPress = () => {
-     leaveCall();
-     return true;
-   };
-   const subscription = BackHandler.addEventListener(
-     "hardwareBackPress",
-     onBackPress
-   );
-   return () => subscription.remove();
- }, [leaveCall]);
+  useEffect(() => {
+    const onBackPress = () => {
+      leaveCall();
+      return true;
+    };
+    const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => subscription.remove();
+  }, [leaveCall]);
+
+  async function requestPermissions() {
+    if (Platform.OS === "android") {
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ]);
+        console.log("Permissions granted:", granted);
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+  }
 
   useEffect(() => {
     (async () => {
       try {
+        // Lấy tên user từ AsyncStorage
         const userJson = await AsyncStorage.getItem("userInfo");
         const user = userJson ? JSON.parse(userJson) : {};
         const name = user.name || "Guest";
         setUserName(name);
 
+        // Gọi API tạo phòng (nếu cần)
         const resp = await axios.post(CREATE_ROOM_URL, { conversationId });
         const { url } = resp.data;
-        const fullUrl = url + (url.includes("?") ? "&" : "?") + "userName=" + encodeURIComponent(name);
 
-        setRoomUrl(fullUrl);
-                console.log(url);
+        // Lấy roomName từ URL
+        const roomName = url.split("/").at(-1);
+
+        // Gọi API Daily để lấy meeting token
+        const newToken = await createMeetingToken(roomName, name);
+
+        // Lưu URL & Token
+        setRoomUrl(url);
+        setToken(newToken);
       } catch (e) {
         console.error("Daily room error:", e);
         Alert.alert("Error", e.message || "Could not join call");
+        navigation.goBack();
       } finally {
         setLoading(false);
       }
@@ -70,6 +92,8 @@ useEffect(() => {
     );
   }
 
+  const fullUrl = `${roomUrl}?t=${token}`;
+
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
@@ -81,7 +105,7 @@ useEffect(() => {
 
       <WebView
         ref={webviewRef}
-        source={{ uri: roomUrl }}
+        source={{ uri: fullUrl }}
         style={{ flex: 1 }}
         javaScriptEnabled
         domStorageEnabled
@@ -90,6 +114,7 @@ useEffect(() => {
         onPermissionRequest={({ nativeEvent }) => {
           nativeEvent.grant(nativeEvent.resources);
         }}
+        originWhitelist={['*']}
       />
     </View>
   );
@@ -105,9 +130,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F6FBFF",
     borderBottomWidth: 1,
     borderColor: "#eaeaea",
-    marginTop:30
+    marginTop: 30,
   },
-  backBtn: { paddingRight: 18, paddingVertical: 8},
+  backBtn: { paddingRight: 18, paddingVertical: 8 },
   arrow: { fontSize: 24, color: "#086DC0" },
   headerTitle: { fontSize: 20, fontWeight: "600", color: "#086DC0" },
 });
