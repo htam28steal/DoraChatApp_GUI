@@ -743,7 +743,6 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
     const [showMentionList, setShowMentionList] = useState(false);
     const [filteredMembers, setFilteredMembers] = useState([]);
 
-    console.log(`MEMBER IN CONVERSATION`, membersinconversation);
     const handleInputChange = (text) => {
         setInput(text);
 
@@ -884,7 +883,13 @@ const messageInputStyles = StyleSheet.create({
  * Also integrates a modal for long-press message options: "Thu hồi", "Xoá" and "Chuyển tiếp".
  */
 export default function ChatScreen({ route, navigation }) {
-    const { conversationId } = route.params;  // Lấy conversationId từ route.params
+
+    const { nameG, avatarG } = route.params;
+
+    console.log(`HAHAHA AVATAR`, avatarG);
+
+    console.log(`HAHAHA NAME`, nameG);
+    const { conversationId } = route.params;
     const [conversation, setConversation] = useState(null);
     const [userId, setUserId] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -907,7 +912,6 @@ export default function ChatScreen({ route, navigation }) {
 
     const [memberTags, setMemberTags] = useState([])
 
-    console.log(`HAHAHA`, memberTags)
 
 
 
@@ -1217,7 +1221,6 @@ export default function ChatScreen({ route, navigation }) {
     const checkaddChannel = (conversation, memberId) => {
         if (conversation?.leaderId === memberId?.toString()) return true;
         if (!conversation?.managerIds || conversation.managerIds.length === 0) {
-            console.log("Không có quản lý trong nhóm");
             return false;
         }
         if (!memberId) {
@@ -1227,7 +1230,7 @@ export default function ChatScreen({ route, navigation }) {
         return conversation.managerIds.some(id => id?.toString() === memberId?.toString());
     };
 
-    function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange }) {
+    function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange, nameG, avatarG }) {
         const navigation = useNavigation();
         const [localPinnedMessages, setLocalPinnedMessages] = useState([]);
 
@@ -1255,10 +1258,10 @@ export default function ChatScreen({ route, navigation }) {
                         <Image source={Return} style={headerStyles.backBtn} />
                     </TouchableOpacity>
 
-                    <Image source={AvatarImage} style={headerStyles.avatar} />
+                    <Image source={{ uri: avatarG }} style={headerStyles.avatar} />
 
                     <View style={headerStyles.infoContainer}>
-                        <Text style={headerStyles.name}>John Doe</Text>
+                        <Text style={headerStyles.name}>{nameG}</Text>
                         <View style={headerStyles.statusContainer}>
                             <View style={headerStyles.statusDot} />
                             <Text style={headerStyles.statusText}>Active</Text>
@@ -1687,7 +1690,6 @@ export default function ChatScreen({ route, navigation }) {
             const reactors = await Promise.all(
                 msg.reacts.map(async (react) => {
                     const member = await handleGetMember(react.memberId);
-                    console.log(`MemberId: `, react.memberId)
                     return {
                         ...member,
                         type: react.type,
@@ -1820,7 +1822,6 @@ export default function ChatScreen({ route, navigation }) {
                 payload.tagPositions = tagPositions;
             }
 
-            console.log(`PAYLOAD GUI DI LA `, payload);
 
 
             await axios.post("/api/messages/text", payload);
@@ -1958,7 +1959,8 @@ export default function ChatScreen({ route, navigation }) {
                     handleAddChannel={openCreateChannel}
                     checkaddChannel={checkaddChannel}
                     onChannelChange={handleChannelChange}
-
+                    nameG={nameG}
+                    avatarG={avatarG}
                 />
                 <View style={chatScreenStyles.chatContainer}>
                     <ChatBox

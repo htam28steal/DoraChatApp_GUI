@@ -29,8 +29,8 @@ if (response && response.data?.token) {
 
   await AsyncStorage.setItem('userToken', accessToken);
   await AsyncStorage.setItem('userId', id);
-  await AsyncStorage.setItem('refreshToken', refreshToken); // ✅ Required
-  await AsyncStorage.setItem('userInfo', JSON.stringify(user)); // ✅ Fix here
+  await AsyncStorage.setItem('refreshToken', refreshToken); 
+  await AsyncStorage.setItem('userInfo', JSON.stringify(user)); 
 
   console.log('Logged in userId:', id);
   navigation.navigate("GroupsScreen", { token: accessToken, uID: id });

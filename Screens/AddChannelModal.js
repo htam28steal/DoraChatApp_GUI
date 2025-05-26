@@ -3,8 +3,6 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert } fro
 import channelService from '../api/channelService';
 const AddChannelModal = ({ visible, onCancel, onCreate, memberId, conversation }) => {
     const [channelName, setChannelName] = useState('');
-    console.log(`MEMBERID ADD CHANNEL`, memberId)
-    console.log(`ConversationID ADD CHANNEL`, conversation)
 
     const handleCreate = async () => {
         if (!channelName.trim()) {
