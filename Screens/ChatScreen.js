@@ -61,6 +61,22 @@ const LINE_WIDTH = 140; // Adjust for duration/spacing
 const LINE_HEIGHT = 3;
 const BUTTON_SIZE = 40;
 
+
+function dedupeMessages(msgs) {
+  // Keeps only the last occurrence of each _id
+  const seen = new Set();
+  const out = [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (!seen.has(m._id)) {
+      out.unshift(m); // Keep latest
+      seen.add(m._id);
+    }
+  }
+  return out;
+}
+
+
 export function AudioBubble({ url}) {
   const [playing, setPlaying] = useState(false);
   const [sound, setSound] = useState(null);
@@ -543,60 +559,90 @@ const Container = onLongPress ? TouchableOpacity : View;
 
         
 {msg.type === "IMAGE" ? (
- <View style={{ position: "relative" }}
-  
- >
-  <TouchableOpacity
-     style={{ position: "relative" }}
-     activeOpacity={0.8}
-     onPress={() =>
-       navigation.navigate("FullScreenImage", { uri: msg.content })
-     }
-     onLongPress={onLongPress}
-   >
-  <Image
-    source={{ uri: msg.content }}
-    style={messageItemStyles.imageContent}
-    onLoadStart={() => setImgLoading(true)}
-    onLoadEnd={() => {
-      setImgLoading(false);
-      onMediaLoad?.();
-    }}
-  />
-  {imgLoading && (
-    <View style={messageItemStyles.imageOverlay}>
-      <ActivityIndicator size="small" color="#086DC0" />
-    </View>
-  )}
-  </TouchableOpacity>
-</View>
-
-
-        ) : msg.type === "VIDEO" ? (
-          <Video
-            source={{ uri: content }}
-            style={messageItemStyles.videoContent}
-            useNativeControls
-            resizeMode="cover"
-            isLooping={false}
-             onLoad={() => onMediaLoad?.()}
-          />
-          ) : msg.type === "FILE" && isAudioFile(msg.fileName, msg.content) ? (
+  <View style={{ position: "relative" }}>
+    <TouchableOpacity
+      style={{ position: "relative" }}
+      activeOpacity={0.8}
+      disabled={msg.pending}
+      onPress={() => !msg.pending && navigation.navigate("FullScreenImage", { uri: msg.content })}
+      onLongPress={onLongPress}
+    >
+      <Image
+        source={{ uri: msg.content }}
+        style={messageItemStyles.imageContent}
+        onLoadStart={() => setImgLoading(true)}
+        onLoadEnd={() => {
+          setImgLoading(false);
+          onMediaLoad?.();
+        }}
+        blurRadius={msg.pending ? 8 : 0}
+      />
+      {(imgLoading || msg.pending) && (
+        <View style={messageItemStyles.imageOverlay}>
+          <ActivityIndicator size="small" color="#086DC0" />
+        </View>
+      )}
+    </TouchableOpacity>
+    {msg.pending && (
+      <Text style={{
+        position: "absolute",
+        top: 8, right: 16, color: "#888", fontWeight: "bold", fontSize: 13, backgroundColor: "#FFF7",
+        borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2
+      }}>
+        Sending...
+      </Text>
+    )}
+  </View>
+) : msg.type === "VIDEO" ? (
+  <View style={{ position: "relative" }}>
+    <Video
+      source={{ uri: msg.content }}
+      style={messageItemStyles.videoContent}
+      useNativeControls={!msg.pending}
+      resizeMode="cover"
+      isLooping={false}
+      onLoad={() => onMediaLoad?.()}
+      shouldPlay={false}
+      isMuted={msg.pending}
+    />
+    {(msg.pending) && (
+      <View style={[messageItemStyles.imageOverlay, { justifyContent: "center" }]}>
+        <ActivityIndicator size="small" color="#086DC0" />
+        <Text style={{ color: "#888", marginTop: 8, fontWeight: "bold" }}>Đang gửi...</Text>
+      </View>
+    )}
+  </View>
+   ) : msg.type === "FILE" && isAudioFile(msg.fileName, msg.content) ? (
          <AudioBubble url={msg.content} />
         ) : msg.type === "FILE" ? (
-<TouchableOpacity
-  style={messageItemStyles.fileContainer}
-  onPress={() => downloadFile(msg.content, msg.fileName)}
-  onLongPress={onLongPress}
-  activeOpacity={0.7}
->
-  <Image source={getFileIcon(msg.content)} style={messageItemStyles.fileIcon} />
-  <Text style={messageItemStyles.fileText}>
-    {msg.fileName || "Open File"}
-  </Text>
-</TouchableOpacity>
-
-        ) : (
+  msg.pending ? (
+    // ───── PENDING PLACEHOLDER ─────
+    <View
+      style={[
+        messageItemStyles.filePlaceholder,
+        { width: 150, height: 150 },
+      ]}
+    >
+      <ActivityIndicator size="large" color="#086DC0" />
+    </View>
+  ) : (
+    // ───── REAL FILE ─────
+    <TouchableOpacity
+      style={messageItemStyles.fileContainer}
+      onPress={() => downloadFile(msg.content, msg.fileName)}
+      onLongPress={onLongPress}
+      activeOpacity={0.7}
+    >
+      <Image
+        source={getFileIcon(msg.content)}
+        style={messageItemStyles.fileIcon}
+      />
+      <Text style={messageItemStyles.fileText}>
+        {msg.fileName || "Open File"}
+      </Text>
+    </TouchableOpacity>
+  )
+) : (
          <Text
   style={[
     messageItemStyles.textContent,
@@ -651,7 +697,21 @@ const messageItemStyles = StyleSheet.create({
     flexDirection: "row",
     marginVertical: 4,
     alignItems: "flex-end",
-  },
+  },filePlaceholder: {
+  backgroundColor: "#F0F0F0",
+  borderRadius: 12,
+  justifyContent: "center",
+  alignItems: "center",
+  marginVertical: 2,
+  alignSelf: "flex-start",
+  // subtle shadow
+  shadowColor: "#000",
+  shadowOpacity: 0.05,
+  shadowOffset: { width: 0, height: 1 },
+  shadowRadius: 2,
+  elevation: 1,
+},
+
   leftAlign: { justifyContent: "flex-start" },
   rightAlign: { flexDirection: "row-reverse" },
   avatar: { width: 40, height: 40, borderRadius: 20 },
@@ -875,6 +935,12 @@ const scrollToMessage = useCallback((messageId) => {
 
   lastIdRef.current = newLastId;
   }, [messages]);
+    const ids = messages.map(m => m._id);
+  const idSet = new Set(ids);
+  if (idSet.size !== ids.length) {
+    console.warn("Duplicate message ids in chat!", ids);
+  }
+
 
   return (
     
@@ -918,6 +984,7 @@ const scrollToMessage = useCallback((messageId) => {
   prevMsg?.type === "NOTIFY";
 
         return (
+          
         <MessageItem
             key={msg._id}
           ref={ref => (messageRefs.current[msg._id] = ref)}
@@ -1054,7 +1121,7 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser
         </View>
       </View>
       <View style={headerStyles.iconsContainer}>
-        <TouchableOpacity style={headerStyles.iconButton}>
+        <TouchableOpacity style={headerStyles.iconButton} onPress={()=>navigation.navigate('CallScreen',{conversationId})}>
           <Image source={CallIcon} style={headerStyles.icon} />
         </TouchableOpacity>
         <TouchableOpacity style={headerStyles.iconButton}>
@@ -1144,6 +1211,7 @@ const [inviteToken, setInviteToken] = useState('');
 const [selectedForwardId, setSelectedForwardId] = useState(null);
 const [currentUser, setCurrentUser] = useState(null);
 const [otherUser, setOtherUser] = useState(null);
+const [sendAudioBtn, setSendAudioBtn] = useState(false);
 
 
 const [loadingMore, setLoadingMore] = useState(false);
@@ -1153,6 +1221,23 @@ const [allMessages, setAllMessages] = useState([]);
 
 const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
 const [hasMore, setHasMore] = useState(true);
+
+useEffect(() => {
+if(recordingModal){
+  setSendAudioBtn(false)
+}
+
+},[recordingModal])
+
+const createOptimisticMediaMsg = ({ type, localUri }) => ({
+  _id: String(Date.now()) + '_' + Math.random(), // unique
+  memberId: { userId },
+  type,
+  content: localUri, // Local file URI for immediate display
+  createdAt: new Date().toISOString(),
+  pending: true,
+  local: true, // just for your rendering
+});
 
 const handleShowInviteModal = async (inviteLink) => {
   // Example link: https://dora.chat/join/8a379855
@@ -1268,52 +1353,52 @@ const playRecording = async () => {
 };
 
 const sendRecording = async () => {
-  if (!recordedUri) {
-    console.log("[Audio] No recorded URI!");
-    return;
-  }
-  setRecordingModal(false);
-  const fileName = `audio_${Date.now()}.aac`;
+  if (!recordedUri) return;
+  setSendAudioBtn(true)
 
-  // Log out the URI and fileName for debugging
-  console.log("[Audio] Preparing to upload file:", recordedUri, "as", fileName);
+  // 1️⃣ create an optimistic placeholder
+  const tempId = `tmp_audio_${Date.now()}`;
+  const optimisticMsg = {
+    _id: tempId,
+    memberId: { userId },
+    type: "FILE",
+    content: recordedUri,
+    fileName: tempId + ".aac",
+    pending: true,
+    createdAt: new Date().toISOString(),
+  };
+  setMessages(prev => [...prev, optimisticMsg]);
 
-  const formData = new FormData();
-  formData.append("id", userId);
-  formData.append("conversationId", conversationId);
-  formData.append("file", {
-    uri: recordedUri,
-    name: fileName,
-    type: "audio/aac",
-  });
-
-  // Log out the FormData for debugging (works only in Chrome debugger, not in Hermes)
-  // This will print FormData keys, not values. It's a limitation of React Native.
-  for (let [key, value] of formData._parts || []) {
-    console.log(`[Audio] FormData field: ${key}`, value);
-  }
-
+  // 2️⃣ upload
   try {
-    console.log("[Audio] Sending POST /api/messages/file...");
-    await axios.post("/api/messages/file", formData, {
+    const formData = new FormData();
+    formData.append("id", userId);
+    formData.append("conversationId", conversationId);
+    formData.append("file", {
+      uri: recordedUri,
+      name: optimisticMsg.fileName,
+      type: "audio/aac",
+    });
+    const response = await axios.post("/api/messages/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       timeout: 20000,
     });
-    console.log("[Audio] Upload successful!");
-    resetRecording();
+
+    // 3️⃣ replace placeholder with real data
+    const realMsg = Array.isArray(response.data) ? response.data[0] : response.data;
+    setMessages(prev =>
+      prev.map(m => m._id === tempId ? { ...realMsg, pending: false } : m)
+    );
+    setRecordingModal(false)
   } catch (error) {
-    // Axios error can have response, request, or message
-    if (error.response) {
-      console.error("[Audio] Axios upload failed – response error:", error.response.data);
-    } else if (error.request) {
-      console.error("[Audio] Axios upload failed – request error:", error.request);
-    } else {
-      console.error("[Audio] Axios upload failed – unknown error:", error.message);
-    }
+    // remove placeholder on error
+    setMessages(prev => prev.filter(m => m._id !== tempId));
     Alert.alert("Gửi thất bại", "Không gửi được bản ghi âm.");
+  } finally {
     resetRecording();
   }
 };
+
 
 
 
@@ -1322,12 +1407,19 @@ const sendRecording = async () => {
     // update pinnedMessages list
     setPinnedMessages(prev => [...prev, { messageId }]);
     // mark that message is pinned in your message list
-    setMessages(prev =>
-      prev.map(m => m._id === messageId
-        ? { ...m, isPinned: true }
-        : m
-      )
-    );
+setMessages(prev => {
+  // If optimistic message still exists, replace it.
+  const found = prev.some(m => m._id === tempId);
+  if (found) {
+    return prev.map(m => (m._id === tempId ? { ...responseData, pending: false } : m));
+  }
+  // If not, only add if not already present.
+  if (!prev.some(m => m._id === responseData._id)) {
+    return [...prev, { ...responseData, pending: false }];
+  }
+  return prev;
+});
+
   }, [conversationId]); 
 
     const handleUnpinSocket = useCallback(({ conversationId: convId, messageId }) => {
@@ -1824,36 +1916,25 @@ useEffect(() => {
 
       const all = msgRes.data || [];
 
-      console.log(
-  "🔍 fetched messages:",
-  all.map(m => ({
-    _id: m._id,
-    type: m.type,
-    fileName: m.fileName,
-    createdAt: m.createdAt
-  }))
-);
-
       const pinned = pinRes.data || [];
 
-      setAllMessages(all);
+setAllMessages(dedupeMessages(all));
 
-      // Attach isPinned flag
-      const pinnedIds = new Set(pinned.map(p => p.messageId));
-      const decorated = all.map(msg =>
-        pinnedIds.has(msg._id)
-          ? { ...msg, isPinned: true }
-          : msg
-      );
+const pinnedIds = new Set(pinned.map(p => p.messageId));
+const decorated = all.map(msg =>
+  pinnedIds.has(msg._id)
+    ? { ...msg, isPinned: true }
+    : msg
+);
 
-      const initialLimit = 40;
-      const skip = Math.max(0, decorated.length - initialLimit);
-      const lastMessages = decorated.slice(skip);
+const initialLimit = 40;
+const skip = Math.max(0, decorated.length - initialLimit);
+const lastMessages = decorated.slice(skip);
 
-      setMessages(lastMessages);
-      setPagination({ skip, limit: 20 });
-      setHasMore(skip > 0);
-      setPinnedMessages(pinned);
+setMessages(dedupeMessages(lastMessages));
+setPagination({ skip, limit: 20 });
+setHasMore(skip > 0);
+setPinnedMessages(pinned);
 
     } catch (err) {
       console.error("Failed to load messages or pins", err);
@@ -1988,71 +2069,77 @@ const uploadMediaAndSendMessage = async () => {
 
   if (result.canceled || !result.assets || result.assets.length === 0) return;
   
-
   const selectedMedia = result.assets[0];
   const mediaUri = selectedMedia.uri;
   const fileName = mediaUri.split("/").pop();
-  const mimeType = selectedMedia.mimeType || (selectedMedia.type === "video" ? "video/mp4" : "image/jpeg");
+  const isVideo = selectedMedia.type === "video";
+  const type = isVideo ? "VIDEO" : "IMAGE";
+  const mimeType = selectedMedia.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
 
+  // 1. Insert optimistic placeholder message
+  const tempId = Date.now() + '_' + Math.random();
+  const optimisticMsg = {
+    _id: tempId,
+    memberId: { userId },
+    type,
+    content: mediaUri,
+    createdAt: new Date().toISOString(),
+    pending: true,
+    local: true,
+  };
+  setMessages(prev => [...prev, optimisticMsg]);
+
+  // 2. Do upload
   const formData = new FormData();
   formData.append("id", userId);
   formData.append("conversationId", conversationId);
-  formData.append(selectedMedia.type === "video" ? "video" : "image", {
+  formData.append(isVideo ? "video" : "image", {
     uri: mediaUri,
     name: fileName,
     type: mimeType,
   });
 
- try {
-  const endpoint = selectedMedia.type === "video"
-    ? "/api/messages/video"
-    : "/api/messages/images";
+  try {
+    const endpoint = isVideo
+      ? "/api/messages/video"
+      : "/api/messages/images";
 
-  const response = await axios.post(endpoint, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-    timeout: selectedMedia.type === "video" ? 30000 : 20000,
-  });
+    const response = await axios.post(endpoint, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: isVideo ? 30000 : 20000,
+    });
 
-  const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
+    // Get real message data from server
+    const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
 
-  const mediaUrl =
-    responseData?.file?.url ||
-    responseData?.url ||
-    responseData?.content ||
-    responseData?.message?.url ||
-    null;
+    // Replace the placeholder with the real message
+setMessages(prev => dedupeMessages(
+  prev.map(m =>
+    m._id === tempId
+      ? { ...responseData, pending: false }
+      : m
+  )
+));
 
-  if (!mediaUrl) {
-    console.warn("⚠️ Unexpected upload response:", response.data);
-    throw new Error("Server did not return a URL");
+  } catch (err) {
+    // On error: remove the placeholder
+    setMessages(prev => prev.filter(m => m._id !== tempId));
+    Alert.alert("Error", "Failed to upload media.");
   }
-
-  // sendOptimisticMediaMessage({
-  //   type: selectedMedia.type === "video" ? "VIDEO" : "IMAGE",
-  //   url: mediaUrl,
-  // });
-
-} catch (err) {
-  console.error("Upload error:", err);
-  Alert.alert("Error", "Failed to upload media.");
-}
-
 };
 
 
 
- const pickDocument = async () => {
+
+const pickDocument = async () => {
   setUploading(true);
   try {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: "*/*",
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
+    const result = await DocumentPicker.getDocumentAsync({ type: "*/*" });
+    console.log("[FilePicker] Result:", result);
 
-    if (result?.canceled || (!result.assets && result.type !== "success")) {
+    if (result.type !== "success" && !result.assets) {
       setUploading(false);
       return;
     }
@@ -2071,12 +2158,28 @@ const uploadMediaAndSendMessage = async () => {
     }
 
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    console.log("[FilePicker] fileInfo:", fileInfo);
+
     if (!fileInfo.exists) {
       Alert.alert("Error", "File not found.");
       setUploading(false);
       return;
     }
 
+    // 1️⃣ Create optimistic placeholder
+    const tempId = `tmp_${Date.now()}`;
+    const optimisticMsg = {
+      _id: tempId,
+      memberId: { userId },
+      type: "FILE",
+      content: fileUri,
+      fileName,
+      pending: true,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
+    // 2️⃣ Log FormData fields
     const formData = new FormData();
     formData.append("id", userId);
     formData.append("conversationId", conversationId);
@@ -2086,25 +2189,56 @@ const uploadMediaAndSendMessage = async () => {
       type: mimeType,
     });
 
-    await axios.post("/api/messages/file", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-        
-      },
-       timeout: 30000,
+    // Logging FormData keys (values not accessible directly in React Native)
+    if (formData._parts) {
+      for (let [k, v] of formData._parts) {
+        console.log(`[FormData] ${k}:`, v);
+      }
+    }
+
+    // 3️⃣ Do upload
+    console.log("[FileUpload] Sending file to server...");
+    const response = await axios.post("/api/messages/file", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 30000,
     });
+    console.log("[FileUpload] Server response:", response.data);
+
+    // 4️⃣ Swap out placeholder
+    const realMsg = Array.isArray(response.data) ? response.data[0] : response.data;
+setMessages(prev => dedupeMessages([
+  ...prev.filter(m => m._id !== tempId), // remove placeholder
+  { ...realMsg, pending: false },        // add the real message
+]));
 
   } catch (error) {
-    console.error("Full Axios Error:", JSON.stringify(error, null, 2));
-    Alert.alert("Upload error", error.message || "Không thể upload file.");
+    console.log("[FileUpload] ERROR sending file:", error);
+
+    if (error.response) {
+      console.log("[FileUpload] Error response data:", error.response.data);
+      Alert.alert("Upload error", error.response.data?.message || "Server error.");
+    } else if (error.request) {
+      console.log("[FileUpload] No response received:", error.request);
+      Alert.alert("Upload error", "No response from server.");
+    } else {
+      console.log("[FileUpload] General error:", error.message);
+      Alert.alert("Upload error", error.message);
+    }
+
+    // Remove placeholder if failed
+    setMessages(prev => prev.filter(m => !m._id.startsWith("tmp_")));
   } finally {
     setUploading(false);
   }
 };
+
+
 const handleSendMessage = async (text) => {
   if (!text.trim()) return;
 
-  const tempId = String(Date.now());
+ const tempId = "tmp_" + Date.now() + "_" + Math.random();
+
+  
   const optimisticMsg = {
     _id: tempId,
     memberId: { userId },
@@ -2167,28 +2301,20 @@ useEffect(() => {
     if (!socket || !conversationId || !userId) return;
 
     
+// in your ChatScreen useEffect…
+const receiveHandler = (message) => {
+  if (message.conversationId !== conversationId) return;
 
-  const receiveHandler = (message) => {
-    if (message.conversationId !== conversationId) return;
-    setMessages((prev) => {
-      // replace the optimistic placeholder if it matches
-      console.log("📨 Received message from server:", message);
+  // ❌ skip messages sent by me
+  if (message.memberId.userId === userId) return;
 
-      if (message.memberId?.userId === userId) {
-        const idx = prev.findIndex(
-          m => m.pending && m.content === message.content
-        );
-        if (idx !== -1) {
-          const updated = [...prev];
-          updated[idx] = message;
-          return updated;
-        }
-      }
-      // otherwise skip if it’s already there by server _id
-      if (prev.some(m => m._id === message._id)) return prev;
-      return [...prev, message];
-    });
-  };
+  setMessages(prev => [...prev, message]);
+};
+
+socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
+
+
+
   
 
   socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
@@ -2704,7 +2830,7 @@ selectedMessage?.isPinned
               <Text style={{ color: '#222', fontSize: 15 }}>Xóa</Text>
             </TouchableOpacity>
             {/* Gửi */}
-            <TouchableOpacity onPress={sendRecording} style={{ alignItems: 'center' }}>
+            <TouchableOpacity onPress={sendRecording} style={{ alignItems: 'center' }} disabled={sendAudioBtn} >
               <View style={{
                 width: 50, height: 50,
                 backgroundColor: '#086DC0',

@@ -1266,7 +1266,7 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
 
                     <View style={headerStyles.iconsContainer}>
-                        <TouchableOpacity style={headerStyles.iconButton}>
+                        <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('CallScreen', { conversationId })}>
                             <Image source={CallIcon} style={headerStyles.icon} />
                         </TouchableOpacity>
                         <TouchableOpacity style={headerStyles.iconButton}>
