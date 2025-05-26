@@ -56,6 +56,7 @@ const addChannel = require("../icons/addChannel.png")
  */
 const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) => {
     const isMe = msg.memberId?.userId === currentUserId;
+    console.log()
     const content = msg.content || "";
     const MAX_TEXT_LENGTH = 350;
     const centerAlignedTypes = ["VOTE", "NOTIFY"];
