@@ -1230,7 +1230,7 @@ export default function ChatScreen({ route, navigation }) {
         return conversation.managerIds.some(id => id?.toString() === memberId?.toString());
     };
 
-    function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange, nameG, avatarG }) {
+    function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange, nameG, avatarG, conversationId,  currentChannelId }) {
         const navigation = useNavigation();
         const [localPinnedMessages, setLocalPinnedMessages] = useState([]);
 
@@ -1269,7 +1269,7 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
 
                     <View style={headerStyles.iconsContainer}>
-                        <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('CallScreen', { conversationId })}>
+                        <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('CallScreen', { conversationId, channelId: currentChannelId })}>
                             <Image source={CallIcon} style={headerStyles.icon} />
                         </TouchableOpacity>
                         <TouchableOpacity style={headerStyles.iconButton}>
