@@ -1,6 +1,6 @@
-import api from "./apiConfig";
+import axios from "./apiConfig";
 
-const memberApi = {
+const memberService = {
     isMember: (conversationId, userId) => {
         return axios.get("api/members/is-member", {
             params: {

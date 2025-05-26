@@ -38,7 +38,7 @@ import VoiceRecordModal from "./VoiceRecordModal";
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import AddNewChannel from './AddChannelModal';
-
+import memberService from "../api/memberService";
 
 const AvatarImage = require("../Images/avt.png");
 const CallIcon = require("../assets/Call.png");
@@ -56,7 +56,6 @@ const addChannel = require("../icons/addChannel.png")
  */
 const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) => {
     const isMe = msg.memberId?.userId === currentUserId;
-    console.log()
     const content = msg.content || "";
     const MAX_TEXT_LENGTH = 350;
     const centerAlignedTypes = ["VOTE", "NOTIFY"];
@@ -72,6 +71,13 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
         5: '👎',
         6: '😮',
     };
+
+
+
+
+
+
+
     const getFileExtension = (url) => {
         if (!url) return '';
 
@@ -268,7 +274,7 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
             ]}
         >
             {!isCenterAligned && (showAvatar ? (
-                <Image source={AvatarImage} style={messageItemStyles.avatar} />
+                <Image source={{ uri: msg.memberId.avatar }} style={messageItemStyles.avatar} />
             ) : (
                 <View style={messageItemStyles.avatarPlaceholder} />
             ))}
@@ -887,9 +893,7 @@ export default function ChatScreen({ route, navigation }) {
 
     const { nameG, avatarG } = route.params;
 
-    console.log(`HAHAHA AVATAR`, avatarG);
 
-    console.log(`HAHAHA NAME`, nameG);
     const { conversationId } = route.params;
     const [conversation, setConversation] = useState(null);
     const [userId, setUserId] = useState(null);
@@ -1092,6 +1096,7 @@ export default function ChatScreen({ route, navigation }) {
     const handlePinMessages = async (message) => {
         if (!message) return;
 
+        console.log(`MESSAGE `, message);
         try {
             const isPinned = isMessagePinned(message._id);
 
@@ -1099,6 +1104,8 @@ export default function ChatScreen({ route, navigation }) {
                 await handleUnpinMessage(message._id);
                 return;
             }
+
+            console.log(`MEMBER ID PIN LÀ `, message.memberId._id);
 
             const response = await axios.post('/api/pin-messages', {
                 messageId: message._id,
@@ -1231,7 +1238,7 @@ export default function ChatScreen({ route, navigation }) {
         return conversation.managerIds.some(id => id?.toString() === memberId?.toString());
     };
 
-    function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange, nameG, avatarG, conversationId,  currentChannelId }) {
+    function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange, nameG, avatarG, conversationId, currentChannelId }) {
         const navigation = useNavigation();
         const [localPinnedMessages, setLocalPinnedMessages] = useState([]);
 
