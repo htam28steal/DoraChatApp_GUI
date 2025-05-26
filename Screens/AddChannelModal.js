@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
-
-const AddChannelModal = ({ visible, onCancel, onCreate }) => {
+import channelService from '../api/channelService';
+const AddChannelModal = ({ visible, onCancel, onCreate, memberId, conversation }) => {
     const [channelName, setChannelName] = useState('');
+    console.log(`MEMBERID ADD CHANNEL`, memberId)
+    console.log(`ConversationID ADD CHANNEL`, conversation)
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         if (!channelName.trim()) {
             Alert.alert('Error', 'Channel name cannot be empty');
             return;
         }
-        onCreate(channelName);
-        setChannelName('');
+        try {
+            const newChannel = await channelService.addChannel(channelName, conversation, memberId);
+            onCreate(channelName);
+            setChannelName('');
+            onCancel();
+        } catch (err) {
+            console.log(`ERROR ADD CHANNELS`, err)
+        }
+
     };
 
     return (
@@ -18,7 +27,7 @@ const AddChannelModal = ({ visible, onCancel, onCreate }) => {
             visible={visible}
             animationType="slide"
             transparent={true}
-            onRequestClose={onCancel} 
+            onRequestClose={onCancel}
         >
             <View style={styles.modalContainer}>
                 <View style={styles.modalContent}>

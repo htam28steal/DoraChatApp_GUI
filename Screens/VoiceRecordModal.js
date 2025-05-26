@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
 import { Audio } from 'expo-av';
-
 import api from '../api/apiConfig';
 import * as FileSystem from 'expo-file-system';
+
 const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, channelId }) => {
     const [isRecording, setIsRecording] = useState(false);
     const [recordTime, setRecordTime] = useState(0);
@@ -13,38 +13,48 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
     const [isPlaying, setIsPlaying] = useState(false);
     let interval = null;
 
-    // Hủy interval khi component unmount
-    useEffect(() => {
-        return () => {
-            if (interval) clearInterval(interval);
-            if (sound) sound.unloadAsync();
-            if (recording) recording.stopAndUnloadAsync();
-        };
-    }, []);
-
-    const formatTime = seconds => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const resetState = () => {
+        setIsRecording(false);
+        setRecordTime(0);
+        setRecordedUri(null);
+        setIsPlaying(false);
+        if (sound) {
+            sound.unloadAsync();
+            setSound(null);
+        }
+        if (recording) {
+            recording.stopAndUnloadAsync();
+            setRecording(null);
+        }
+        if (interval) {
+            clearInterval(interval);
+            interval = null;
+        }
     };
 
-    // Bắt đầu ghi âm
+    useEffect(() => {
+        if (!isVisible) {
+            resetState();
+        }
+
+        return () => {
+            resetState();
+        };
+    }, [isVisible]);
+
     const startRecording = async () => {
         try {
-            // Xin quyền truy cập micro
             const permission = await Audio.requestPermissionsAsync();
             if (permission.status !== 'granted') {
                 alert('Cần cấp quyền truy cập micro để ghi âm');
                 return;
             }
 
-            // Cấu hình audio
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: true,
                 playsInSilentModeIOS: true,
             });
 
-            // Bắt đầu ghi âm
             const { recording } = await Audio.Recording.createAsync(
                 Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY
             );
@@ -53,7 +63,6 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
             setIsRecording(true);
             setRecordTime(0);
 
-            // Bắt đầu đếm thời gian
             interval = setInterval(() => {
                 setRecordTime(prev => prev + 1);
             }, 1000);
@@ -64,7 +73,6 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
         }
     };
 
-    // Dừng ghi âm
     const stopRecording = async () => {
         try {
             if (interval) clearInterval(interval);
@@ -74,7 +82,6 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
                 const uri = recording.getURI();
                 setRecordedUri(uri);
                 setRecording(null);
-                console.log('Bản ghi âm đã lưu tại:', uri);
             }
 
             setIsRecording(false);
@@ -83,12 +90,10 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
         }
     };
 
-    // Phát lại bản ghi
     const playRecording = async () => {
         if (!recordedUri) return;
 
         try {
-            // Dừng phát nếu đang phát
             if (sound) {
                 await sound.unloadAsync();
             }
@@ -114,7 +119,6 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
         }
     };
 
-    // Dừng phát
     const stopPlayback = async () => {
         if (sound) {
             await sound.stopAsync();
@@ -122,17 +126,11 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
         }
     };
 
-    // Xóa bản ghi
     const deleteRecording = () => {
-        if (sound) {
-            sound.unloadAsync();
-            setSound(null);
-        }
-        setRecordedUri(null);
-        setRecordTime(0);
-        onClose(); // Tắt modal sau khi xóa
+        resetState();
+        onClose(); // Thêm dòng này để đóng modal sau khi xóa
     };
-    // Gửi bản ghi
+
     const sendRecording = async () => {
         if (!recordedUri) return;
 
@@ -152,7 +150,7 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
             formData.append('file', {
                 uri: recordedUri,
                 name: fileName,
-                type: 'audio/x-m4a', // Sử dụng type chính xác cho m4a
+                type: 'audio/x-m4a',
             });
 
             const response = await api.post('/api/messages/file', formData, {
@@ -162,9 +160,7 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
             });
 
             console.log('Upload thành công:', response.data);
-
-            setRecordedUri(null);
-            setRecordTime(0);
+            resetState();
             if (onSendRecord) onSendRecord(recordedUri);
             onClose();
 
@@ -178,16 +174,20 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
         }
     };
 
+
     return (
         <Modal
             visible={isVisible}
             transparent={true}
             animationType="slide"
-            onRequestClose={onClose}
+            onRequestClose={() => {
+                resetState();
+                onClose();
+            }}
         >
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
-                    <Text style={styles.timeText}>{formatTime(recordTime)}</Text>
+
 
                     <Text style={styles.hintText}>
                         {isRecording
@@ -198,12 +198,14 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
                     </Text>
 
                     {isRecording ? (
-                        <TouchableOpacity
-                            style={[styles.button, styles.stopButton]}
-                            onPress={stopRecording}
-                        >
-                            <Text style={styles.buttonText}>Dừng</Text>
-                        </TouchableOpacity>
+                        <View style={styles.recordingButtonsContainer}>
+                            <TouchableOpacity
+                                style={[styles.button, styles.stopButton]}
+                                onPress={stopRecording}
+                            >
+                                <Text style={styles.buttonText}>Dừng</Text>
+                            </TouchableOpacity>
+                        </View>
                     ) : recordTime > 0 ? (
                         <View style={styles.actionButtonsContainer}>
                             <TouchableOpacity
@@ -228,12 +230,23 @@ const VoiceRecordModal = ({ isVisible, onClose, onSendRecord, conversationId, ch
                             </TouchableOpacity>
                         </View>
                     ) : (
-                        <TouchableOpacity
-                            style={[styles.button, styles.recordButton]}
-                            onPress={startRecording}
-                        >
-                            <Text style={styles.buttonText}>Ghi âm</Text>
-                        </TouchableOpacity>
+                        <View style={styles.initialButtonsContainer}>
+                            <TouchableOpacity
+                                style={[styles.button, styles.recordButton]}
+                                onPress={startRecording}
+                            >
+                                <Text style={styles.buttonText}>Ghi âm</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.button, styles.cancelButton]}
+                                onPress={() => {
+                                    resetState();
+                                    onClose();
+                                }}
+                            >
+                                <Text style={styles.buttonText}>Hủy</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
             </View>
@@ -285,6 +298,9 @@ const styles = StyleSheet.create({
     sendButton: {
         backgroundColor: '#34C759',
     },
+    cancelButton: {
+        backgroundColor: '#8E8E93',
+    },
     buttonText: {
         color: 'white',
         fontWeight: 'bold',
@@ -293,6 +309,18 @@ const styles = StyleSheet.create({
     actionButtonsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        width: '100%',
+        marginTop: 10,
+    },
+    initialButtonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        width: '100%',
+        marginTop: 10,
+    },
+    recordingButtonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
         width: '100%',
         marginTop: 10,
     },

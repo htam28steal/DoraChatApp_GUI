@@ -43,8 +43,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
         }
     }, [memberId]);
 
-    console.log(`Member is: `, member);
-    console.log(`User Vote là : `, user);
     useEffect(() => {
         const fetchUserId = async () => {
             try {
@@ -175,6 +173,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
                                 const res = await voteService.addVoteOption(msg._id, msg.memberId._id, trimmed);
 
                                 setDynamicOptions(prev => [...prev, res]);
+                                console.log(`LOG NÈ`, dynamicOptions)
                                 setNewOptionText('');
                             } catch (err) {
                                 console.error('Lỗi khi thêm phương án:', err);
@@ -209,23 +208,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
 
                             {opt.members?.length > 0 && (
                                 <View style={{ flexDirection: 'row', position: 'absolute', right: 10, top: 8 }}>
-                                    {opt.members.slice(0, 2).map((member, i) => (
-                                        <Image
-                                            key={member._id}
-                                            source={{ uri: member.avatar || DEFAULT_AVATAR }}
-                                            style={{
-                                                width: 25,
-                                                height: 25,
-                                                borderRadius: 15,
-                                                borderWidth: 1,
-                                                borderColor: '#fff',
-                                                marginLeft: i === 0 ? 0 : -10,
-                                                zIndex: 10 - i
-                                            }}
-                                        />
-                                    ))}
-
-                                    {opt.members.length > 2 && (
+                                    {msg?.isAnonymous ? (
                                         <View style={{
                                             width: 25,
                                             height: 25,
@@ -233,19 +216,52 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
                                             backgroundColor: '#e0e0e0',
                                             justifyContent: 'center',
                                             alignItems: 'center',
-                                            marginLeft: -10,
                                             borderWidth: 1,
                                             borderColor: '#fff',
-                                            zIndex: 8
                                         }}>
-                                            <Text style={{ fontSize: 10 }}>+{opt.members.length - 2}</Text>
+                                            <Text style={{ fontSize: 10 }}>{opt.members.length}</Text>
                                         </View>
+                                    ) : (
+                                        // Hiển thị avatar nếu không phải ẩn danh
+                                        <>
+                                            {opt.members.slice(0, 2).map((member, i) => (
+                                                <Image
+                                                    key={member._id}
+                                                    source={{ uri: member.avatar || DEFAULT_AVATAR }}
+                                                    style={{
+                                                        width: 25,
+                                                        height: 25,
+                                                        borderRadius: 15,
+                                                        borderWidth: 1,
+                                                        borderColor: '#fff',
+                                                        marginLeft: i === 0 ? 0 : -10,
+                                                        zIndex: 10 - i
+                                                    }}
+                                                />
+                                            ))}
+
+                                            {opt.members.length > 2 && (
+                                                <View style={{
+                                                    width: 25,
+                                                    height: 25,
+                                                    borderRadius: 15,
+                                                    backgroundColor: '#e0e0e0',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    marginLeft: -10,
+                                                    borderWidth: 1,
+                                                    borderColor: '#fff',
+                                                    zIndex: 8
+                                                }}>
+                                                    <Text style={{ fontSize: 10 }}>+{opt.members.length - 2}</Text>
+                                                </View>
+                                            )}
+                                        </>
                                     )}
                                 </View>
                             )}
                         </View>
                     ))}
-
                 </ScrollView>
 
                 <View style={styles.buttonRow}>

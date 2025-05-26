@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, use } from "react";
 import {
     View,
     Text,
@@ -16,6 +16,7 @@ import {
     KeyboardAvoidingView
 } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+
 
 
 import axios from "../api/apiConfig";
@@ -56,7 +57,6 @@ const addChannel = require("../icons/addChannel.png")
 const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) => {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
-    console.log(msg.content);
     const MAX_TEXT_LENGTH = 350;
     const centerAlignedTypes = ["VOTE", "NOTIFY"];
     const isCenterAligned = centerAlignedTypes.includes(msg.type);
@@ -200,6 +200,59 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     };
 
 
+    const renderMessageContent = (msg) => {
+        const { content, tagPositions = [] } = msg;
+
+        if (!tagPositions.length) {
+            return (
+                <Text style={messageItemStyles.textContent}>
+                    {content}
+                </Text>
+            );
+        }
+
+        const sortedTags = [...tagPositions].sort((a, b) => a.start - b.start);
+        const elements = [];
+        let lastIndex = 0;
+
+        sortedTags.forEach((tag, idx) => {
+            if (tag.start > lastIndex) {
+                elements.push(
+                    <Text key={`text-${lastIndex}`} style={messageItemStyles.textContent}>
+                        {content.slice(lastIndex, tag.start)}
+                    </Text>
+                );
+            }
+
+            elements.push(
+                <Text
+                    key={`tag-${idx}`}
+                    style={[messageItemStyles.textContent, messageItemStyles.taggedText]}
+                >
+                    {content.slice(tag.start, tag.end)}
+                </Text>
+            );
+
+            lastIndex = tag.end;
+        });
+
+        if (lastIndex < content.length) {
+            elements.push(
+                <Text key={`text-end`} style={messageItemStyles.textContent}>
+                    {content.slice(lastIndex)}
+                </Text>
+            );
+        }
+
+        return (
+            <Text style={messageItemStyles.textContent}>
+                {elements}
+            </Text>
+        );
+    };
+
+
+
     return (
         <Container
             onLongPress={onLongPress}
@@ -264,23 +317,7 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
 
                                         {opt.members?.length > 0 && (
                                             <View style={{ flexDirection: 'row', position: 'absolute', right: 10, top: 8 }}>
-                                                {opt.members.slice(0, 2).map((member, i) => (
-                                                    <Image
-                                                        key={member._id}
-                                                        source={{ uri: member.avatar || DEFAULT_AVATAR }}
-                                                        style={{
-                                                            width: 25,
-                                                            height: 25,
-                                                            borderRadius: 15,
-                                                            borderWidth: 1,
-                                                            borderColor: '#fff',
-                                                            marginLeft: i === 0 ? 0 : -10,
-                                                            zIndex: 10 - i
-                                                        }}
-                                                    />
-                                                ))}
-
-                                                {opt.members.length > 2 && (
+                                                {msg.isAnonymous ? (
                                                     <View style={{
                                                         width: 25,
                                                         height: 25,
@@ -288,13 +325,46 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                                                         backgroundColor: '#e0e0e0',
                                                         justifyContent: 'center',
                                                         alignItems: 'center',
-                                                        marginLeft: -10,
                                                         borderWidth: 1,
                                                         borderColor: '#fff',
-                                                        zIndex: 8
                                                     }}>
-                                                        <Text style={{ fontSize: 10 }}>+{opt.members.length - 2}</Text>
+                                                        <Text style={{ fontSize: 10 }}>{opt.members.length}</Text>
                                                     </View>
+                                                ) : (
+                                                    <>
+                                                        {opt.members.slice(0, 2).map((member, i) => (
+                                                            <Image
+                                                                key={member._id}
+                                                                source={{ uri: member.avatar || DEFAULT_AVATAR }}
+                                                                style={{
+                                                                    width: 25,
+                                                                    height: 25,
+                                                                    borderRadius: 15,
+                                                                    borderWidth: 1,
+                                                                    borderColor: '#fff',
+                                                                    marginLeft: i === 0 ? 0 : -10,
+                                                                    zIndex: 10 - i
+                                                                }}
+                                                            />
+                                                        ))}
+
+                                                        {opt.members.length > 2 && (
+                                                            <View style={{
+                                                                width: 25,
+                                                                height: 25,
+                                                                borderRadius: 15,
+                                                                backgroundColor: '#e0e0e0',
+                                                                justifyContent: 'center',
+                                                                alignItems: 'center',
+                                                                marginLeft: -10,
+                                                                borderWidth: 1,
+                                                                borderColor: '#fff',
+                                                                zIndex: 8
+                                                            }}>
+                                                                <Text style={{ fontSize: 10 }}>+{opt.members.length - 2}</Text>
+                                                            </View>
+                                                        )}
+                                                    </>
                                                 )}
                                             </View>
                                         )}
@@ -338,20 +408,29 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                             }
                         })()
                     ) : (
-                        <Text
+                        <View
                             style={[
-                                messageItemStyles.textContent,
                                 isMe ? messageItemStyles.myMessage : messageItemStyles.theirMessage,
                                 msg.type === "RECALL" && { fontStyle: "italic", color: "#999" },
                             ]}
                         >
-                            {msg.type === "RECALL"
-                                ? "Message has been recalled"
-                                : content.length > MAX_TEXT_LENGTH
-                                    ? content.slice(0, MAX_TEXT_LENGTH) + "..."
-                                    : content}
-                        </Text>
-                    )}
+                            {msg.type === "RECALL" ? (
+                                <Text
+                                    style={[
+                                        messageItemStyles.textContent,
+                                        { fontStyle: "italic", color: "#999" }
+                                    ]}
+                                >
+                                    Message has been recalled
+                                </Text>
+                            ) : (
+                                renderMessageContent(msg)
+                            )}
+                        </View>
+
+                    )
+
+                }
 
 
                 {msg.reacts && msg.reacts.length > 0 && (
@@ -404,12 +483,18 @@ const messageItemStyles = StyleSheet.create({
         flexDirection: "row",
         width: "100%",
     },
-
     leftAlign: { justifyContent: "flex-start" },
     rightAlign: { flexDirection: "row-reverse" },
     avatar: { width: 40, height: 40, borderRadius: 20 },
     avatarPlaceholder: { width: 40, height: 40 },
-    contentContainer: { maxWidth: 468, marginHorizontal: 8 },
+
+    contentContainer: {
+        maxWidth: '75%',
+        minWidth: 0,
+        flex: 0,
+        marginHorizontal: 8
+    },
+
     imageContent: {
         width: 250,
         height: 250,
@@ -443,13 +528,17 @@ const messageItemStyles = StyleSheet.create({
         marginTop: 4,
         flexWrap: "wrap",
     },
+
     textContent: {
-        paddingHorizontal: 12,
-        paddingVertical: 14,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
         borderRadius: 12,
         fontSize: 14,
         color: "#000",
+        flexShrink: 1,
+        flexWrap: 'wrap',
     },
+
     videoContainer: {
         width: 250,
         height: 250,
@@ -463,8 +552,30 @@ const messageItemStyles = StyleSheet.create({
         height: 48,
         marginBottom: 8,
     },
-    myMessage: { backgroundColor: "#EFF8FF", alignSelf: "flex-end" },
-    theirMessage: { backgroundColor: "#F5F5F5" },
+
+    myMessage: {
+        backgroundColor: "#EFF8FF",
+        alignSelf: "flex-start",
+        borderRadius: 10,
+        borderTopRightRadius: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        maxWidth: 300,
+        minWidth: 0,
+        flex: 0,
+    },
+
+    theirMessage: {
+        backgroundColor: "#F5F5F5",
+        borderRadius: 10,
+        borderTopRightRadius: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        maxWidth: 300,
+        minWidth: 0,
+        flex: 0,
+    },
+
     timeText: { fontSize: 10, color: "#959595", marginTop: 4 },
     reactContainer: {
         flexDirection: 'row',
@@ -519,7 +630,6 @@ const messageItemStyles = StyleSheet.create({
         marginTop: 10,
         gap: 8,
     },
-
     optionButton: {
         backgroundColor: '#f1f1f1',
         paddingVertical: 10,
@@ -528,16 +638,9 @@ const messageItemStyles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ccc',
     },
-
     optionText: {
         fontSize: 14,
         color: '#333',
-    },
-
-    txtContent: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 8,
     },
     btnVote: {
         width: '100%',
@@ -557,12 +660,20 @@ const messageItemStyles = StyleSheet.create({
         paddingHorizontal: 8,
         marginVertical: 8,
     },
+    taggedText: {
+        color: '#086DC0',
+        fontWeight: '600',
+        backgroundColor: 'rgba(8, 109, 192, 0.1)',
+        borderRadius: 4,
+        paddingHorizontal: 2,
+        overflow: 'hidden',
+    },
 });
 
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) {
+function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
     const scrollViewRef = useRef(null);
     const scrollPosition = useRef(0);
 
@@ -577,7 +688,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji
                 animated: false,
             });
         }
-    }, [messages]);
+    }, [messages, channelId]);
 
     return (
         <ScrollView
@@ -627,20 +738,19 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress, onRecord, membersinconversation }) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress, onRecord, membersinconversation, memberNames }) {
 
     const [showMentionList, setShowMentionList] = useState(false);
     const [filteredMembers, setFilteredMembers] = useState([]);
 
-    console.log(`Nhan duoc roi ne`, membersinconversation);
+    console.log(`MEMBER IN CONVERSATION`, membersinconversation);
     const handleInputChange = (text) => {
         setInput(text);
 
-        // Kiểm tra mention
         const mentionMatch = text.toString().match(/@(\w*)$/);
         if (mentionMatch) {
             const query = mentionMatch[1].toLowerCase();
-            const filtered = membersinconversation.filter(member =>
+            const filtered = memberNames.filter(member =>
                 member.name.toLowerCase().includes(query)
             );
             setFilteredMembers(filtered);
@@ -652,7 +762,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
 
     const handleSend = () => {
         if (!input.trim()) return;
-        onSend(input);
+        onSend(input, memberNames);
         setInput("");
         setShowMentionList(false);
     };
@@ -663,18 +773,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
         setShowMentionList(false);
     };
 
-    const renderColoredText = () => {
-        return input.split(/(@\w+)/g).map((part, index) => {
-            if (part.startsWith('@')) {
-                return (
-                    <Text key={index} style={{ color: '#086DC0', fontWeight: 'bold' }}>
-                        {part}
-                    </Text>
-                );
-            }
-            return <Text key={index}>{part}</Text>;
-        });
-    };
+
 
     return (
         <View style={messageInputStyles.container}>
@@ -689,6 +788,8 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
                     onChangeText={handleInputChange}
                     onSubmitEditing={handleSend}
                     returnKeyType="send"
+                    multiline
+
                 />
 
                 {showMentionList && (
@@ -802,7 +903,19 @@ export default function ChatScreen({ route, navigation }) {
     const [showRecordModal, setRecordModal] = useState(false);
 
     const [showAddChannel, setShowAddChannel] = useState(false);
-    const [members, setMembers] = useState(null)
+    const [members, setMembers] = useState(null);
+
+    const [memberTags, setMemberTags] = useState([])
+
+    console.log(`HAHAHA`, memberTags)
+
+
+
+    const handleChannelChange = (channelId) => {
+        setCurrentChannelId(channelId);
+        fetchAllMessages(channelId);
+    };
+
 
     const emojiToType = {
         '❤️': 1,
@@ -814,8 +927,6 @@ export default function ChatScreen({ route, navigation }) {
     };
 
 
-    console.log(`Messages là : `, messages);
-    // Lấy userId từ AsyncStorage
     useEffect(() => {
         const fetchUserId = async () => {
             try {
@@ -848,33 +959,44 @@ export default function ChatScreen({ route, navigation }) {
             fetchConversation();
         }
     }, [conversationId]);
+    const fetchChannels = async () => {
+        try {
+            const response = await axios.get(`/api/channels/${conversationId}`);
+            setChannels(response.data);
 
-    // Fetch danh sách channel nếu là nhóm (conversation.type === true)
-    useEffect(() => {
-        const fetchChannels = async () => {
-            try {
-                const response = await axios.get(`/api/channels/${conversationId}`);
-                setChannels(response.data);
-                console.log("Channels:", response.data);
-            } catch (error) {
-                console.error("Error fetching channels:", error);
-                Alert.alert(
-                    "Error fetching channels",
-                    error.response?.data?.message || error.message
-                );
+            if (response.data.length > 0) {
+                setCurrentChannelId(response.data[0]._id);
             }
-        };
+        } catch (error) {
+            console.error("Error fetching channels:", error);
+            Alert.alert(
+                "Error fetching channels",
+                error.response?.data?.message || error.message
+            );
+        }
+    };
+    useEffect(() => {
 
-        if (conversation?.type) {  // Kiểm tra nếu là nhóm
+        fetchChannels();
+        if (conversation?.type) {
             fetchChannels();
         }
     }, [conversation, conversationId]);
 
-    const fetchAllMessages = async () => {
+    const fetchAllMessages = async (channelId = null) => {
         if (!conversationId) return;
 
         try {
-            const response = await axios.get(`/api/messages/${conversationId}`);
+            let response;
+            if (channelId) {
+                response = await axios.get(`/api/messages/channel/${channelId}`), {
+                    timeout: 30000
+                };
+            } else {
+                response = await axios.get(`/api/messages/${conversationId}`, {
+                    timeout: 30000
+                });
+            }
             setMessages(response.data);
         } catch (error) {
             console.error("Error fetching messages:", error);
@@ -886,11 +1008,13 @@ export default function ChatScreen({ route, navigation }) {
     };
 
     useEffect(() => {
-        fetchAllMessages();
-    }, [conversationId]);
+        if (currentChannelId) {
+            fetchAllMessages(currentChannelId);
+        } else {
+            fetchAllMessages();
+        }
+    }, [currentChannelId, conversationId]);
 
-    const firstChannelId = channels.length > 0 ? channels[0]._id : null;
-    console.log("First Channel ID:", firstChannelId);
 
     const handleMessageLongPress = useCallback((message) => {
         setSelectedMessage(message);
@@ -1091,29 +1215,28 @@ export default function ChatScreen({ route, navigation }) {
     });
 
     const checkaddChannel = (conversation, memberId) => {
+        if (conversation?.leaderId === memberId?.toString()) return true;
         if (!conversation?.managerIds || conversation.managerIds.length === 0) {
             console.log("Không có quản lý trong nhóm");
             return false;
         }
         if (!memberId) {
-            console.log("Không có memberId");
             return false;
         }
 
         return conversation.managerIds.some(id => id?.toString() === memberId?.toString());
     };
 
-    function HeaderSingleChat({ handleAddChannel, checkaddChannel }) {
+    function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange }) {
         const navigation = useNavigation();
         const [localPinnedMessages, setLocalPinnedMessages] = useState([]);
 
-        console.log(`HEADER NÈ `, checkaddChannel(conversation, memberId))
 
-        useEffect(() => {
-            if (channels.length > 0) {
-                setCurrentChannelId(channels[0]._id);
-            }
-        }, [channels]);
+
+        const handleChannelPress = (channelId) => {
+            onChannelChange(channelId);
+        };
+
 
         useEffect(() => {
             const loadPinnedMessages = async () => {
@@ -1160,23 +1283,33 @@ export default function ChatScreen({ route, navigation }) {
 
                 <View style={headerStyles.channelsContainer}>
                     <View style={{ width: 200, height: '100%' }}>
-                        <ScrollView horizontal={true} style={{ width: '100%', maxHeight: 300, flexDirection: 'row', }}>
+                        <ScrollView horizontal={true} style={{ width: '100%', maxHeight: 300, flexDirection: 'row' }}>
                             {channels.map((channel) => (
                                 <TouchableOpacity
                                     key={channel._id}
-                                    onPress={() => setCurrentChannelId(channel._id)}
+                                    onPress={() => handleChannelPress(channel._id)}
                                     style={[
                                         headerStyles.channelButton,
                                         currentChannelId === channel._id && headerStyles.channelSelected
                                     ]}
                                 >
-                                    <Text style={headerStyles.channelText}>{channel.name}</Text>
+                                    <Text style={[
+                                        headerStyles.channelText,
+                                        currentChannelId === channel._id && headerStyles.channelTextSelected
+                                    ]}>
+                                        {channel.name}
+                                    </Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                     </View>
                     {checkaddChannel(conversation, memberId) && (
-                        <TouchableOpacity style={{ position: 'absolute', right: 5, top: 10, }} onPress={() => { handleAddChannel('123') }}><Image source={addChannel} style={{ height: 20, width: 20 }} /></TouchableOpacity>
+                        <TouchableOpacity
+                            style={{ position: 'absolute', right: 5, top: 10 }}
+                            onPress={() => handleAddChannel('123')}
+                        >
+                            <Image source={addChannel} style={{ height: 20, width: 20 }} />
+                        </TouchableOpacity>
                     )}
                 </View>
                 <TouchableOpacity style={[{ width: '100%', color: "black", display: 'flex' }]}>
@@ -1518,14 +1651,13 @@ export default function ChatScreen({ route, navigation }) {
                 formData.append('id', userId);
                 formData.append('conversationId', conversationId);
                 formData.append('channelId', currentChannelId);
+
                 formData.append('file', {
                     uri: fileUri,
                     name: fileName,
                     type: mimeType,
                 });
 
-                // Chỉ upload file, không thêm tin nhắn vào state
-                // Tin nhắn sẽ được thêm tự động qua WebSocket
                 await axios.post('/api/messages/file', formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data',
@@ -1575,7 +1707,6 @@ export default function ChatScreen({ route, navigation }) {
     const handleGetMember = async (memberId) => {
 
         try {
-            console.log(`MemberId La : `, memberId)
             const response = await axios.get(`/api/members/member/${memberId._id}`);
 
             return response.data.data;
@@ -1606,13 +1737,66 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    const handleSendMessage = async (message) => {
+    const checkTagsWithPosition = (message, members) => {
+        const tagRegex = /@[a-zA-ZÀ-ỹ]+(?:\s[a-zA-ZÀ-ỹ]+)*/g;
+        const tags = [...message.matchAll(tagRegex)];
+
+        const tagPositions = [];
+        const seenIds = new Set();
+        const validTags = [];
+
+        const normalize = str =>
+            str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+        tags.forEach(match => {
+            const tagText = match[0];
+            const tagName = tagText.substring(1).trim();
+            const start = match.index;
+            const end = start + tagText.length;
+
+            if (!tagName) return;
+
+            const member = members.find(
+                m => normalize(m.name) === normalize(tagName)
+            );
+
+            if (!member) return;
+
+            const memberId = String(member._id);
+
+            if (!seenIds.has(memberId)) {
+                validTags.push(memberId);
+                seenIds.add(memberId);
+            }
+
+            tagPositions.push({
+                memberId,
+                start,
+                end,
+                name: member.name,
+            });
+        });
+
+        return { validTags, tagPositions };
+    };
+
+
+
+    const handleSendMessage = async (message, members) => {
         if (!message.trim()) return;
         if (!userId) {
             Alert.alert("User not loaded", "Unable to send message without a valid user.");
             return;
         }
+
+
+
+
+
         try {
+
+            const { validTags, tagPositions } = checkTagsWithPosition(message, members);
+
             const newMessage = {
                 _id: String(Date.now()), // temporary id
                 memberId: { userId: userId },
@@ -1623,16 +1807,31 @@ export default function ChatScreen({ route, navigation }) {
             };
             setMessages((prev) => [...prev, newMessage]);
 
-            await axios.post("/api/messages/text", {
+
+            const payload = {
                 userId: userId,
                 conversationId: conversationId,
                 content: message,
                 channelId: currentChannelId,
-            });
+            };
+
+            if (validTags.length > 0) {
+                payload.tags = validTags;
+                payload.tagPositions = tagPositions;
+            }
+
+            console.log(`PAYLOAD GUI DI LA `, payload);
+
+
+            await axios.post("/api/messages/text", payload);
+
+
+
 
             socket.emit(SOCKET_EVENTS.SEND_MESSAGE, {
                 conversationId: conversationId,
                 content: message,
+                channelId: currentChannelId,
             });
         } catch (err) {
             Alert.alert("Cannot send message", err.response?.data?.message || err.message);
@@ -1674,13 +1873,10 @@ export default function ChatScreen({ route, navigation }) {
         };
     }, [socket, conversationId, userId]);
 
-    const handleSendRecord = () => {
-        setRecordModal(false);
-    }
 
 
     const handleCreatePoll = () => {
-        fetchAllMessages();
+        fetchAllMessages(currentChannelId);
         setVoteShowModal(false);
     };
     const handleVoteSubmit = (updatedVoteMessage) => {
@@ -1718,29 +1914,38 @@ export default function ChatScreen({ route, navigation }) {
 
 
 
-    const handleCreateChannel = (channelName) => {
-
-
+    const openCreateChannel = () => {
         setShowAddChannel(true);
     };
 
+    const handleCreateChannel = async (newChannelName) => {
+        await fetchChannels();
+    };
+
+    const fetchMembersInConversation = async () => {
+
+        try {
+            const res = await axios.get(`/api/members/${conversationId}`);
+            const members = res.data.data;
+            setMembers(members);
+
+        } catch (err) {
+            console.error("Lỗi lấy members:", err);
+        }
+    };
+
+
+
     useEffect(() => {
-        const fetchMembersInConversation = async () => {
-
-            try {
-                const res = await axios.get(`/api/members/${conversationId}`);
-                const members = res.data.data;
-                setMembers(members);
-            } catch (err) {
-                console.error("Lỗi lấy memberId:", err);
-            }
-        };
-
         fetchMembersInConversation();
     }, [conversationId]);
 
-    console.log(`MEMBERSinConversation`, members)
-
+    useEffect(() => {
+        if (members && memberId) {
+            const filteredMembers = members.filter(member => String(member._id) !== String(memberId));
+            setMemberTags(filteredMembers);
+        }
+    }, [members, memberId]);
     return (
 
         <View style={chatScreenStyles.container}>
@@ -1750,8 +1955,10 @@ export default function ChatScreen({ route, navigation }) {
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 <HeaderSingleChat
-                    handleAddChannel={handleCreateChannel}
+                    handleAddChannel={openCreateChannel}
                     checkaddChannel={checkaddChannel}
+                    onChannelChange={handleChannelChange}
+
                 />
                 <View style={chatScreenStyles.chatContainer}>
                     <ChatBox
@@ -1761,6 +1968,7 @@ export default function ChatScreen({ route, navigation }) {
                         handlePressEmoji={handlePressEmoji}
                         isPinned={isPinned}
                         handleOpenVoteModal={handleOpenVoteModal}
+                        channelId={channels}
                     />
                 </View>
                 <MessageInput
@@ -1774,7 +1982,7 @@ export default function ChatScreen({ route, navigation }) {
                     onVotePress={() => setVoteShowModal(true)}
                     onRecord={() => setRecordModal(true)}
                     membersinconversation={members}
-
+                    memberNames={memberTags}
                 />
                 <EmojiPicker
                     onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
@@ -1802,13 +2010,16 @@ export default function ChatScreen({ route, navigation }) {
                     onClose={() => setRecordModal(false)}
                     conversationId={conversationId}
                     channelId={currentChannelId}
-                    onSendRecord={(uri) => console.log('File ghi âm:', uri)}
+                    onSendRecord={(uri) => fetchAllMessages(currentChannelId)}
                 />
 
                 <AddNewChannel
                     visible={showAddChannel}
                     onCancel={() => setShowAddChannel(false)}
                     onCreate={handleCreateChannel}
+                    memberId={memberId}
+                    conversation={conversationId}
+
                 />
 
                 <Modal
