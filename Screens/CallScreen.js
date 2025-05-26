@@ -15,7 +15,7 @@ export default function DailyVideoCallScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const webviewRef = useRef(null);
 
-  const { conversationId } = route.params;
+  const { conversationId, channelId } = route.params;
 
   const leaveCall = useCallback(() => {
     if (webviewRef.current) {
@@ -60,9 +60,9 @@ export default function DailyVideoCallScreen({ navigation, route }) {
         const user = userJson ? JSON.parse(userJson) : {};
         const name = user.name || "Guest";
         setUserName(name);
-
+        const  conversationRoomId = conversationId + channelId
         // Gọi API tạo phòng (nếu cần)
-        const resp = await axios.post(CREATE_ROOM_URL, { conversationId });
+        const resp = await axios.post(CREATE_ROOM_URL, { conversationId: conversationRoomId });
         const { url } = resp.data;
 
         // Lấy roomName từ URL

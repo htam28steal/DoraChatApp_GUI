@@ -1277,7 +1277,9 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
 
                     <View style={headerStyles.iconsContainer}>
-                        <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('CallScreen', { conversationId, channelId: currentChannelId })}>
+                        <TouchableOpacity style={headerStyles.iconButton} onPress={() =>{
+                              console.log('NAVIGATE VIDEO', conversationId, currentChannelId);
+                             navigation.navigate('CallScreen', { conversationId, channelId: currentChannelId })}}>
                             <Image source={CallIcon} style={headerStyles.icon} />
                         </TouchableOpacity>
                         <TouchableOpacity style={headerStyles.iconButton}>
@@ -1969,6 +1971,8 @@ export default function ChatScreen({ route, navigation }) {
                     onChannelChange={handleChannelChange}
                     nameG={nameG}
                     avatarG={avatarG}
+                    conversationId={conversationId}
+                    currentChannelId={currentChannelId}
                 />
                 <View style={chatScreenStyles.chatContainer}>
                     <ChatBox
