@@ -58,15 +58,15 @@ const addChannel = require("../icons/addChannel.png")
 
 
 function dedupeMessages(msgs) {
-  const seen = new Set();
-  const unique = [];
-  for (const msg of msgs) {
-    if (!seen.has(msg._id)) {
-      seen.add(msg._id);
-      unique.push(msg);
+    const seen = new Set();
+    const unique = [];
+    for (const msg of msgs) {
+        if (!seen.has(msg._id)) {
+            seen.add(msg._id);
+            unique.push(msg);
+        }
     }
-  }
-  return unique;
+    return unique;
 }
 
 
@@ -93,13 +93,9 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     };
 
 
- const replied = msg.replyMessageId
-  ? allMessages.find(m => m._id === msg.replyMessageId)
-  : null;
-
-
-
-
+    const replied = msg.replyMessageId
+        ? allMessages.find(m => m._id === msg.replyMessageId)
+        : null;
 
 
     const getFileExtension = (url) => {
@@ -738,7 +734,7 @@ replyContainer: {
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages,allMessages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
+function ChatBox({ messages, allMessages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
     const scrollViewRef = useRef(null);
     const scrollPosition = useRef(0);
 
@@ -781,7 +777,7 @@ function ChatBox({ messages,allMessages, currentUserId, onMessageLongPress, hand
                     <MessageItem
                         key={key}
                         msg={msg}
-                         allMessages={allMessages} 
+                        allMessages={allMessages}
                         showAvatar={isFirstInGroup}
                         showTime={isLastInGroup}
                         currentUserId={currentUserId}
@@ -808,7 +804,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
 
     const [showMentionList, setShowMentionList] = useState(false);
     const [filteredMembers, setFilteredMembers] = useState([]);
-    
+
 
     const handleInputChange = (text) => {
         setInput(text);
@@ -1001,8 +997,8 @@ useEffect(() => {
 }, [conversationId]);
 
 
-const handleReadMessage = async () => {
-  if (!selectedMessage || selectedMessage.type !== "TEXT") return;
+    const handleReadMessage = async () => {
+        if (!selectedMessage || selectedMessage.type !== "TEXT") return;
 
   try {
 
@@ -1013,25 +1009,25 @@ const handleReadMessage = async () => {
 
     const { url } = res.data;
 
-    // 1) Create a new Sound object
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: url },
-      { shouldPlay: true }  // auto-start playback
-    );
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: url },
+                { shouldPlay: true }
+            );
 
-    // 2) Optionally track when it’s done
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.didJustFinish) {
-        sound.unloadAsync();
-      }
-    });
+            sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.didJustFinish) {
+                    console.log("🔈 Finished playing TTS");
+                    sound.unloadAsync();
+                }
+            });
 
-  } catch (err) {
-    Alert.alert("Error", err.response?.data?.message || err.message);
-  } finally {
-    setModalVisible(false);
-  }
-};
+        } catch (err) {
+            console.error("❌ TTS error:", err);
+            Alert.alert("Error", err.response?.data?.message || err.message);
+        } finally {
+            setModalVisible(false);
+        }
+    };
 
 
     const handleChannelChange = (channelId) => {
@@ -1070,7 +1066,6 @@ const handleReadMessage = async () => {
         const fetchConversation = async () => {
             try {
                 const response = await axios.get(`/api/conversations/${conversationId}`);
-                console.log('Conversation Data:', response.data);
                 setConversation(response.data);
             } catch (error) {
                 Alert.alert("Error", "Unable to fetch conversation: " + (error.response?.data?.message || error.message));
@@ -1156,24 +1151,24 @@ return {
         setSelectedMessage(message);
         setModalVisible(true);
     }, []);
-useEffect(() => {
-  const load = async () => {
-    const res = await axios.get(`/api/messages/${conversationId}`);
-    const full = dedupeMessages(res.data);
+    useEffect(() => {
+        const load = async () => {
+            const res = await axios.get(`/api/messages/${conversationId}`);
+            const full = dedupeMessages(res.data);
 
-    // Attach replyToMessage for reply preview
-    const withReplies = full.map(msg => ({
-      ...msg,
-      replyToMessage: msg.replyMessageId
-        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
-        : undefined,
-    }));
+            // Attach replyToMessage for reply preview
+            const withReplies = full.map(msg => ({
+                ...msg,
+                replyToMessage: msg.replyMessageId
+                    ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+                    : undefined,
+            }));
 
-    setAllMessages(withReplies);
-    setMessages(withReplies.slice(-40)); // or adjust window as you like
-  };
-  load();
-}, [conversationId]);
+            setAllMessages(withReplies);
+            setMessages(withReplies.slice(-40)); // or adjust window as you like
+        };
+        load();
+    }, [conversationId]);
 
     const handleRecallAction = () => {
         if (!selectedMessage) return;
@@ -1308,6 +1303,8 @@ useEffect(() => {
         try {
             const memberResponse = await axios.get(`/api/members/${conversationId}/${userId}`);
 
+            console.log(`LOG ACTIVE`, memberResponse.data.active);
+            setIsRemoved(memberResponse.data.active);
             const memberId = memberResponse.data.data?._id;
 
             await axios.delete(`/api/pin-messages/${messageId?._id}/${memberId}`);
@@ -1843,11 +1840,13 @@ useEffect(() => {
                     type: mimeType,
                 });
 
-                await axios.post('/api/messages/file', formData, {
+                const newMsg = await axios.post('/api/messages/file', formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data',
                     },
-                });
+                    timeout: 3000,
+                }
+                );
 
             }
         } catch (error) {
@@ -1983,7 +1982,14 @@ useEffect(() => {
 
 
     const handleSendMessage = async (message, members) => {
+        if (isRemoved) {
+            Alert.alert("Lỗi", "Bạn không còn trong nhóm này");
+            return;
+        }
         if (!message.trim()) return;
+
+
+
         if (!userId) {
             Alert.alert("User not loaded", "Unable to send message without a valid user.");
             return;
@@ -2003,7 +2009,7 @@ useEffect(() => {
                 createdAt: new Date().toISOString(),
                 pending: true,
                 replyTo: replyingMessage ? replyingMessage._id : undefined,
-                 replyToMessage: replyingMessage || undefined,
+                replyToMessage: replyingMessage || undefined,
             };
 
     
@@ -2042,7 +2048,7 @@ useEffect(() => {
                 conversationId: conversationId,
                 content: message,
                 channelId: currentChannelId,
-                 replyTo: replyingMessage ? replyingMessage._id : undefined,
+                replyTo: replyingMessage ? replyingMessage._id : undefined,
             });
         } catch (err) {
             Alert.alert("Cannot send message", err.response?.data?.message || err.message);
@@ -2303,7 +2309,7 @@ useEffect(() => {
                             <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
                                 <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
                             </TouchableOpacity>
-                               <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
+                            <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
                                 <Text style={styles.modalButtonText}>Đọc tin nhắn</Text>
                             </TouchableOpacity>
                             <TouchableOpacity

@@ -50,7 +50,7 @@ function AppContainer() {
   // Tạo userRef để lưu thông tin user được lấy từ AsyncStorage
   const userRef = useRef();
 
-  // Gọi useSocketListeners để đăng ký các sự kiện socket
+  // Gọi useSocketListeners để đăng ký các sự kiện socketp
   useSocketListeners(userRef);
 
   return (
