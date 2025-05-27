@@ -1370,7 +1370,7 @@ const sendRecording = async () => {
     memberId: { userId },
     type: "FILE",
     content: recordedUri,
-    fileName: tempId + ".aac",
+    fileName: tempId + ".mp3",
     pending: true,
     createdAt: new Date().toISOString(),
   };
@@ -1384,7 +1384,7 @@ const sendRecording = async () => {
     formData.append("file", {
       uri: recordedUri,
       name: optimisticMsg.fileName,
-      type: "audio/aac",
+      type: "audio/mpeg",
     });
     const response = await axios.post("/api/messages/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
