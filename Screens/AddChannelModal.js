@@ -1,8 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
 import channelService from '../api/channelService';
+
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
+
 const AddChannelModal = ({ visible, onCancel, onCreate, memberId, conversation }) => {
     const [channelName, setChannelName] = useState('');
+
+
+
+    useEffect(() => {
+        const handleCreateS = (newChannel) => {
+            onCreate(newChannel.name);
+        }
+        socket.on(SOCKET_EVENTS.NEW_CHANNEL, handleCreateS);
+        return () => { socket.off(SOCKET_EVENTS.NEW_CHANNEL, handleCreateS); }
+    }, [socket])
+
 
     const handleCreate = async () => {
         if (!channelName.trim()) {

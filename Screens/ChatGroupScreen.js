@@ -952,7 +952,6 @@ export default function ChatScreen({ route, navigation }) {
         fetchUserId();
     }, []);
 
-    // Fetch thông tin cuộc trò chuyện
     useEffect(() => {
         const fetchConversation = async () => {
             try {
@@ -1058,6 +1057,8 @@ export default function ChatScreen({ route, navigation }) {
     };
 
 
+
+
     const isPinned = async (msg) => {
         try {
             const response = await axios.get(`/api/pin-messages/${conversationId}`);
@@ -1093,10 +1094,24 @@ export default function ChatScreen({ route, navigation }) {
 
 
 
+    useEffect(() => {
+        const handlePinMessagesS = (message) => {
+            setMessages(prevMessages =>
+                prevMessages.map(msg =>
+                    msg._id === message.messageId
+                        ? { ...msg, isPinned: true }
+                        : msg
+                )
+            );
+        }
+        socket.on(SOCKET_EVENTS.PIN_MESSAGE, handlePinMessagesS);
+        return () => { socket.off(SOCKET_EVENTS.PIN_MESSAGE, handlePinMessagesS); }
+    }, [socket])
+
+
     const handlePinMessages = async (message) => {
         if (!message) return;
 
-        console.log(`MESSAGE `, message);
         try {
             const isPinned = isMessagePinned(message._id);
 
@@ -1105,7 +1120,6 @@ export default function ChatScreen({ route, navigation }) {
                 return;
             }
 
-            console.log(`MEMBER ID PIN LÀ `, message.memberId._id);
 
             const response = await axios.post('/api/pin-messages', {
                 messageId: message._id,
@@ -1130,6 +1144,20 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
+
+    useEffect(() => {
+        const handleUnpinS = (message) => {
+            setMessages(prevMessages =>
+                prevMessages.map(msg =>
+                    msg._id === message.messageId
+                        ? { ...msg, isPinned: true }
+                        : msg
+                )
+            );
+        }
+        socket.on(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinS);
+        return () => { socket.off(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinS); }
+    }, [socket])
 
     const handleUnpinMessage = async (messageId) => {
         try {
@@ -1156,6 +1184,8 @@ export default function ChatScreen({ route, navigation }) {
             Alert.alert('Lỗi', 'Không thể gỡ ghim tin nhắn');
         }
     };
+
+
 
     const handlePinnedMessages = async () => {
         try {
@@ -1277,9 +1307,10 @@ export default function ChatScreen({ route, navigation }) {
                     </View>
 
                     <View style={headerStyles.iconsContainer}>
-                        <TouchableOpacity style={headerStyles.iconButton} onPress={() =>{
-                              console.log('NAVIGATE VIDEO', conversationId, currentChannelId);
-                             navigation.navigate('CallScreen', { conversationId, channelId: currentChannelId })}}>
+                        <TouchableOpacity style={headerStyles.iconButton} onPress={() => {
+                            console.log('NAVIGATE VIDEO', conversationId, currentChannelId);
+                            navigation.navigate('CallScreen', { conversationId, channelId: currentChannelId })
+                        }}>
                             <Image source={CallIcon} style={headerStyles.icon} />
                         </TouchableOpacity>
                         <TouchableOpacity style={headerStyles.iconButton}>
@@ -1728,6 +1759,23 @@ export default function ChatScreen({ route, navigation }) {
         }
     }
 
+
+
+    useEffect(() => {
+        const handleReactS = (message) => {
+            setMessages(prevMessages =>
+                prevMessages.map(m =>
+                    m._id === message._id
+                        ? { ...m, reacts: message?.reacts || m.reacts }
+                        : m
+                )
+            );
+        }
+        socket.on(SOCKET_EVENTS.REACT_TO_MESSAGE, handleReactS);
+        return () => { socket.off(SOCKET_EVENTS.REACT_TO_MESSAGE, handleReactS); }
+    }, [socket])
+
+
     const handleReact = async (message, reactType) => {
         try {
             const response = await axios.post('/api/messages/react', {
@@ -1736,18 +1784,20 @@ export default function ChatScreen({ route, navigation }) {
                 reactType: reactType,
             });
 
-            // Chỉ cập nhật message được react
-            setMessages(prevMessages =>
-                prevMessages.map(m =>
-                    m._id === message._id
-                        ? { ...m, reacts: response.data?.reacts || m.reacts }
-                        : m
-                )
-            );
+
+            //socket.emit phát sự kiện  
+            // socket.on lắng nghe 
+
+
+
         } catch (error) {
             console.error('Failed to send react:', error.response?.data || error.message);
         }
     };
+
+
+
+
 
     const checkTagsWithPosition = (message, members) => {
         const tagRegex = /@[a-zA-ZÀ-ỹ]+(?:\s[a-zA-ZÀ-ỹ]+)*/g;
@@ -1854,7 +1904,6 @@ export default function ChatScreen({ route, navigation }) {
 
         const receiveHandler = (message) => {
             setMessages(prev => {
-                // Nếu là message của user hiện tại
                 if (message.memberId?.userId === userId) {
                     return prev.map(m =>
                         m.pending && m.content === message.content
@@ -1863,7 +1912,6 @@ export default function ChatScreen({ route, navigation }) {
                     );
                 }
 
-                // Nếu message đã tồn tại thì cập nhật, không thì thêm mới
                 const existingIndex = prev.findIndex(m => m._id === message._id);
                 if (existingIndex !== -1) {
                     const newMessages = [...prev];
