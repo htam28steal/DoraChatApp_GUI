@@ -14,6 +14,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import voteService from '../api/voteService';
 import userService from '../api/userService';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
 
 const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
 
@@ -28,7 +30,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
         if (memberId) {
             setMember(memberId);
         } else {
-            // Fallback: Tự lấy memberId nếu props không có
             const fetchMemberId = async () => {
                 try {
                     const storedUserId = await AsyncStorage.getItem("userId");
@@ -140,6 +141,20 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
             onSubmit(msg);
         }
     };
+
+
+    useEffect(() => {
+        const handleVoteOptionSelectS = (selectoption) => {
+            onSubmit(selectoption);
+        }
+        socket.on(SOCKET_EVENTS.VOTE_OPTION_SELECTED, handleVoteOptionSelectS);
+        return () => { socket.off(SOCKET_EVENTS.VOTE_OPTION_SELECTED, handleVoteOptionSelectS); }
+    }, [socket])
+
+
+
+
+
 
     const { content, options = [] } = message || {};
 

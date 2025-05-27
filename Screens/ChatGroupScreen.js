@@ -911,12 +911,11 @@ export default function ChatScreen({ route, navigation }) {
     const [showVotedModal, setVotedModal] = useState(false);
     const [memberId, setMemberId] = useState(null);
     const [showRecordModal, setRecordModal] = useState(false);
-
     const [showAddChannel, setShowAddChannel] = useState(false);
     const [members, setMembers] = useState(null);
-
     const [memberTags, setMemberTags] = useState([])
 
+    const [isRemoved, setIsRemoved] = useState(false);
 
 
 
@@ -1851,10 +1850,6 @@ export default function ChatScreen({ route, navigation }) {
             return;
         }
 
-
-
-
-
         try {
 
             const { validTags, tagPositions } = checkTagsWithPosition(message, members);
@@ -1900,9 +1895,19 @@ export default function ChatScreen({ route, navigation }) {
     };
 
     useEffect(() => {
-        if (!socket || !conversationId) return;
+        if (isRemoved) {
+            socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+
+            Alert.alert("Thông báo", "Bạn đã bị xóa khỏi nhóm");
+            navigation.goBack();
+        }
+    }, [isRemoved]);
+
+    useEffect(() => {
+        if (!socket || !conversationId || isRemoved) return;
 
         const receiveHandler = (message) => {
+            if (isRemoved) return;
             setMessages(prev => {
                 if (message.memberId?.userId === userId) {
                     return prev.map(m =>
@@ -1930,7 +1935,7 @@ export default function ChatScreen({ route, navigation }) {
             socket.off(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
             socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
         };
-    }, [socket, conversationId, userId]);
+    }, [socket, conversationId, userId, isRemoved]);
 
 
 
@@ -1993,8 +1998,6 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-
-
     useEffect(() => {
         fetchMembersInConversation();
     }, [conversationId]);
@@ -2005,6 +2008,26 @@ export default function ChatScreen({ route, navigation }) {
             setMemberTags(filteredMembers);
         }
     }, [members, memberId]);
+
+
+
+    useEffect(() => {
+        const handleRemoveEvent = (data) => {
+            if (data.memberId === memberId) {
+                setIsRemoved(true);
+                socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+            }
+        };
+
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleRemoveEvent);
+
+        return () => {
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleRemoveEvent);
+        };
+    }, [memberId, conversationId]);
+
+
+
     return (
 
         <View style={chatScreenStyles.container}>
@@ -2033,19 +2056,22 @@ export default function ChatScreen({ route, navigation }) {
                         channelId={channels}
                     />
                 </View>
-                <MessageInput
-                    input={input}
-                    setInput={setInput}
-                    onSend={handleSendMessage}
-                    onPickMedia={pickMedia}
-                    onPickFile={pickDocument}
-                    onEmojiPress={() => setEmojiOpen(true)}
-                    onModalReact={handlePressEmoji}
-                    onVotePress={() => setVoteShowModal(true)}
-                    onRecord={() => setRecordModal(true)}
-                    membersinconversation={members}
-                    memberNames={memberTags}
-                />
+
+                {!isRemoved && (
+                    <MessageInput
+                        input={input}
+                        setInput={setInput}
+                        onSend={handleSendMessage}
+                        onPickMedia={pickMedia}
+                        onPickFile={pickDocument}
+                        onEmojiPress={() => setEmojiOpen(true)}
+                        onModalReact={handlePressEmoji}
+                        onVotePress={() => setVoteShowModal(true)}
+                        onRecord={() => setRecordModal(true)}
+                        membersinconversation={members}
+                        memberNames={memberTags}
+                    />
+                )}
                 <EmojiPicker
                     onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
                     open={emojiOpen}

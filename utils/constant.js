@@ -92,6 +92,7 @@ export const SOCKET_EVENTS = {
 
   // Member
   UPDATE_MEMBER_NAME: "update-member-name",
+  MEMBER_REMOVED: "member-removed",
 
   // Channel
   NEW_CHANNEL: "new-channel",

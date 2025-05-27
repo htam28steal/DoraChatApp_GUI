@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,10 @@ import {
     Alert
 } from 'react-native';
 import voteService from '../api/voteService';
+import { socket } from "../utils/socketClient";
+import { SOCKET_EVENTS } from "../utils/constant";
+
+
 
 const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId, channelId }) => {
 
@@ -72,6 +76,23 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
             console.error("Vote create error:", error);
         }
     };
+
+    useEffect(() => {
+        const handleCreateVoteS = (newVote) => {
+            onCreate(newVote);
+        }
+        socket.on(SOCKET_EVENTS.CREATE_VOTE, handleCreateVoteS);
+        socket.on(SOCKET_EVENTS.ADD_VOTE_OPTION, handleCreateVoteS)
+        return () => {
+            socket.off(SOCKET_EVENTS.CREATE_VOTE, handleCreateVoteS);
+            socket.off(SOCKET_EVENTS.ADD_VOTE_OPTION, handleCreateVoteS)
+
+        }
+    }, [socket])
+
+
+
+
 
     return (
         <Modal visible={visible} animationType="slide">
