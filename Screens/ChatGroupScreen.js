@@ -58,15 +58,15 @@ const addChannel = require("../icons/addChannel.png")
 
 
 function dedupeMessages(msgs) {
-  const seen = new Set();
-  const unique = [];
-  for (const msg of msgs) {
-    if (!seen.has(msg._id)) {
-      seen.add(msg._id);
-      unique.push(msg);
+    const seen = new Set();
+    const unique = [];
+    for (const msg of msgs) {
+        if (!seen.has(msg._id)) {
+            seen.add(msg._id);
+            unique.push(msg);
+        }
     }
-  }
-  return unique;
+    return unique;
 }
 
 
@@ -93,19 +93,9 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     };
 
 
- const replied = msg.replyMessageId
-  ? allMessages.find(m => m._id === msg.replyMessageId)
-  : null;
-
-console.log('MessageItem:', {
-  msg,
-  replyMessageId: msg.replyMessageId,
-  allMessagesCount: allMessages?.length,
-  replied,
-});
-
-
-
+    const replied = msg.replyMessageId
+        ? allMessages.find(m => m._id === msg.replyMessageId)
+        : null;
 
 
     const getFileExtension = (url) => {
@@ -321,25 +311,25 @@ console.log('MessageItem:', {
                     </Text>
                 )}
                 {msg.replyToMessage && (
-    <View style={{
-        backgroundColor: '#f3f6fa',
-        borderLeftWidth: 3,
-        borderLeftColor: '#086DC0',
-        padding: 5,
-        marginBottom: 4,
-        borderRadius: 6,
-    }}>
-        <Text style={{ color: '#086DC0', fontSize: 11, fontWeight: '600' }}>
-            {msg.replyToMessage.memberId?.name || 'ai đó'}
-        </Text>
-        <Text numberOfLines={2} style={{ color: '#555', fontSize: 12 }}>
-            {msg.replyToMessage.type === "IMAGE" ? "Ảnh" :
-             msg.replyToMessage.type === "VIDEO" ? "Video" :
-             msg.replyToMessage.type === "FILE" ? "Tệp đính kèm" :
-             msg.replyToMessage.content}
-        </Text>
-    </View>
-)}
+                    <View style={{
+                        backgroundColor: '#f3f6fa',
+                        borderLeftWidth: 3,
+                        borderLeftColor: '#086DC0',
+                        padding: 5,
+                        marginBottom: 4,
+                        borderRadius: 6,
+                    }}>
+                        <Text style={{ color: '#086DC0', fontSize: 11, fontWeight: '600' }}>
+                            {msg.replyToMessage.memberId?.name || 'ai đó'}
+                        </Text>
+                        <Text numberOfLines={2} style={{ color: '#555', fontSize: 12 }}>
+                            {msg.replyToMessage.type === "IMAGE" ? "Ảnh" :
+                                msg.replyToMessage.type === "VIDEO" ? "Video" :
+                                    msg.replyToMessage.type === "FILE" ? "Tệp đính kèm" :
+                                        msg.replyToMessage.content}
+                        </Text>
+                    </View>
+                )}
 
                 {msg.type === "NOTIFY" ? (
                     <Text style={messageItemStyles.notifyText}>
@@ -731,7 +721,7 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages,allMessages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
+function ChatBox({ messages, allMessages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
     const scrollViewRef = useRef(null);
     const scrollPosition = useRef(0);
 
@@ -774,7 +764,7 @@ function ChatBox({ messages,allMessages, currentUserId, onMessageLongPress, hand
                     <MessageItem
                         key={key}
                         msg={msg}
-                         allMessages={allMessages} 
+                        allMessages={allMessages}
                         showAvatar={isFirstInGroup}
                         showTime={isLastInGroup}
                         currentUserId={currentUserId}
@@ -801,7 +791,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
 
     const [showMentionList, setShowMentionList] = useState(false);
     const [filteredMembers, setFilteredMembers] = useState([]);
-    
+
 
     const handleInputChange = (text) => {
         setInput(text);
@@ -973,54 +963,51 @@ export default function ChatScreen({ route, navigation }) {
 
     const [isRemoved, setIsRemoved] = useState(false);
 
-useEffect(() => {
-  const load = async () => {
-    const res       = await axios.get(`/api/messages/${conversationId}`);
-    const full      = dedupeMessages(res.data);
-    setAllMessages(full);
+    useEffect(() => {
+        const load = async () => {
+            const res = await axios.get(`/api/messages/${conversationId}`);
+            const full = dedupeMessages(res.data);
+            setAllMessages(full);
 
-    // take last N for your scroll window (e.g. 40)
-    const start     = Math.max(0, full.length - 40);
-    setMessages(full.slice(start));
-  };
-  load();
-}, [conversationId]);
+            const start = Math.max(0, full.length - 40);
+            setMessages(full.slice(start));
+        };
+        load();
+    }, [conversationId]);
 
 
-const handleReadMessage = async () => {
-  if (!selectedMessage || selectedMessage.type !== "TEXT") return;
+    const handleReadMessage = async () => {
+        if (!selectedMessage || selectedMessage.type !== "TEXT") return;
 
-  try {
-    console.log("✉️ Sending TTS request for text:", selectedMessage.content);
-    const res = await axios.post("/api/messages/tts", {
-      text: selectedMessage.content,
-    });
-    console.log("✅ TTS response:", res.data);
+        try {
+            console.log("✉️ Sending TTS request for text:", selectedMessage.content);
+            const res = await axios.post("/api/messages/tts", {
+                text: selectedMessage.content,
+            });
+            console.log("✅ TTS response:", res.data);
 
-    const { url } = res.data;
-    console.log("▶️ Playing audio from:", url);
+            const { url } = res.data;
+            console.log("▶️ Playing audio from:", url);
 
-    // 1) Create a new Sound object
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: url },
-      { shouldPlay: true }  // auto-start playback
-    );
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: url },
+                { shouldPlay: true }
+            );
 
-    // 2) Optionally track when it’s done
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.didJustFinish) {
-        console.log("🔈 Finished playing TTS");
-        sound.unloadAsync();
-      }
-    });
+            sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.didJustFinish) {
+                    console.log("🔈 Finished playing TTS");
+                    sound.unloadAsync();
+                }
+            });
 
-  } catch (err) {
-    console.error("❌ TTS error:", err);
-    Alert.alert("Error", err.response?.data?.message || err.message);
-  } finally {
-    setModalVisible(false);
-  }
-};
+        } catch (err) {
+            console.error("❌ TTS error:", err);
+            Alert.alert("Error", err.response?.data?.message || err.message);
+        } finally {
+            setModalVisible(false);
+        }
+    };
 
 
     const handleChannelChange = (channelId) => {
@@ -1059,7 +1046,6 @@ const handleReadMessage = async () => {
         const fetchConversation = async () => {
             try {
                 const response = await axios.get(`/api/conversations/${conversationId}`);
-                console.log('Conversation Data:', response.data);
                 setConversation(response.data);
             } catch (error) {
                 Alert.alert("Error", "Unable to fetch conversation: " + (error.response?.data?.message || error.message));
@@ -1093,29 +1079,29 @@ const handleReadMessage = async () => {
             fetchChannels();
         }
     }, [conversation, conversationId]);
-const fetchAllMessages = async (channelId = null) => {
-  if (!conversationId) return;
-  try {
-    let endpoint = channelId
-      ? `/api/messages/channel/${channelId}`
-      : `/api/messages/${conversationId}`;
-    const { data } = await axios.get(endpoint, { timeout: 30000 });
-    const full = dedupeMessages(data);
+    const fetchAllMessages = async (channelId = null) => {
+        if (!conversationId) return;
+        try {
+            let endpoint = channelId
+                ? `/api/messages/channel/${channelId}`
+                : `/api/messages/${conversationId}`;
+            const { data } = await axios.get(endpoint, { timeout: 30000 });
+            const full = dedupeMessages(data);
 
-    const withReplies = full.map(msg => ({
-      ...msg,
-      replyToMessage: msg.replyMessageId
-        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
-        : undefined,
-    }));
+            const withReplies = full.map(msg => ({
+                ...msg,
+                replyToMessage: msg.replyMessageId
+                    ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+                    : undefined,
+            }));
 
-    setAllMessages(withReplies);
-    setMessages(withReplies.slice(-40));
-  } catch (error) {
-    console.error("Error fetching messages:", error);
-    Alert.alert("Error fetching messages", error.response?.data?.message || error.message);
-  }
-};
+            setAllMessages(withReplies);
+            setMessages(withReplies.slice(-40));
+        } catch (error) {
+            console.error("Error fetching messages:", error);
+            Alert.alert("Error fetching messages", error.response?.data?.message || error.message);
+        }
+    };
 
 
     useEffect(() => {
@@ -1131,24 +1117,24 @@ const fetchAllMessages = async (channelId = null) => {
         setSelectedMessage(message);
         setModalVisible(true);
     }, []);
-useEffect(() => {
-  const load = async () => {
-    const res = await axios.get(`/api/messages/${conversationId}`);
-    const full = dedupeMessages(res.data);
+    useEffect(() => {
+        const load = async () => {
+            const res = await axios.get(`/api/messages/${conversationId}`);
+            const full = dedupeMessages(res.data);
 
-    // Attach replyToMessage for reply preview
-    const withReplies = full.map(msg => ({
-      ...msg,
-      replyToMessage: msg.replyMessageId
-        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
-        : undefined,
-    }));
+            // Attach replyToMessage for reply preview
+            const withReplies = full.map(msg => ({
+                ...msg,
+                replyToMessage: msg.replyMessageId
+                    ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+                    : undefined,
+            }));
 
-    setAllMessages(withReplies);
-    setMessages(withReplies.slice(-40)); // or adjust window as you like
-  };
-  load();
-}, [conversationId]);
+            setAllMessages(withReplies);
+            setMessages(withReplies.slice(-40)); // or adjust window as you like
+        };
+        load();
+    }, [conversationId]);
 
     const handleRecallAction = () => {
         if (!selectedMessage) return;
@@ -1283,6 +1269,8 @@ useEffect(() => {
         try {
             const memberResponse = await axios.get(`/api/members/${conversationId}/${userId}`);
 
+            console.log(`LOG ACTIVE`, memberResponse.data.active);
+            setIsRemoved(memberResponse.data.active);
             const memberId = memberResponse.data.data?._id;
 
             await axios.delete(`/api/pin-messages/${messageId?._id}/${memberId}`);
@@ -1822,11 +1810,13 @@ useEffect(() => {
                     type: mimeType,
                 });
 
-                await axios.post('/api/messages/file', formData, {
+                const newMsg = await axios.post('/api/messages/file', formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data',
                     },
-                });
+                    timeout: 3000,
+                }
+                );
 
             }
         } catch (error) {
@@ -1965,7 +1955,14 @@ useEffect(() => {
 
 
     const handleSendMessage = async (message, members) => {
+        if (isRemoved) {
+            Alert.alert("Lỗi", "Bạn không còn trong nhóm này");
+            return;
+        }
         if (!message.trim()) return;
+
+
+
         if (!userId) {
             Alert.alert("User not loaded", "Unable to send message without a valid user.");
             return;
@@ -1985,17 +1982,17 @@ useEffect(() => {
                 createdAt: new Date().toISOString(),
                 pending: true,
                 replyTo: replyingMessage ? replyingMessage._id : undefined,
-                 replyToMessage: replyingMessage || undefined,
+                replyToMessage: replyingMessage || undefined,
             };
 
-    
-        if (replyingMessage) {
-            newMessage.replyTo = replyingMessage._id;
-            newMessage.replyToMessage = replyingMessage;
-            console.log("Set replyTo:", newMessage.replyTo);
-        }
 
-        console.log("newMessage after possible reply:", newMessage);
+            if (replyingMessage) {
+                newMessage.replyTo = replyingMessage._id;
+                newMessage.replyToMessage = replyingMessage;
+                console.log("Set replyTo:", newMessage.replyTo);
+            }
+
+            console.log("newMessage after possible reply:", newMessage);
 
             setMessages((prev) => [...prev, newMessage]);
             setReplyingMessage(null);
@@ -2025,7 +2022,7 @@ useEffect(() => {
                 conversationId: conversationId,
                 content: message,
                 channelId: currentChannelId,
-                 replyTo: replyingMessage ? replyingMessage._id : undefined,
+                replyTo: replyingMessage ? replyingMessage._id : undefined,
             });
         } catch (err) {
             Alert.alert("Cannot send message", err.response?.data?.message || err.message);
@@ -2272,7 +2269,7 @@ useEffect(() => {
                             <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
                                 <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
                             </TouchableOpacity>
-                               <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
+                            <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
                                 <Text style={styles.modalButtonText}>Đọc tin nhắn</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
