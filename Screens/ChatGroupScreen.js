@@ -171,10 +171,14 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     }
 
 
-    const lastDotIndex = msg.content.lastIndexOf('.');
-    const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
+
     useEffect(() => {
-        if (ext !== 'm4a') return;  // chỉ chạy nếu ext là m4a
+        if (msg.type !== "FILE" || !msg.content) return;
+
+        const lastDotIndex = msg.content.lastIndexOf('.');
+
+        const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
+        if (ext !== 'm4a') return;
 
         let isMounted = true;
         let audioSound = null;
@@ -219,7 +223,6 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                 }
                 setIsPlaying(!isPlaying);
             } else {
-                // Nếu chưa load audio thì load trước
                 await loadAudio();
             }
         } catch (error) {
@@ -1697,20 +1700,25 @@ export default function ChatScreen({ route, navigation }) {
             formData.append('channelId', currentChannelId);
 
             try {
-                const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
+                const endpoint = selectedMedia.type === 'video'
+                    ? '/api/messages/video'
+                    : '/api/messages/images';
                 const response = await axios.post(endpoint, formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
+                    headers: { 'Content-Type': 'multipart/form-data' },
                     timeout: selectedMedia.type === 'video' ? 30000 : 20000,
                 });
 
-                const mediaUrl = response.data?.file?.url;
+                const content = selectedMedia.type === 'video'
+                    ? response.data.content
+                    : response.data[0]?.content;
+
+
+                console.log(`MEDIA URL`, content);
                 const newMsg = {
                     _id: String(Date.now()),
                     memberId: { userId: userId || "" },
                     type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
-                    content: mediaUrl,
+                    content: content,
                     createdAt: new Date().toISOString(),
                 };
 
