@@ -16,6 +16,7 @@ import {
     KeyboardAvoidingView
 } from "react-native";
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import Toast from "react-native-toast-message";
 
 
 
@@ -2059,8 +2060,11 @@ return {
         if (isRemoved) {
             socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
 
-            Alert.alert("Thông báo", "Bạn đã bị xóa khỏi nhóm");
-            navigation.goBack();
+            Toast.show({
+                 type: "info",
+             text1: "You are no longer member of this group",
+             });
+            navigation.navigate('GroupsScreen');
         }
     }, [isRemoved]);
 
