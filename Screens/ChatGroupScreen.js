@@ -53,7 +53,7 @@ const SendIcon = require("../icons/send.png");
 const Return = require("../icons/back.png");
 const MicIcon = require("../icons/mic.png");
 const addChannel = require("../icons/addChannel.png")
-
+const vote = require("../icons/ballot.png");
 
 
 
@@ -171,10 +171,14 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     }
 
 
-    const lastDotIndex = msg.content.lastIndexOf('.');
-    const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
+
     useEffect(() => {
-        if (ext !== 'm4a') return;  // chỉ chạy nếu ext là m4a
+        if (msg.type !== "FILE" || !msg.content) return;
+
+        const lastDotIndex = msg.content.lastIndexOf('.');
+
+        const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
+        if (ext !== 'm4a') return;
 
         let isMounted = true;
         let audioSound = null;
@@ -219,7 +223,6 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                 }
                 setIsPlaying(!isPlaying);
             } else {
-                // Nếu chưa load audio thì load trước
                 await loadAudio();
             }
         } catch (error) {
@@ -311,19 +314,19 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                         📌 Đã ghim
                     </Text>
                 )}
-               {msg.replyToMessage && (
-    <TouchableOpacity
-      style={messageItemStyles.replyContainer}
-      onPress={() => onReplyPress(msg.replyToId)}
-    >
-      <Text style={messageItemStyles.replyAuthor}>
-        {msg.replyToMessage.memberId.name}
-      </Text>
-      <Text numberOfLines={1} style={messageItemStyles.replySnippet}>
-        {msg.replyToMessage.content}
-      </Text>
-    </TouchableOpacity>
-  )}
+                {msg.replyToMessage && (
+                    <TouchableOpacity
+                        style={messageItemStyles.replyContainer}
+                        onPress={() => onReplyPress(msg.replyToId)}
+                    >
+                        <Text style={messageItemStyles.replyAuthor}>
+                            {msg.replyToMessage.memberId.name}
+                        </Text>
+                        <Text numberOfLines={1} style={messageItemStyles.replySnippet}>
+                            {msg.replyToMessage.content}
+                        </Text>
+                    </TouchableOpacity>
+                )}
 
                 {msg.type === "NOTIFY" ? (
                     <Text style={messageItemStyles.notifyText}>
@@ -710,25 +713,25 @@ const messageItemStyles = StyleSheet.create({
         paddingHorizontal: 2,
         overflow: 'hidden',
     },
-replyContainer: {
-    backgroundColor: '#e6e6fa',
-    padding: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#086DC0',
-    borderRadius: 6,
-    marginBottom: 4,
-  },
-  replyAuthor: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#086DC0',
-    marginBottom: 2,
-  },
-  replySnippet: {
-    fontSize: 13,
-    color: '#333',
-  },
-  
+    replyContainer: {
+        backgroundColor: '#e6e6fa',
+        padding: 8,
+        borderLeftWidth: 4,
+        borderLeftColor: '#086DC0',
+        borderRadius: 6,
+        marginBottom: 4,
+    },
+    replyAuthor: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#086DC0',
+        marginBottom: 2,
+    },
+    replySnippet: {
+        fontSize: 13,
+        color: '#333',
+    },
+
 
 });
 
@@ -878,7 +881,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
                 <TouchableOpacity style={messageInputStyles.iconButton} onPress={onEmojiPress}>
                     <Image source={EmojiIcon} style={messageInputStyles.icon} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={onVotePress}  ><Text>Vote</Text></TouchableOpacity>
+                <TouchableOpacity onPress={onVotePress} ><Image source={vote} style={messageInputStyles.icon} /></TouchableOpacity>
                 <TouchableOpacity onPress={onRecord}><Image source={MicIcon} style={messageInputStyles.icon} /></TouchableOpacity>
             </View>
             <TouchableOpacity style={messageInputStyles.sendButton} onPress={handleSend}>
@@ -976,39 +979,38 @@ export default function ChatScreen({ route, navigation }) {
     const [allMessages, setAllMessages] = useState([]);
 
     const [isRemoved, setIsRemoved] = useState(false);
-    
 
-useEffect(() => {
-  const load = async () => {
-    const res = await axios.get(`/api/messages/${conversationId}`);
-    const full = dedupeMessages(res.data);
 
-    // This mapping only honors `replyMessageId`, never your `replyTo` fallback:
-    const withReplies = full.map(msg => ({
-      ...msg,
-      replyToMessage: msg.replyMessageId
-        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
-        : undefined,
-    }));
+    useEffect(() => {
+        const load = async () => {
+            const res = await axios.get(`/api/messages/${conversationId}`);
+            const full = dedupeMessages(res.data);
 
-    setAllMessages(withReplies);
-    setMessages(withReplies.slice(-40));
-  };
-  load();
-}, [conversationId]);
+            const withReplies = full.map(msg => ({
+                ...msg,
+                replyToMessage: msg.replyMessageId
+                    ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+                    : undefined,
+            }));
+
+            setAllMessages(withReplies);
+            setMessages(withReplies.slice(-40));
+        };
+        load();
+    }, [conversationId]);
 
 
     const handleReadMessage = async () => {
         if (!selectedMessage || selectedMessage.type !== "TEXT") return;
 
-  try {
+        try {
 
-    const res = await axios.post("/api/messages/tts", {
-      text: selectedMessage.content,
-    });
+            const res = await axios.post("/api/messages/tts", {
+                text: selectedMessage.content,
+            });
 
 
-    const { url } = res.data;
+            const { url } = res.data;
 
             const { sound } = await Audio.Sound.createAsync(
                 { uri: url },
@@ -1100,43 +1102,43 @@ useEffect(() => {
             fetchChannels();
         }
     }, [conversation, conversationId]);
-const fetchAllMessages = async (channelId = null) => {
-  if (!conversationId) return;
-  try {
-     const endpoint = channelId
-    ? `/api/messages/channel/${channelId}`
-    : `/api/messages/${conversationId}`;
-  const { data } = await axios.get(endpoint);
-  const full = dedupeMessages(data);
+    const fetchAllMessages = async (channelId = null) => {
+        if (!conversationId) return;
+        try {
+            const endpoint = channelId
+                ? `/api/messages/channel/${channelId}`
+                : `/api/messages/${conversationId}`;
+            const { data } = await axios.get(endpoint);
+            const full = dedupeMessages(data);
 
 
-const withReplies = full.map(msg => {
-    // unify parent reference
-    let parentId =
-      msg.replyTo ||
-      (msg.replyMessageId && (typeof msg.replyMessageId === 'object'
-        ? msg.replyMessageId._id
-        : msg.replyMessageId)) ||
-      null;
+            const withReplies = full.map(msg => {
+                // unify parent reference
+                let parentId =
+                    msg.replyTo ||
+                    (msg.replyMessageId && (typeof msg.replyMessageId === 'object'
+                        ? msg.replyMessageId._id
+                        : msg.replyMessageId)) ||
+                    null;
 
 
-return {
-      ...msg,
-      replyToId: parentId,
-      replyToMessage: parentId
-        ? full.find(m => m._id === parentId)
-        : undefined,
+                return {
+                    ...msg,
+                    replyToId: parentId,
+                    replyToMessage: parentId
+                        ? full.find(m => m._id === parentId)
+                        : undefined,
+                };
+            });
+
+
+            setAllMessages(withReplies);
+            setMessages(withReplies.slice(-40));
+        } catch (error) {
+
+            Alert.alert("Error fetching messages", error.response?.data?.message || error.message);
+        }
     };
-});
-
-
-  setAllMessages(withReplies);
-  setMessages(withReplies.slice(-40));
-  } catch (error) {
-
-    Alert.alert("Error fetching messages", error.response?.data?.message || error.message);
-  }
-};
 
 
     useEffect(() => {
@@ -1304,8 +1306,11 @@ return {
         try {
             const memberResponse = await axios.get(`/api/members/${conversationId}/${userId}`);
 
-            console.log(`LOG ACTIVE`, memberResponse.data.active);
-            setIsRemoved(memberResponse.data.active);
+
+
+
+            // setIsRemoved(memberResponse.data.active);
+
             const memberId = memberResponse.data.data?._id;
 
             await axios.delete(`/api/pin-messages/${messageId?._id}/${memberId}`);
@@ -1366,7 +1371,6 @@ return {
             width: '60%',
             minHeight: 60,
             backgroundColor: 'white',
-            padding: 8,
             backgroundColor: "#D8EDFF",
 
         },
@@ -1442,8 +1446,6 @@ return {
                     <View style={headerStyles.infoContainer}>
                         <Text style={headerStyles.name}>{nameG}</Text>
                         <View style={headerStyles.statusContainer}>
-                            <View style={headerStyles.statusDot} />
-                            <Text style={headerStyles.statusText}>Active</Text>
                         </View>
                     </View>
 
@@ -1496,8 +1498,8 @@ return {
                         </TouchableOpacity>
                     )}
                 </View>
-                <TouchableOpacity style={[{ width: '100%', color: "black", display: 'flex' }]}>
-                    <PinnedMessagesSection pinnedMessages={lastMessage} style={{ backgroundColor: 'black' }} />
+                <TouchableOpacity style={[{ width: '100%', color: "black", display: 'flex', padding: 0, margin: 0 }]}>
+                    <PinnedMessagesSection pinnedMessages={lastMessage} />
                 </TouchableOpacity>
 
             </View>
@@ -1515,6 +1517,7 @@ return {
             height: 'auto'
         },
         headerContent: {
+            paddingTop: 10,
             flexDirection: 'row',
             alignItems: 'center',
             marginBottom: 10,
@@ -1531,9 +1534,9 @@ return {
             height: '80%',
             resizeMode: 'contain',
         },
-        avatar: { width: 55, height: 55, borderRadius: 35 },
-        infoContainer: { marginLeft: 12, flex: 1 },
-        name: { fontSize: 22, fontWeight: "600", color: "#086DC0" },
+        avatar: { width: 45, height: 45, borderRadius: 35 },
+        infoContainer: { marginLeft: 12, flex: 1, width: 300 },
+        name: { fontSize: 15, fontWeight: "600", color: "#086DC0" },
         statusContainer: {
             flexDirection: "row",
             alignItems: "center",
@@ -1569,7 +1572,7 @@ return {
 
         iconsContainer: { flexDirection: "row" },
         iconButton: { padding: 8, marginLeft: 8 },
-        icon: { width: 24, height: 24, resizeMode: "contain" },
+        icon: { width: 15, height: 15, resizeMode: "contain" },
     });
 
 
@@ -1697,20 +1700,25 @@ return {
             formData.append('channelId', currentChannelId);
 
             try {
-                const endpoint = selectedMedia.type === 'video' ? '/api/messages/video' : '/api/messages/images';
+                const endpoint = selectedMedia.type === 'video'
+                    ? '/api/messages/video'
+                    : '/api/messages/images';
                 const response = await axios.post(endpoint, formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
+                    headers: { 'Content-Type': 'multipart/form-data' },
                     timeout: selectedMedia.type === 'video' ? 30000 : 20000,
                 });
 
-                const mediaUrl = response.data?.file?.url;
+                const content = selectedMedia.type === 'video'
+                    ? response.data.content
+                    : response.data[0]?.content;
+
+
+                console.log(`MEDIA URL`, content);
                 const newMsg = {
                     _id: String(Date.now()),
                     memberId: { userId: userId || "" },
                     type: selectedMedia.type === 'video' ? "VIDEO" : "IMAGE",
-                    content: mediaUrl,
+                    content: content,
                     createdAt: new Date().toISOString(),
                 };
 
@@ -1845,9 +1853,21 @@ return {
                     headers: {
                         'Content-Type': 'multipart/form-data',
                     },
-                    timeout: 3000,
+                    timeout: 8000,
                 }
                 );
+                const newMsg1 = {
+                    _id: String(Date.now()),
+                    memberId: { userId: userId || "" },
+                    type: 'FILE',
+                    content: fileName,
+                    fileName: fileName,
+                    createdAt: new Date().toISOString(),
+                };
+
+
+                setMessages((prev) => [...prev, newMsg1]);
+
 
             }
         } catch (error) {
@@ -1983,7 +2003,7 @@ return {
 
 
     const handleSendMessage = async (message, members) => {
-        if (isRemoved) {
+        if (!isRemoved) {
             Alert.alert("Lỗi", "Bạn không còn trong nhóm này");
             return;
         }
@@ -2013,12 +2033,12 @@ return {
                 replyToMessage: replyingMessage || undefined,
             };
 
-    
-        if (replyingMessage) {
-            newMessage.replyTo = replyingMessage._id;
-            newMessage.replyToMessage = replyingMessage;
 
-        }
+            if (replyingMessage) {
+                newMessage.replyTo = replyingMessage._id;
+                newMessage.replyToMessage = replyingMessage;
+
+            }
 
 
             setMessages((prev) => [...prev, newMessage]);
@@ -2056,23 +2076,20 @@ return {
         }
     };
 
-    useEffect(() => {
-        if (isRemoved) {
-            socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+    // useEffect(() => {
+    //     if (isRemoved) {
+    //         socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
 
-            Toast.show({
-                 type: "info",
-             text1: "You are no longer member of this group",
-             });
-            navigation.navigate('GroupsScreen');
-        }
-    }, [isRemoved]);
+    //         Alert.alert("Thông báo", "Bạn đã bị xóa khỏi nhóm");
+    //         navigation.goBack();
+    //     }
+    // }, [isRemoved]);
 
     useEffect(() => {
-        if (!socket || !conversationId || isRemoved) return;
+        if (!socket || !conversationId || !isRemoved) return;
 
         const receiveHandler = (message) => {
-            if (isRemoved) return;
+            if (!isRemoved) return;
             setMessages(prev => {
                 if (message.memberId?.userId === userId) {
                     return prev.map(m =>
@@ -2130,6 +2147,8 @@ return {
                 try {
                     const res = await axios.get(`/api/members/${conversationId}/${userId}`);
                     const member = res.data.data;
+
+                    setIsRemoved(res.data.data.active);
                     setMemberId(member._id);
                 } catch (err) {
                     console.error("Lỗi lấy memberId:", err);
@@ -2140,12 +2159,9 @@ return {
         fetchMemberId();
     }, [conversationId, userId]);
 
-
-
     const openCreateChannel = () => {
         setShowAddChannel(true);
     };
-
     const handleCreateChannel = async (newChannelName) => {
         await fetchChannels();
     };
@@ -2178,7 +2194,7 @@ return {
     useEffect(() => {
         const handleRemoveEvent = (data) => {
             if (data.memberId === memberId) {
-                setIsRemoved(true);
+                setIsRemoved(false);
                 socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
             }
         };
@@ -2189,6 +2205,17 @@ return {
             socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleRemoveEvent);
         };
     }, [memberId, conversationId]);
+
+
+    useEffect(() => {
+        const handleAddGroup = () => {
+            setIsRemoved(true);
+        };
+        socket.on(SOCKET_EVENTS.MEMBER_ADDED, handleAddGroup);
+        return () => {
+            socket.off(SOCKET_EVENTS.MEMBER_ADDED, handleAddGroup);
+        };
+    }, [socket]);
 
 
 
@@ -2222,22 +2249,22 @@ return {
                     />
                 </View>
                 {replyingMessage && (
-                <View style={styles.replyPreview}>
-                    <View style={styles.replyLeftAccent}/>
-                    <View style={styles.replyContent}>
-                    <Text style={styles.replyTitle}>
-                        Trả lời {replyingMessage.memberId.name}
-                    </Text>
-                    <Text style={styles.replySnippet} numberOfLines={1} ellipsizeMode="tail">
-                        {replyingMessage.content}
-                    </Text>
+                    <View style={styles.replyPreview}>
+                        <View style={styles.replyLeftAccent} />
+                        <View style={styles.replyContent}>
+                            <Text style={styles.replyTitle}>
+                                Trả lời {replyingMessage.memberId.name}
+                            </Text>
+                            <Text style={styles.replySnippet} numberOfLines={1} ellipsizeMode="tail">
+                                {replyingMessage.content}
+                            </Text>
+                        </View>
+                        <TouchableOpacity onPress={() => setReplyingMessage(null)}>
+                            <Text style={styles.replyCloseText}>×</Text>
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => setReplyingMessage(null)}>
-                    <Text style={styles.replyCloseText}>×</Text>
-                    </TouchableOpacity>
-                </View>
                 )}
-                {!isRemoved && (
+                {isRemoved && (
                     <MessageInput
                         input={input}
                         setInput={setInput}
@@ -2435,40 +2462,40 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: "#086DC0",
     },
-     replyPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f2f2f2',
-    padding: 8,
-    marginHorizontal: 8,
-    marginVertical: 4,
-    borderRadius: 8,
-  },
-  replyLeftAccent: {
-    width: 4,
-    height: '100%',
-    backgroundColor: '#086DC0',
-    marginRight: 8,
-    borderRadius: 2,
-  },
-  replyContent: {
-    flex: 1,
-  },
-  replyTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#086DC0',
-    marginBottom: 2,
-  },
-  replySnippet: {
-    fontSize: 14,
-    color: '#333',
-  },
-  replyCloseText: {
-    fontSize: 16,
-    color: '#999',
-    marginLeft: 8,
-  },
+    replyPreview: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f2f2f2',
+        padding: 8,
+        marginHorizontal: 8,
+        marginVertical: 4,
+        borderRadius: 8,
+    },
+    replyLeftAccent: {
+        width: 4,
+        height: '100%',
+        backgroundColor: '#086DC0',
+        marginRight: 8,
+        borderRadius: 2,
+    },
+    replyContent: {
+        flex: 1,
+    },
+    replyTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#086DC0',
+        marginBottom: 2,
+    },
+    replySnippet: {
+        fontSize: 14,
+        color: '#333',
+    },
+    replyCloseText: {
+        fontSize: 16,
+        color: '#999',
+        marginLeft: 8,
+    },
 
     reactModalContainer: {
         backgroundColor: "#fff",
