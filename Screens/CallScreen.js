@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, BackHandler, Platform } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, BackHandler } from "react-native";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "../api/apiConfig";
 import Toast from "react-native-toast-message";
 import { createMeetingToken } from "../api/createMeetingToken";
-import { PermissionsAndroid } from "react-native";
+import { Camera } from "expo-camera"; // ✅ Dùng expo-camera thay PermissionsAndroid
 
 const CREATE_ROOM_URL = "/api/daily/create-room";
 const LEAVE_ROOM_URL = "/api/daily/leave-room";
@@ -15,12 +15,29 @@ export default function DailyVideoCallScreen({ navigation, route }) {
   const [roomUrl, setRoomUrl] = useState(null);
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(true);
+  const [leaving, setLeaving] = useState(false);
   const webviewRef = useRef(null);
 
   const { conversationId, channelId } = route.params;
 
+  // ✅ Hàm request quyền cho cả iOS & Android
+  const requestPermissions = async () => {
+    const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+    const { status: audioStatus } = await Camera.requestMicrophonePermissionsAsync();
+
+    // console.log("Camera:", cameraStatus, "Microphone:", audioStatus);
+    if (cameraStatus !== "granted" || audioStatus !== "granted") {
+      Alert.alert(
+        "Quyền bị từ chối",
+        "App cần quyền Camera và Microphone để thực hiện cuộc gọi."
+      );
+    }
+  };
+
   const leaveCall = useCallback(async () => {
-    // Rời call trên WebView trước
+    if (leaving) return; // chặn spam
+    setLeaving(true);
+
     if (webviewRef.current) {
       webviewRef.current.injectJavaScript(`
         if(window.leaveCall) {
@@ -30,7 +47,6 @@ export default function DailyVideoCallScreen({ navigation, route }) {
       `);
     }
 
-    // Gọi API để xoá dữ liệu call
     try {
       const userToken = await AsyncStorage.getItem("userToken");
       await axios.post(
@@ -42,17 +58,18 @@ export default function DailyVideoCallScreen({ navigation, route }) {
           },
         }
       );
-      console.log("Đã rời call & clear dữ liệu trên server.");
+      // console.log("✅ Đã rời call & clear dữ liệu trên server.");
     } catch (err) {
-      console.error("Lỗi khi gọi API leave-room:", err);
+      // console.error("❌ Lỗi khi gọi API leave-room:", err);
       Toast.show({
         type: "error",
         text1: "Fail to leave call",
       });
+    } finally {
+      setLeaving(false);
+      navigation.goBack();
     }
-
-    navigation.goBack();
-  }, [navigation]);
+  }, [navigation, leaving]);
 
   useEffect(() => {
     const onBackPress = () => {
@@ -66,13 +83,8 @@ export default function DailyVideoCallScreen({ navigation, route }) {
   useEffect(() => {
     (async () => {
       try {
-        // Yêu cầu quyền Android (nếu cần)
-        if (Platform.OS === "android") {
-          await PermissionsAndroid.requestMultiple([
-            PermissionsAndroid.PERMISSIONS.CAMERA,
-            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          ]);
-        }
+        // ✅ Gọi requestPermissions trước
+        await requestPermissions();
 
         // Lấy user name
         const userJson = await AsyncStorage.getItem("userInfo");
@@ -80,7 +92,6 @@ export default function DailyVideoCallScreen({ navigation, route }) {
         const name = user.name || "Guest";
         setUserName(name);
 
-        // Tạo room
         const conversationRoomId = conversationId + channelId;
         const userToken = await AsyncStorage.getItem("userToken");
 
@@ -104,23 +115,23 @@ export default function DailyVideoCallScreen({ navigation, route }) {
         setRoomUrl(url);
         setToken(newToken);
       } catch (err) {
-        console.error("Lỗi khi tạo room:", err);
+        // console.error("❌ Lỗi khi tạo room:", err);
         Toast.show({
           type: "error",
           text1: "Fail to call",
         });
-        navigation.navigate("ConversationScreen");
+        setTimeout(() => navigation.navigate("ConversationScreen"), 1500);
       } finally {
         setLoading(false);
       }
     })();
   }, [conversationId, channelId, navigation]);
 
-  // Loading UI
   if (loading || !roomUrl || !token) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator color="#086DC0" size="large" />
+        <Text style={{ marginTop: 10, color: "#086DC0" }}>Đang kết nối tới phòng họp…</Text>
       </View>
     );
   }
@@ -144,10 +155,8 @@ export default function DailyVideoCallScreen({ navigation, route }) {
         domStorageEnabled
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
-        onPermissionRequest={({ nativeEvent }) => {
-          nativeEvent.grant(nativeEvent.resources);
-        }}
         originWhitelist={["*"]}
+        androidHardwareAccelerationDisabled={false}
       />
     </View>
   );
