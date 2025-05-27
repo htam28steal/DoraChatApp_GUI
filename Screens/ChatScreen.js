@@ -1412,25 +1412,16 @@ const sendRecording = async () => {
 
 
 
-  const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
-    if (convId !== conversationId) return;
-    // update pinnedMessages list
-    setPinnedMessages(prev => [...prev, { messageId }]);
-    // mark that message is pinned in your message list
-setMessages(prev => {
-  // If optimistic message still exists, replace it.
-  const found = prev.some(m => m._id === tempId);
-  if (found) {
-    return prev.map(m => (m._id === tempId ? { ...responseData, pending: false } : m));
-  }
-  // If not, only add if not already present.
-  if (!prev.some(m => m._id === responseData._id)) {
-    return [...prev, { ...responseData, pending: false }];
-  }
-  return prev;
-});
+const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
+  if (convId !== conversationId) return;
+  setPinnedMessages(prev => [...prev, { messageId }]);
+  setMessages(prev =>
+    prev.map(m =>
+      m._id === messageId ? { ...m, isPinned: true } : m
+    )
+  );
+}, [conversationId]);
 
-  }, [conversationId]); 
 
     const handleUnpinSocket = useCallback(({ conversationId: convId, messageId }) => {
     if (convId !== conversationId) return;
