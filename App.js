@@ -175,7 +175,7 @@ export default function App() {
     <Provider store={store}>
       <AppContainer />
 
-      <Toast />
+      <Toast visibilityTime={5000} />
     </Provider>
   );
 }

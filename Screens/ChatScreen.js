@@ -1229,6 +1229,9 @@ const [allMessages, setAllMessages] = useState([]);
 const [pagination, setPagination] = useState({ skip: 0, limit: 20 });
 const [hasMore, setHasMore] = useState(true);
 
+
+
+
 useEffect(() => {
 if(recordingModal){
   setSendAudioBtn(false)
@@ -1605,30 +1608,6 @@ const loadMoreMessages = async () => {
         '👎': 5,
         '😮': 6,
     };
-const handleGetMember = async (memberId) => {
-  console.log("🔍 currentUser:", currentUser?._id, "otherUser:", otherUser?._id, "looking for:", memberId);
-
-  // 1) If it’s you
-  if (currentUser && currentUser._id === memberId) {
-    return { name: currentUser.name, avatar: currentUser.avatar };
-  }
-
-  // 2) If it’s the other chat partner
-  if (otherUser && otherUser._id === memberId) {
-    return { name: otherUser.name, avatar: otherUser.avatar };
-  }
-
-  // 3) Fallback: fetch any other user by their Mongo _id
-  try {
-    const data = await UserService.getUserById(memberId);
-    console.log("✅ Fetched fallback user:", data);
-    return { name: data.name, avatar: data.avatar };
-  } catch (err) {
-    console.error("❌ Failed to fetch fallback user:", err);
-    return { name: "Unknown", avatar: null };
-  }
-};
-
 
 
 
