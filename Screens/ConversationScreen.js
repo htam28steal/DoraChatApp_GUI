@@ -546,7 +546,7 @@ useEffect(() => {
       ) : (
         <FlatList
           contentContainerStyle={styles.list}
-          data={filteredConversations}
+          data={filteredConversations.filter(c => c && c._id)}
           keyExtractor={item => item._id.toString()}
           renderItem={renderItem}
         />
@@ -806,7 +806,8 @@ useEffect(() => {
                   displayName = item.name; // group
                 } else {
                   // single chat
-                  const other = item.members.find(m => m.userId !== userId) || {};
+                  const other = Array.isArray(conv.members) ? conv.members.find(m => m.userId !== userId) : {};
+
                   displayName = friendsById[other.userId]?.name || other.name || 'Unknown';
                 }
                 return (

@@ -893,53 +893,132 @@ function ChatBox({
   allMessages, 
   scrollToMessageId,
     onInvitePress, 
+    initialJumpId
 }) {
 
-
+ const [jumpId, setJumpId] = useState(initialJumpId);
  const lastIdRef = useRef(messages[messages.length - 1]?._id);
 const prevLengthRef = useRef(0);
   const scrollViewRef = useRef(null);
   const messageRefs    = useRef({});
 
-// helper to jump:
-const scrollToMessage = useCallback((messageId) => {
-  const item = messageRefs.current[messageId];
-  if (!item || !scrollViewRef.current) return;
 
-  if (item.measureLayout) {
-    item.measureLayout(
-      scrollViewRef.current, 
-      (x, y) => scrollViewRef.current.scrollTo({ y: y - 20, animated: true }),
-      () => {}
-    );
+useEffect(() => {
+  if (!scrollToMessageId) return;
+
+  // Check if message is currently in the list
+  const targetMsg = messages.find(m => m._id === scrollToMessageId);
+
+  if (targetMsg) {
+    // Wait 4 seconds, then scroll
+    const timer = setTimeout(() => {
+      scrollToMessage(scrollToMessageId);
+      // Call a callback or setScrollToMessageId(null) in parent if needed
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }
+  // If not found, try to load more messages, and re-run effect
+  loadMoreMessages();
+}, [scrollToMessageId, messages]);
+
+
+
+useEffect(() => {
+  if (!scrollToMessageId) return;
+
+  const targetMsg = messages.find(m => m._id === scrollToMessageId);
+
+  if (targetMsg) {
+    const timer = setTimeout(() => {
+      scrollToMessage(scrollToMessageId);
+      // Clear in parent or locally:
+      // setScrollToMessageId(null);
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }
+  loadMoreMessages();
+}, [scrollToMessageId, messages]);
+
+
+    useEffect(() => {
+    if (jumpId) {
+      scrollToMessage(jumpId);
+      setJumpId(null);
+    }
+  }, [jumpId]);
+
+const scrollToMessage = useCallback((messageId, attempt = 0) => {
+  const item = messageRefs.current[messageId];
+  if (item && scrollViewRef.current) {
+    if (item.measureLayout) {
+      item.measureLayout(
+        scrollViewRef.current,
+        (x, y) => scrollViewRef.current.scrollTo({ y: y - 20, animated: true }),
+        () => {}
+      );
+    }
+  } else if (attempt < 5) {
+    // If not found, try loading more and retry after a delay
+    loadMoreMessages(); // This should load older messages
+    setTimeout(() => scrollToMessage(messageId, attempt + 1), 300);
   } else {
-    console.warn("Ref missing measureLayout for messageId:", messageId);
+    console.warn("Could not find message for scroll:", messageId);
   }
 }, []);
 
 
-   useEffect(() => {
-    if (scrollToMessageId && messages.length) {
-      // give the list a frame to render
-      setTimeout(() => scrollToMessage(scrollToMessageId), 50);
-    }
-  }, [scrollToMessageId, messages]);
-  
   useEffect(() => {
-  const newLastId = messages[messages.length - 1]?._id;
+    if (jumpId) return;           // ←—— guard!
 
-  // scroll only when a brand-new message is at the bottom
-  if (newLastId && newLastId !== lastIdRef.current) {
+    const newLastId = messages[messages.length - 1]?._id;
+    const prevLastId = lastIdRef.current;
+    const prevLength = prevLengthRef.current;
+
+    if (
+      messages.length > prevLength &&
+      newLastId &&
+      newLastId !== prevLastId
+    ) {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }
+
+    lastIdRef.current = newLastId;
+    prevLengthRef.current = messages.length;
+  }, [messages, jumpId]);
+
+  
+const prevMessagesLength = useRef(messages.length);
+
+useEffect(() => {
+  const newLastId = messages[messages.length - 1]?._id;
+  const prevLastId = lastIdRef.current;
+  const prevLength = prevMessagesLength.current;
+
+  // Only scroll if a new message is added at the end
+  if (
+    messages.length > prevLength &&
+    newLastId &&
+    newLastId !== prevLastId
+  ) {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }
 
   lastIdRef.current = newLastId;
-  }, [messages]);
-    const ids = messages.map(m => m._id);
-  const idSet = new Set(ids);
-  if (idSet.size !== ids.length) {
-    console.warn("Duplicate message ids in chat!", ids);
+  prevMessagesLength.current = messages.length;
+}, [messages]);
+useEffect(() => {
+  if (scrollToMessageId && messages.length) {
+    const timer = setTimeout(() => {
+      scrollToMessage(scrollToMessageId);
+    }, 2000); 
+
+    // Cleanup in case the component unmounts or scrollToMessageId/messages change
+    return () => clearTimeout(timer);
   }
+}, [scrollToMessageId, messages]);
+
 
 
   return (
@@ -1004,10 +1083,8 @@ onLongPress={() => onMessageLongPress(msg)}
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100); // slight delay to allow layout to recalculate
-  }}
-          
+  }}          
         />
-
         );
       })}
     </ScrollView>
@@ -1128,12 +1205,6 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser
         </View>
       </View>
       <View style={headerStyles.iconsContainer}>
-        <TouchableOpacity style={headerStyles.iconButton} onPress={()=>navigation.navigate('CallScreen',{conversationId})}>
-          <Image source={CallIcon} style={headerStyles.icon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={headerStyles.iconButton}>
-          <Image source={VideoCallIcon} style={headerStyles.icon} />
-        </TouchableOpacity>
         <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('DetailScreen', { conversationId, friendId: other.userId })}>
           <Image source={DetailChatIcon} style={headerStyles.icon} />
         </TouchableOpacity>
@@ -1412,25 +1483,16 @@ const sendRecording = async () => {
 
 
 
-  const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
-    if (convId !== conversationId) return;
-    // update pinnedMessages list
-    setPinnedMessages(prev => [...prev, { messageId }]);
-    // mark that message is pinned in your message list
-setMessages(prev => {
-  // If optimistic message still exists, replace it.
-  const found = prev.some(m => m._id === tempId);
-  if (found) {
-    return prev.map(m => (m._id === tempId ? { ...responseData, pending: false } : m));
-  }
-  // If not, only add if not already present.
-  if (!prev.some(m => m._id === responseData._id)) {
-    return [...prev, { ...responseData, pending: false }];
-  }
-  return prev;
-});
+const handlePinSocket = useCallback(({ conversationId: convId, messageId }) => {
+  if (convId !== conversationId) return;
+  setPinnedMessages(prev => [...prev, { messageId }]);
+  setMessages(prev =>
+    prev.map(m =>
+      m._id === messageId ? { ...m, isPinned: true } : m
+    )
+  );
+}, [conversationId]);
 
-  }, [conversationId]); 
 
     const handleUnpinSocket = useCallback(({ conversationId: convId, messageId }) => {
     if (convId !== conversationId) return;
