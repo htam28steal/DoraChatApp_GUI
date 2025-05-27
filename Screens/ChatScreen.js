@@ -893,53 +893,102 @@ function ChatBox({
   allMessages, 
   scrollToMessageId,
     onInvitePress, 
+    initialJumpId
 }) {
 
-
+ const [jumpId, setJumpId] = useState(initialJumpId);
  const lastIdRef = useRef(messages[messages.length - 1]?._id);
 const prevLengthRef = useRef(0);
   const scrollViewRef = useRef(null);
   const messageRefs    = useRef({});
 
-// helper to jump:
-const scrollToMessage = useCallback((messageId) => {
-  const item = messageRefs.current[messageId];
-  if (!item || !scrollViewRef.current) return;
 
-  if (item.measureLayout) {
-    item.measureLayout(
-      scrollViewRef.current, 
-      (x, y) => scrollViewRef.current.scrollTo({ y: y - 20, animated: true }),
-      () => {}
-    );
+    useEffect(() => {
+    if (jumpId) {
+      scrollToMessage(jumpId);
+      setJumpId(null);
+    }
+  }, [jumpId]);
+
+const scrollToMessage = useCallback((messageId, attempt = 0) => {
+  const item = messageRefs.current[messageId];
+  if (item && scrollViewRef.current) {
+    if (item.measureLayout) {
+      item.measureLayout(
+        scrollViewRef.current,
+        (x, y) => scrollViewRef.current.scrollTo({ y: y - 20, animated: true }),
+        () => {}
+      );
+    }
+  } else if (attempt < 5) {
+    // If not found, try loading more and retry after a delay
+    loadMoreMessages(); // This should load older messages
+    setTimeout(() => scrollToMessage(messageId, attempt + 1), 300);
   } else {
-    console.warn("Ref missing measureLayout for messageId:", messageId);
+    console.warn("Could not find message for scroll:", messageId);
   }
 }, []);
+const handleJumpToPinned = (messageId) => {
+  // If not in messages, load more first (recursively).
+  if (!messages.some(msg => msg._id === messageId)) {
+    loadMoreMessages();
+    setTimeout(() => handleJumpToPinned(messageId), 200); // Try again
+  } else {
+    setScrollToMessageId(messageId);
+  }
+};
 
 
-   useEffect(() => {
-    if (scrollToMessageId && messages.length) {
-      // give the list a frame to render
-      setTimeout(() => scrollToMessage(scrollToMessageId), 50);
-    }
-  }, [scrollToMessageId, messages]);
-  
   useEffect(() => {
-  const newLastId = messages[messages.length - 1]?._id;
+    if (jumpId) return;           // ←—— guard!
 
-  // scroll only when a brand-new message is at the bottom
-  if (newLastId && newLastId !== lastIdRef.current) {
+    const newLastId = messages[messages.length - 1]?._id;
+    const prevLastId = lastIdRef.current;
+    const prevLength = prevLengthRef.current;
+
+    if (
+      messages.length > prevLength &&
+      newLastId &&
+      newLastId !== prevLastId
+    ) {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }
+
+    lastIdRef.current = newLastId;
+    prevLengthRef.current = messages.length;
+  }, [messages, jumpId]);
+
+  
+const prevMessagesLength = useRef(messages.length);
+
+useEffect(() => {
+  const newLastId = messages[messages.length - 1]?._id;
+  const prevLastId = lastIdRef.current;
+  const prevLength = prevMessagesLength.current;
+
+  // Only scroll if a new message is added at the end
+  if (
+    messages.length > prevLength &&
+    newLastId &&
+    newLastId !== prevLastId
+  ) {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }
 
   lastIdRef.current = newLastId;
-  }, [messages]);
-    const ids = messages.map(m => m._id);
-  const idSet = new Set(ids);
-  if (idSet.size !== ids.length) {
-    console.warn("Duplicate message ids in chat!", ids);
+  prevMessagesLength.current = messages.length;
+}, [messages]);
+useEffect(() => {
+  if (scrollToMessageId && messages.length) {
+    const timer = setTimeout(() => {
+      scrollToMessage(scrollToMessageId);
+    }, 1000); 
+
+    // Cleanup in case the component unmounts or scrollToMessageId/messages change
+    return () => clearTimeout(timer);
   }
+}, [scrollToMessageId, messages]);
+
 
 
   return (
@@ -1004,10 +1053,8 @@ onLongPress={() => onMessageLongPress(msg)}
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100); // slight delay to allow layout to recalculate
-  }}
-          
+  }}          
         />
-
         );
       })}
     </ScrollView>
