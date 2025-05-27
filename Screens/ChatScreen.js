@@ -903,6 +903,45 @@ const prevLengthRef = useRef(0);
   const messageRefs    = useRef({});
 
 
+useEffect(() => {
+  if (!scrollToMessageId) return;
+
+  // Check if message is currently in the list
+  const targetMsg = messages.find(m => m._id === scrollToMessageId);
+
+  if (targetMsg) {
+    // Wait 4 seconds, then scroll
+    const timer = setTimeout(() => {
+      scrollToMessage(scrollToMessageId);
+      // Call a callback or setScrollToMessageId(null) in parent if needed
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }
+  // If not found, try to load more messages, and re-run effect
+  loadMoreMessages();
+}, [scrollToMessageId, messages]);
+
+
+
+useEffect(() => {
+  if (!scrollToMessageId) return;
+
+  const targetMsg = messages.find(m => m._id === scrollToMessageId);
+
+  if (targetMsg) {
+    const timer = setTimeout(() => {
+      scrollToMessage(scrollToMessageId);
+      // Clear in parent or locally:
+      // setScrollToMessageId(null);
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }
+  loadMoreMessages();
+}, [scrollToMessageId, messages]);
+
+
     useEffect(() => {
     if (jumpId) {
       scrollToMessage(jumpId);
@@ -928,15 +967,6 @@ const scrollToMessage = useCallback((messageId, attempt = 0) => {
     console.warn("Could not find message for scroll:", messageId);
   }
 }, []);
-const handleJumpToPinned = (messageId) => {
-  // If not in messages, load more first (recursively).
-  if (!messages.some(msg => msg._id === messageId)) {
-    loadMoreMessages();
-    setTimeout(() => handleJumpToPinned(messageId), 200); // Try again
-  } else {
-    setScrollToMessageId(messageId);
-  }
-};
 
 
   useEffect(() => {
@@ -982,7 +1012,7 @@ useEffect(() => {
   if (scrollToMessageId && messages.length) {
     const timer = setTimeout(() => {
       scrollToMessage(scrollToMessageId);
-    }, 1000); 
+    }, 2000); 
 
     // Cleanup in case the component unmounts or scrollToMessageId/messages change
     return () => clearTimeout(timer);
@@ -1175,12 +1205,6 @@ function HeaderSingleChat({ conversationId, conversation,currentUserId,otherUser
         </View>
       </View>
       <View style={headerStyles.iconsContainer}>
-        <TouchableOpacity style={headerStyles.iconButton} onPress={()=>navigation.navigate('CallScreen',{conversationId})}>
-          <Image source={CallIcon} style={headerStyles.icon} />
-        </TouchableOpacity>
-        <TouchableOpacity style={headerStyles.iconButton}>
-          <Image source={VideoCallIcon} style={headerStyles.icon} />
-        </TouchableOpacity>
         <TouchableOpacity style={headerStyles.iconButton} onPress={() => navigation.navigate('DetailScreen', { conversationId, friendId: other.userId })}>
           <Image source={DetailChatIcon} style={headerStyles.icon} />
         </TouchableOpacity>
