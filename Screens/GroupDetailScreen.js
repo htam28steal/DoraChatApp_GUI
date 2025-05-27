@@ -374,61 +374,36 @@ const fetchGroupCurrentMembers = async () => {
       console.error('Failed to fetch members', err);
     }
   };
-  useEffect(() => {
-    const loadMyRole = async () => {
-      try {
-        const userId = await AsyncStorage.getItem('userId');
-        if (!userId) return;
-  
-        // 1) Fetch both the conversation *and* its members
-        const [convRes, memRes] = await Promise.all([
-          axios.get(`/api/conversations/${conversationId}`),
-          axios.get(`/api/conversations/${conversationId}/members`)
-        ]);
-  
-        // support either res.data.conversation or just res.data
-        const convo = convRes.data.conversation || convRes.data;
-        setGroupName(convo.name);
+// 1) Move this out of useEffect → into the top of your component:
+const loadMyRole = useCallback(async () => {
+  try {
+    const userId = await AsyncStorage.getItem('userId');
+    const [convRes, memRes] = await Promise.all([
+      axios.get(`/api/conversations/${conversationId}`),
+      axios.get(`/api/conversations/${conversationId}/members`)
+    ]);
+    const convo = convRes.data.conversation || convRes.data;
+    // unwrap Mongo ObjectIds if needed…
+    let leaderId = convo.leaderId;
+    if (leaderId?.$oid) leaderId = leaderId.$oid;
+    const managerIds = (convo.managerIds || []).map(m => m.$oid ? m.$oid : m);
 
-        const members = memRes.data || [];
-  
-        // 2) Unwrap Mongo’s {$oid: "..."} if present
-        let leaderId = convo.leaderId;
-        if (leaderId && typeof leaderId === 'object' && leaderId.$oid) {
-          leaderId = leaderId.$oid;
-        }
-  
-        const managerIds = Array.isArray(convo.managerIds)
-          ? convo.managerIds.map(m => (m && m.$oid) ? m.$oid : m)
-          : [];
-  
-        // 3) Find *your* membership record and grab its memberId
-        const myRecord = members.find(m => m.userId === userId);
-        const myMemberId = myRecord
-          ? (myRecord.memberId || myRecord._id || myRecord.id)
-          : null;
-  
-        console.log('→ meMemberId:', myMemberId,
-                    ' leaderId:', leaderId,
-                    ' managers:', managerIds);
-  
-        // 4) Compare *membership* IDs
-        if (myMemberId && myMemberId === leaderId) {
-          setCurrentUserRole('leader');
-        }
-        else if (myMemberId && managerIds.includes(myMemberId)) {
-          setCurrentUserRole('manager');
-        }
-        else {
-          setCurrentUserRole('member');
-        }
-      } catch (err) {
-        console.error('Could not load conversation or role', err);
-      }
-    };
-  
-    loadMyRole();
-  }, [conversationId]);
+    const members = memRes.data || [];
+    const myRecord = members.find(m => m.userId === userId);
+    const myMemberId = myRecord?.memberId || myRecord?._id;
+    if (myMemberId === leaderId)      setCurrentUserRole('leader');
+    else if (managerIds.includes(myMemberId)) setCurrentUserRole('manager');
+    else                               setCurrentUserRole('member');
+  } catch (err) {
+    console.error('Could not load conversation or role', err);
+  }
+}, [conversationId]);
+
+// 2) Still call it on mount:
+useEffect(() => {
+  loadMyRole();
+}, [loadMyRole]);
+
   
   
   
@@ -1295,6 +1270,7 @@ socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
               `/api/conversations/transfer-admin/${conversationId}`,
               { newAdminId: selectedNewAdminId }
             );
+             await loadMyRole();
             Alert.alert('Thành công', 'Đã chuyển quyền quản trị.');
             setShowTransferModal(false);
           } catch (err) {
