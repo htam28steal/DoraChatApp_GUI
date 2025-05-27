@@ -40,6 +40,9 @@ import FullScreenImage from './Screens/FullSreenImage';
 import QR from './Screens/QRScreen'
 import Call from './Screens/CallScreen'
 
+import Toast from 'react-native-toast-message';
+
+
 const Stack = createStackNavigator();
 
 // Component con để sử dụng các hook Redux (ví dụ useDispatch)
@@ -156,7 +159,7 @@ function AppContainer() {
           options={{ headerShown: false }}
 
         />
-              <Stack.Screen
+        <Stack.Screen
           name="CallScreen"
           component={Call}
           options={{ headerShown: false }}
@@ -171,6 +174,8 @@ export default function App() {
   return (
     <Provider store={store}>
       <AppContainer />
+
+      <Toast />
     </Provider>
   );
 }

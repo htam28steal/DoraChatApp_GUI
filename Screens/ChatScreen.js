@@ -1022,7 +1022,7 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onStartRecording}) {
+function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onStartRecording,uploading }) {
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input);
@@ -1055,7 +1055,14 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
           <Image source={EmojiIcon} style={messageInputStyles.icon} />
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={messageInputStyles.sendButton} onPress={handleSend}>
+        <TouchableOpacity
+        style={[
+          messageInputStyles.sendButton,
+          uploading && { opacity: 0.5 }
+        ]}
+        onPress={handleSend}
+        disabled={uploading}
+      >
         <Image source={SendIcon} style={messageInputStyles.sendIcon} />
       </TouchableOpacity>
     </View>
@@ -1363,7 +1370,7 @@ const sendRecording = async () => {
     memberId: { userId },
     type: "FILE",
     content: recordedUri,
-    fileName: tempId + ".aac",
+    fileName: tempId + ".mp3",
     pending: true,
     createdAt: new Date().toISOString(),
   };
@@ -1377,7 +1384,7 @@ const sendRecording = async () => {
     formData.append("file", {
       uri: recordedUri,
       name: optimisticMsg.fileName,
-      type: "audio/aac",
+      type: "audio/mpeg",
     });
     const response = await axios.post("/api/messages/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -2055,9 +2062,12 @@ const handleSelectConversationToForward = async (selectedId) => {
 
 
 const uploadMediaAndSendMessage = async () => {
+  setUploading(true);
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
+
     Alert.alert("Permission denied", "Gallery access needed.");
+        setUploading(false);
     return;
   }
 
@@ -2118,7 +2128,7 @@ const uploadMediaAndSendMessage = async () => {
 setMessages(prev => dedupeMessages(
   prev.map(m =>
     m._id === tempId
-      ? { ...responseData, pending: false }
+       ? { ...responseData, pending: false }
       : m
   )
 ));
@@ -2127,7 +2137,10 @@ setMessages(prev => dedupeMessages(
     // On error: remove the placeholder
     setMessages(prev => prev.filter(m => m._id !== tempId));
     Alert.alert("Error", "Failed to upload media.");
-  }
+  
+  } finally {
+   setUploading(false);
+   }
 };
 
 
@@ -2410,6 +2423,7 @@ socket.emit(SOCKET_EVENTS.JOIN_CONVERSATIONS, [conversationId]);
           onStartRecording={() => setRecordingModal(true)} 
         onPickFile={pickDocument}
         onEmojiPress={() => setEmojiOpen(true)}
+         uploading={uploading}
       />
       <EmojiPicker
         onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
