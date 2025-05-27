@@ -97,12 +97,6 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
   ? allMessages.find(m => m._id === msg.replyMessageId)
   : null;
 
-console.log('MessageItem:', {
-  msg,
-  replyMessageId: msg.replyMessageId,
-  allMessagesCount: allMessages?.length,
-  replied,
-});
 
 
 
@@ -320,26 +314,19 @@ console.log('MessageItem:', {
                         📌 Đã ghim
                     </Text>
                 )}
-                {msg.replyToMessage && (
-    <View style={{
-        backgroundColor: '#f3f6fa',
-        borderLeftWidth: 3,
-        borderLeftColor: '#086DC0',
-        padding: 5,
-        marginBottom: 4,
-        borderRadius: 6,
-    }}>
-        <Text style={{ color: '#086DC0', fontSize: 11, fontWeight: '600' }}>
-            {msg.replyToMessage.memberId?.name || 'ai đó'}
-        </Text>
-        <Text numberOfLines={2} style={{ color: '#555', fontSize: 12 }}>
-            {msg.replyToMessage.type === "IMAGE" ? "Ảnh" :
-             msg.replyToMessage.type === "VIDEO" ? "Video" :
-             msg.replyToMessage.type === "FILE" ? "Tệp đính kèm" :
-             msg.replyToMessage.content}
-        </Text>
-    </View>
-)}
+               {msg.replyToMessage && (
+    <TouchableOpacity
+      style={messageItemStyles.replyContainer}
+      onPress={() => onReplyPress(msg.replyToId)}
+    >
+      <Text style={messageItemStyles.replyAuthor}>
+        {msg.replyToMessage.memberId.name}
+      </Text>
+      <Text numberOfLines={1} style={messageItemStyles.replySnippet}>
+        {msg.replyToMessage.content}
+      </Text>
+    </TouchableOpacity>
+  )}
 
                 {msg.type === "NOTIFY" ? (
                     <Text style={messageItemStyles.notifyText}>
@@ -726,6 +713,26 @@ const messageItemStyles = StyleSheet.create({
         paddingHorizontal: 2,
         overflow: 'hidden',
     },
+replyContainer: {
+    backgroundColor: '#e6e6fa',
+    padding: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#086DC0',
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  replyAuthor: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#086DC0',
+    marginBottom: 2,
+  },
+  replySnippet: {
+    fontSize: 13,
+    color: '#333',
+  },
+  
+
 });
 
 /**
@@ -972,16 +979,23 @@ export default function ChatScreen({ route, navigation }) {
     const [allMessages, setAllMessages] = useState([]);
 
     const [isRemoved, setIsRemoved] = useState(false);
+    
 
 useEffect(() => {
   const load = async () => {
-    const res       = await axios.get(`/api/messages/${conversationId}`);
-    const full      = dedupeMessages(res.data);
-    setAllMessages(full);
+    const res = await axios.get(`/api/messages/${conversationId}`);
+    const full = dedupeMessages(res.data);
 
-    // take last N for your scroll window (e.g. 40)
-    const start     = Math.max(0, full.length - 40);
-    setMessages(full.slice(start));
+    // This mapping only honors `replyMessageId`, never your `replyTo` fallback:
+    const withReplies = full.map(msg => ({
+      ...msg,
+      replyToMessage: msg.replyMessageId
+        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+        : undefined,
+    }));
+
+    setAllMessages(withReplies);
+    setMessages(withReplies.slice(-40));
   };
   load();
 }, [conversationId]);
@@ -991,14 +1005,13 @@ const handleReadMessage = async () => {
   if (!selectedMessage || selectedMessage.type !== "TEXT") return;
 
   try {
-    console.log("✉️ Sending TTS request for text:", selectedMessage.content);
+
     const res = await axios.post("/api/messages/tts", {
       text: selectedMessage.content,
     });
-    console.log("✅ TTS response:", res.data);
+
 
     const { url } = res.data;
-    console.log("▶️ Playing audio from:", url);
 
     // 1) Create a new Sound object
     const { sound } = await Audio.Sound.createAsync(
@@ -1009,13 +1022,11 @@ const handleReadMessage = async () => {
     // 2) Optionally track when it’s done
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.didJustFinish) {
-        console.log("🔈 Finished playing TTS");
         sound.unloadAsync();
       }
     });
 
   } catch (err) {
-    console.error("❌ TTS error:", err);
     Alert.alert("Error", err.response?.data?.message || err.message);
   } finally {
     setModalVisible(false);
@@ -1096,23 +1107,37 @@ const handleReadMessage = async () => {
 const fetchAllMessages = async (channelId = null) => {
   if (!conversationId) return;
   try {
-    let endpoint = channelId
-      ? `/api/messages/channel/${channelId}`
-      : `/api/messages/${conversationId}`;
-    const { data } = await axios.get(endpoint, { timeout: 30000 });
-    const full = dedupeMessages(data);
+     const endpoint = channelId
+    ? `/api/messages/channel/${channelId}`
+    : `/api/messages/${conversationId}`;
+  const { data } = await axios.get(endpoint);
+  const full = dedupeMessages(data);
 
-    const withReplies = full.map(msg => ({
+
+const withReplies = full.map(msg => {
+    // unify parent reference
+    let parentId =
+      msg.replyTo ||
+      (msg.replyMessageId && (typeof msg.replyMessageId === 'object'
+        ? msg.replyMessageId._id
+        : msg.replyMessageId)) ||
+      null;
+
+
+return {
       ...msg,
-      replyToMessage: msg.replyMessageId
-        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+      replyToId: parentId,
+      replyToMessage: parentId
+        ? full.find(m => m._id === parentId)
         : undefined,
-    }));
+    };
+});
 
-    setAllMessages(withReplies);
-    setMessages(withReplies.slice(-40));
+
+  setAllMessages(withReplies);
+  setMessages(withReplies.slice(-40));
   } catch (error) {
-    console.error("Error fetching messages:", error);
+
     Alert.alert("Error fetching messages", error.response?.data?.message || error.message);
   }
 };
@@ -1300,7 +1325,6 @@ useEffect(() => {
 
             setModalVisible(false);
         } catch (err) {
-            console.error(" Lỗi khi gỡ ghim:", err.message);
             Alert.alert('Lỗi', 'Không thể gỡ ghim tin nhắn');
         }
     };
@@ -1312,7 +1336,6 @@ useEffect(() => {
             const response = await axios.get(`/api/pin-messages/${conversationId}`);
             return response.data;
         } catch (err) {
-            console.log(err);
             return [];
         }
     };
@@ -1428,7 +1451,6 @@ useEffect(() => {
 
                     <View style={headerStyles.iconsContainer}>
                         <TouchableOpacity style={headerStyles.iconButton} onPress={() => {
-                            console.log('NAVIGATE VIDEO', conversationId, currentChannelId);
                             navigation.navigate('CallScreen', { conversationId, channelId: currentChannelId })
                         }}>
                             <Image source={CallIcon} style={headerStyles.icon} />
@@ -1560,7 +1582,6 @@ useEffect(() => {
 
         try {
             setMessages((prev) => prev.filter((m) => m._id !== selectedMessage._id));
-            console.log(selectedMessage._id);
             await axios.delete(`/api/messages/${selectedMessage._id}/only`, {
                 data: {
                     conversationId: conversationId
@@ -1636,10 +1657,10 @@ useEffect(() => {
 
                 // Cập nhật danh sách tin nhắn với ảnh mới
                 setMessages((prev) => [...prev, newMsg]);
-                console.log('Image uploaded successfully:', imageUrl);
+
 
             } catch (err) {
-                console.log('Error uploading image:', err);
+
                 Alert.alert('Error', 'Failed to upload image');
             }
         }
@@ -1696,7 +1717,7 @@ useEffect(() => {
                 };
 
                 setMessages((prev) => [...prev, newMsg]);
-                console.log(`${selectedMedia.type} uploaded successfully:`, mediaUrl);
+
             } catch (err) {
                 console.error(`Error uploading ${selectedMedia.type}:`, err);
                 Alert.alert('Error', `Failed to upload ${selectedMedia.type}`);
@@ -1878,9 +1899,6 @@ useEffect(() => {
             throw error;
         }
     }
-
-
-
     useEffect(() => {
         const handleReactS = (message) => {
             setMessages(prevMessages =>
@@ -1992,10 +2010,9 @@ useEffect(() => {
         if (replyingMessage) {
             newMessage.replyTo = replyingMessage._id;
             newMessage.replyToMessage = replyingMessage;
-            console.log("Set replyTo:", newMessage.replyTo);
+
         }
 
-        console.log("newMessage after possible reply:", newMessage);
 
             setMessages((prev) => [...prev, newMessage]);
             setReplyingMessage(null);
@@ -2082,7 +2099,6 @@ useEffect(() => {
         setVoteShowModal(false);
     };
     const handleVoteSubmit = (updatedVoteMessage) => {
-        console.log("Dữ liệu nhận được từ VoteModal:", updatedVoteMessage);
 
         if (!updatedVoteMessage) {
             console.error("Không nhận được dữ liệu vote cập nhật");
@@ -2195,7 +2211,22 @@ useEffect(() => {
                         channelId={channels}
                     />
                 </View>
-
+                {replyingMessage && (
+                <View style={styles.replyPreview}>
+                    <View style={styles.replyLeftAccent}/>
+                    <View style={styles.replyContent}>
+                    <Text style={styles.replyTitle}>
+                        Trả lời {replyingMessage.memberId.name}
+                    </Text>
+                    <Text style={styles.replySnippet} numberOfLines={1} ellipsizeMode="tail">
+                        {replyingMessage.content}
+                    </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setReplyingMessage(null)}>
+                    <Text style={styles.replyCloseText}>×</Text>
+                    </TouchableOpacity>
+                </View>
+                )}
                 {!isRemoved && (
                     <MessageInput
                         input={input}
@@ -2394,6 +2425,40 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: "#086DC0",
     },
+     replyPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f2f2f2',
+    padding: 8,
+    marginHorizontal: 8,
+    marginVertical: 4,
+    borderRadius: 8,
+  },
+  replyLeftAccent: {
+    width: 4,
+    height: '100%',
+    backgroundColor: '#086DC0',
+    marginRight: 8,
+    borderRadius: 2,
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#086DC0',
+    marginBottom: 2,
+  },
+  replySnippet: {
+    fontSize: 14,
+    color: '#333',
+  },
+  replyCloseText: {
+    fontSize: 16,
+    color: '#999',
+    marginLeft: 8,
+  },
 
     reactModalContainer: {
         backgroundColor: "#fff",
