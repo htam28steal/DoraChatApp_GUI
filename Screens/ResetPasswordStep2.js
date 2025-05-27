@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Button,
   TextInput,
+  ImageBackground
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import bg from '../Images/bground.png';
@@ -113,7 +114,7 @@ export default function ResetPassStep2Page() {
   return (
     <View style={styles.container}>
         
-      <View style={styles.contentWrapper}>
+      <ImageBackground source={require('../Images/bground.png')} style={styles.contentWrapper}>
         {/* Left side - Form section */}
         <View style={styles.leftPanel}>
           <View style={styles.innerContainer}>
@@ -145,7 +146,7 @@ export default function ResetPassStep2Page() {
             {loading ? <Spinner /> : <ResetPassStep2Form onSubmit={handleResetStep2} />}
           </View>
         </View>
-      </View>
+      </ImageBackground>
     </View>
   );
 }
@@ -158,19 +159,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contentWrapper: {
-    flexDirection: 'row',
-    width: '100%',
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   leftPanel: {
     flex: 1,
-    backgroundColor: 'white',
     padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingBottom:200
   },
   innerContainer: {
-    width: '80%',
+    width: '90%',
   },
   loginLinkContainer: {
     flexDirection: 'row',
@@ -200,7 +201,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   welcomeText: {
-    color: 'gray',
+    fontSize:13,
     textAlign: 'center',
     marginBottom: 5,
   },
@@ -213,7 +214,6 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: 'gray',
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,

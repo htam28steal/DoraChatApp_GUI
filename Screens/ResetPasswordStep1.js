@@ -9,21 +9,16 @@ import {
   ActivityIndicator,
   Alert,
   Button,
+  ImageBackground,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import axios from '../api/apiConfig';
-// Import your assets – adjust the paths as needed
 import Logo from '../Images/logoDoRa.png';
 
-
-
-// A spinner component using the built-in ActivityIndicator.
 const Spinner = () => {
   return <ActivityIndicator size="large" color="#0000ff" />;
 };
 
-// A simple form component for the reset password step.
-// It uses a TextInput for the email and a Button to trigger the submission.
 const ResetPassStep1Form = ({ email, setEmail, onSubmit }) => {
   return (
     <View style={styles.formContainer}>
@@ -47,15 +42,6 @@ export default function ResetPassStep1Page() {
 
   async function handleResetStep1() {
     setLoading(true);
-
-    // Validate email is provided
-    // if (!email) {
-    //   Alert.alert('Error', 'Please enter your email address');
-    //   setLoading(false);
-    //   return;
-    // }
-
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
@@ -64,21 +50,14 @@ export default function ResetPassStep1Page() {
     }
 
     try {
-      console.log('Email:', email);
-      const response = await axios.post('/api/auth/verify-email-forgot-password',{email});
-      console.log('API response:', response);
-
+      const response = await axios.post('/api/auth/verify-email-forgot-password', { email });
       if (!response || response.error) {
         Alert.alert('Error', 'Something went wrong. Please try again.');
-        setLoading(false);
-        return;
       } else {
         Alert.alert('Success', 'Verification code sent to your email!');
-        // Navigate to the ResetPassword screen (make sure your navigator has this route)
         navigation.navigate('ResetPasswordStep2Screen', { email });
       }
     } catch (error) {
-      console.log('Error response:', error);
       const errorMessage =
         error.response?.data?.message ||
         (typeof error.response?.data === 'string'
@@ -91,12 +70,14 @@ export default function ResetPassStep1Page() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.contentWrapper}>
-        {/* Left Panel: Form and text */}
+    <ImageBackground 
+      source={require('../Images/bground.png')} 
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <View style={styles.overlay}>
         <View style={styles.leftPanel}>
           <View style={styles.innerContainer}>
-            {/* Login Link */}
             <View style={styles.loginLinkContainer}>
               <Text style={styles.loginText}>You had an account?</Text>
               <TouchableOpacity onPress={() => navigation.navigate('LoginScreen')}>
@@ -104,23 +85,19 @@ export default function ResetPassStep1Page() {
               </TouchableOpacity>
             </View>
 
-            {/* Logo */}
             <View style={styles.logoContainer}>
               <Image source={Logo} style={styles.logo} />
             </View>
 
-            {/* Welcome Text */}
             <View style={styles.welcomeTextContainer}>
               <Text style={styles.welcomeText}>
-                We&apos;re super excited to have you join our community.
+                We're super excited to have you join our community.
               </Text>
               <Text style={styles.welcomeText}>
-                Let&apos;s dive into some fun conversations together!
+                Let's dive into some fun conversations together!
               </Text>
             </View>
 
-
-            {/* Conditional rendering for loading spinner or form */}
             {loading ? (
               <Spinner />
             ) : (
@@ -132,33 +109,28 @@ export default function ResetPassStep1Page() {
             )}
           </View>
         </View>
-
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  backgroundImage: {
     flex: 1,
-    backgroundColor: '#D8EDFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contentWrapper: {
-    flexDirection: 'row',
     width: '100%',
+    height: '100%',
+  },
+  overlay: {
     flex: 1,
   },
   leftPanel: {
     flex: 1,
-    backgroundColor: 'white',
-    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   innerContainer: {
-    width: '80%',
+    width: '90%',
+    paddingBottom: 220,
   },
   loginLinkContainer: {
     flexDirection: 'row',
@@ -188,13 +160,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   welcomeText: {
-    color: 'gray',
     textAlign: 'center',
     marginBottom: 5,
-  },
-  progressSteps: {
-    alignItems: 'center',
-    marginBottom: 20,
   },
   formContainer: {
     marginVertical: 20,
@@ -205,17 +172,6 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
-  },
-  rightPanel: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Optionally hide or adjust on smaller screens
-  },
-  banner: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-    borderRadius: 10,
+    backgroundColor: 'white', // Ensure input is visible
   },
 });
