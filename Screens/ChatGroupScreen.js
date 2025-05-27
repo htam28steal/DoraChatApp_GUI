@@ -19,6 +19,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 
 
 
+
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
@@ -51,10 +52,29 @@ const SendIcon = require("../icons/send.png");
 const Return = require("../icons/back.png");
 const MicIcon = require("../icons/mic.png");
 const addChannel = require("../icons/addChannel.png")
+
+
+
+
+
+function dedupeMessages(msgs) {
+  const seen = new Set();
+  const unique = [];
+  for (const msg of msgs) {
+    if (!seen.has(msg._id)) {
+      seen.add(msg._id);
+      unique.push(msg);
+    }
+  }
+  return unique;
+}
+
+
+
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal }) => {
+const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, allMessages }) => {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
     const MAX_TEXT_LENGTH = 350;
@@ -73,6 +93,16 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     };
 
 
+ const replied = msg.replyMessageId
+  ? allMessages.find(m => m._id === msg.replyMessageId)
+  : null;
+
+console.log('MessageItem:', {
+  msg,
+  replyMessageId: msg.replyMessageId,
+  allMessagesCount: allMessages?.length,
+  replied,
+});
 
 
 
@@ -290,6 +320,27 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                         📌 Đã ghim
                     </Text>
                 )}
+                {msg.replyToMessage && (
+    <View style={{
+        backgroundColor: '#f3f6fa',
+        borderLeftWidth: 3,
+        borderLeftColor: '#086DC0',
+        padding: 5,
+        marginBottom: 4,
+        borderRadius: 6,
+    }}>
+        <Text style={{ color: '#086DC0', fontSize: 11, fontWeight: '600' }}>
+            {msg.replyToMessage.memberId?.name || 'ai đó'}
+        </Text>
+        <Text numberOfLines={2} style={{ color: '#555', fontSize: 12 }}>
+            {msg.replyToMessage.type === "IMAGE" ? "Ảnh" :
+             msg.replyToMessage.type === "VIDEO" ? "Video" :
+             msg.replyToMessage.type === "FILE" ? "Tệp đính kèm" :
+             msg.replyToMessage.content}
+        </Text>
+    </View>
+)}
+
                 {msg.type === "NOTIFY" ? (
                     <Text style={messageItemStyles.notifyText}>
                         {content}
@@ -680,7 +731,7 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
+function ChatBox({ messages,allMessages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
     const scrollViewRef = useRef(null);
     const scrollPosition = useRef(0);
 
@@ -723,6 +774,7 @@ function ChatBox({ messages, currentUserId, onMessageLongPress, handlePressEmoji
                     <MessageItem
                         key={key}
                         msg={msg}
+                         allMessages={allMessages} 
                         showAvatar={isFirstInGroup}
                         showTime={isLastInGroup}
                         currentUserId={currentUserId}
@@ -749,6 +801,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
 
     const [showMentionList, setShowMentionList] = useState(false);
     const [filteredMembers, setFilteredMembers] = useState([]);
+    
 
     const handleInputChange = (text) => {
         setInput(text);
@@ -890,6 +943,8 @@ const messageInputStyles = StyleSheet.create({
  * Also integrates a modal for long-press message options: "Thu hồi", "Xoá" and "Chuyển tiếp".
  */
 export default function ChatScreen({ route, navigation }) {
+    const [replyingMessage, setReplyingMessage] = useState(null);
+
 
     const { nameG, avatarG } = route.params;
 
@@ -916,8 +971,57 @@ export default function ChatScreen({ route, navigation }) {
     const [members, setMembers] = useState(null);
 
     const [memberTags, setMemberTags] = useState([])
+    const [allMessages, setAllMessages] = useState([]);
 
 
+useEffect(() => {
+  const load = async () => {
+    const res       = await axios.get(`/api/messages/${conversationId}`);
+    const full      = dedupeMessages(res.data);
+    setAllMessages(full);
+
+    // take last N for your scroll window (e.g. 40)
+    const start     = Math.max(0, full.length - 40);
+    setMessages(full.slice(start));
+  };
+  load();
+}, [conversationId]);
+
+
+const handleReadMessage = async () => {
+  if (!selectedMessage || selectedMessage.type !== "TEXT") return;
+
+  try {
+    console.log("✉️ Sending TTS request for text:", selectedMessage.content);
+    const res = await axios.post("/api/messages/tts", {
+      text: selectedMessage.content,
+    });
+    console.log("✅ TTS response:", res.data);
+
+    const { url } = res.data;
+    console.log("▶️ Playing audio from:", url);
+
+    // 1) Create a new Sound object
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: url },
+      { shouldPlay: true }  // auto-start playback
+    );
+
+    // 2) Optionally track when it’s done
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.didJustFinish) {
+        console.log("🔈 Finished playing TTS");
+        sound.unloadAsync();
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ TTS error:", err);
+    Alert.alert("Error", err.response?.data?.message || err.message);
+  } finally {
+    setModalVisible(false);
+  }
+};
 
 
     const handleChannelChange = (channelId) => {
@@ -990,30 +1094,30 @@ export default function ChatScreen({ route, navigation }) {
             fetchChannels();
         }
     }, [conversation, conversationId]);
+const fetchAllMessages = async (channelId = null) => {
+  if (!conversationId) return;
+  try {
+    let endpoint = channelId
+      ? `/api/messages/channel/${channelId}`
+      : `/api/messages/${conversationId}`;
+    const { data } = await axios.get(endpoint, { timeout: 30000 });
+    const full = dedupeMessages(data);
 
-    const fetchAllMessages = async (channelId = null) => {
-        if (!conversationId) return;
+    const withReplies = full.map(msg => ({
+      ...msg,
+      replyToMessage: msg.replyMessageId
+        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+        : undefined,
+    }));
 
-        try {
-            let response;
-            if (channelId) {
-                response = await axios.get(`/api/messages/channel/${channelId}`), {
-                    timeout: 30000
-                };
-            } else {
-                response = await axios.get(`/api/messages/${conversationId}`, {
-                    timeout: 30000
-                });
-            }
-            setMessages(response.data);
-        } catch (error) {
-            console.error("Error fetching messages:", error);
-            Alert.alert(
-                "Error fetching messages",
-                error.response?.data?.message || error.message
-            );
-        }
-    };
+    setAllMessages(withReplies);
+    setMessages(withReplies.slice(-40));
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    Alert.alert("Error fetching messages", error.response?.data?.message || error.message);
+  }
+};
+
 
     useEffect(() => {
         if (currentChannelId) {
@@ -1028,7 +1132,24 @@ export default function ChatScreen({ route, navigation }) {
         setSelectedMessage(message);
         setModalVisible(true);
     }, []);
+useEffect(() => {
+  const load = async () => {
+    const res = await axios.get(`/api/messages/${conversationId}`);
+    const full = dedupeMessages(res.data);
 
+    // Attach replyToMessage for reply preview
+    const withReplies = full.map(msg => ({
+      ...msg,
+      replyToMessage: msg.replyMessageId
+        ? full.find(m => m._id === (msg.replyMessageId._id || msg.replyMessageId))
+        : undefined,
+    }));
+
+    setAllMessages(withReplies);
+    setMessages(withReplies.slice(-40)); // or adjust window as you like
+  };
+  load();
+}, [conversationId]);
 
     const handleRecallAction = () => {
         if (!selectedMessage) return;
@@ -1859,6 +1980,8 @@ export default function ChatScreen({ route, navigation }) {
 
             const { validTags, tagPositions } = checkTagsWithPosition(message, members);
 
+
+
             const newMessage = {
                 _id: String(Date.now()), // temporary id
                 memberId: { userId: userId },
@@ -1866,8 +1989,21 @@ export default function ChatScreen({ route, navigation }) {
                 content: message,
                 createdAt: new Date().toISOString(),
                 pending: true,
+                replyTo: replyingMessage ? replyingMessage._id : undefined,
+                 replyToMessage: replyingMessage || undefined,
             };
+
+    
+        if (replyingMessage) {
+            newMessage.replyTo = replyingMessage._id;
+            newMessage.replyToMessage = replyingMessage;
+            console.log("Set replyTo:", newMessage.replyTo);
+        }
+
+        console.log("newMessage after possible reply:", newMessage);
+
             setMessages((prev) => [...prev, newMessage]);
+            setReplyingMessage(null);
 
 
             const payload = {
@@ -1876,6 +2012,7 @@ export default function ChatScreen({ route, navigation }) {
                 content: message,
                 channelId: currentChannelId,
             };
+            if (replyingMessage) payload.replyTo = replyingMessage._id;
 
             if (validTags.length > 0) {
                 payload.tags = validTags;
@@ -1893,6 +2030,7 @@ export default function ChatScreen({ route, navigation }) {
                 conversationId: conversationId,
                 content: message,
                 channelId: currentChannelId,
+                 replyTo: replyingMessage ? replyingMessage._id : undefined,
             });
         } catch (err) {
             Alert.alert("Cannot send message", err.response?.data?.message || err.message);
@@ -2025,6 +2163,7 @@ export default function ChatScreen({ route, navigation }) {
                 <View style={chatScreenStyles.chatContainer}>
                     <ChatBox
                         messages={messages}
+                        allMessages={allMessages}
                         currentUserId={userId}
                         onMessageLongPress={handleMessageLongPress}
                         handlePressEmoji={handlePressEmoji}
@@ -2033,6 +2172,33 @@ export default function ChatScreen({ route, navigation }) {
                         channelId={channels}
                     />
                 </View>
+                {replyingMessage && (
+    <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#e7f4ff',
+        padding: 8,
+        borderLeftWidth: 4,
+        borderLeftColor: '#086DC0',
+        marginHorizontal: 12,
+        marginBottom: 2,
+        borderRadius: 8,
+    }}>
+        <View style={{ flex: 1 }}>
+            <Text style={{ color: '#086DC0', fontWeight: '600', fontSize: 12 }}>Đang trả lời {replyingMessage.memberId?.name || 'ai đó'}:</Text>
+            <Text numberOfLines={2} style={{ color: '#444', fontSize: 13 }}>
+                {replyingMessage.type === "IMAGE" ? "Ảnh" :
+                 replyingMessage.type === "VIDEO" ? "Video" :
+                 replyingMessage.type === "FILE" ? "Tệp đính kèm" :
+                 replyingMessage.content}
+            </Text>
+        </View>
+        <TouchableOpacity onPress={() => setReplyingMessage(null)}>
+            <Text style={{ color: 'red', fontSize: 18, paddingHorizontal: 10 }}>✕</Text>
+        </TouchableOpacity>
+    </View>
+)}
+
                 <MessageInput
                     input={input}
                     setInput={setInput}
@@ -2107,6 +2273,18 @@ export default function ChatScreen({ route, navigation }) {
                             <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
                                 <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
                             </TouchableOpacity>
+                               <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
+                                <Text style={styles.modalButtonText}>Đọc tin nhắn</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalButton}
+                                onPress={() => {
+                                    setReplyingMessage(selectedMessage);
+                                    setModalVisible(false);
+                                }}>
+                                <Text style={styles.modalButtonText}>Trả lời</Text>
+                            </TouchableOpacity>
+
                             <TouchableOpacity
                                 style={styles.modalButton}
                                 onPress={() => {

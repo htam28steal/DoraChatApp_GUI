@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import bg from '../Images/bground.png';
 import { authService } from '../api/authService';
+import Toast from 'react-native-toast-message';
 
 const LoginScreen = () => {
   const navigation = useNavigation();
@@ -38,6 +39,11 @@ if (response && response.data?.token) {
 
     } catch (error) {
       console.log('Login error:', error);
+
+        Toast.show({
+          type: "error",
+          text1: "Invalid email or password",
+        });
     } finally {
       setLoading(false);
       console.log('handleLogin finished');
