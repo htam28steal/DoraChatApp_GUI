@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
     View,
     Text,
@@ -13,7 +13,9 @@ import {
     Modal,
     Linking,
     FlatList,
-    KeyboardAvoidingView
+    KeyboardAvoidingView,
+    Animated,
+    Easing
 } from "react-native";
 
 
@@ -67,19 +69,218 @@ function dedupeMessages(msgs) {
     }
     return unique;
 }
+const BUBBLE_WIDTH = 220;
+const LINE_WIDTH = 140; // Adjust for duration/spacing
+const LINE_HEIGHT = 3;
+const BUTTON_SIZE = 40;
 
 
+export function AudioBubble({ url }) {
+    const [playing, setPlaying] = useState(false);
+    const [sound, setSound] = useState(null);
+    const [position, setPosition] = useState(0);
+    const [durationSec, setDurationSec] = useState(0);
 
-const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, allMessages, index }) => {
+    const animated = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        let mounted = true;
+        let loader;
+
+        async function loadMetadata() {
+            const { sound: s, status } = await Audio.Sound.createAsync(
+                { uri: url },
+                { shouldPlay: false }
+            );
+            if (!mounted) {
+                return s.unloadAsync();
+            }
+            if (status.durationMillis) {
+                setDurationSec(status.durationMillis / 1000);
+            }
+            await s.unloadAsync();
+        }
+
+        loadMetadata();
+
+        return () => {
+            mounted = false;
+        };
+    }, [url]);
+
+
+    // Clean up sound when unmount
+    React.useEffect(() => {
+        return () => {
+            if (sound) sound.unloadAsync();
+        };
+    }, [sound]);
+
+    const playAudio = async () => {
+        if (sound) {
+            await sound.replayAsync();
+            setPlaying(true);
+            animateButton(0, 1, durationSec);
+            return;
+        }
+        const { sound: snd, status } = await Audio.Sound.createAsync(
+            { uri: url },
+            { shouldPlay: true }
+        );
+        setSound(snd);
+        setPlaying(true);
+
+        if (status.durationMillis) {
+            setDurationSec(status.durationMillis / 1000);
+        }
+
+        animateButton(0, 1, (status.durationMillis || 0) / 1000);
+
+        snd.setOnPlaybackStatusUpdate((status) => {
+            if (status.didJustFinish) {
+                setPlaying(false);
+                animated.setValue(0);
+            }
+        });
+    };
+
+    const pauseAudio = async () => {
+        if (sound) {
+            await sound.pauseAsync();
+            setPlaying(false);
+            Animated.timing(animated).stop();
+        }
+    };
+
+    const animateButton = (from, to, dur) => {
+        animated.setValue(from);
+        Animated.timing(animated, {
+            toValue: to,
+            duration: dur * 1000,
+            useNativeDriver: false,
+            easing: Easing.linear,
+        }).start();
+    };
+
+    // Position for button
+    const translateX = animated.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, LINE_WIDTH],
+    });
+
+    const shownDuration = (() => {
+        const total = Math.round(durationSec);
+        const m = Math.floor(total / 60).toString().padStart(2, '0');
+        const s = (total % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    })();
+
+    return (
+        <View style={audioStyles.bubble}>
+            <View style={audioStyles.inner}>
+                {/* Audio Line and Play Button */}
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={{ width: LINE_WIDTH + BUTTON_SIZE, height: BUTTON_SIZE, justifyContent: "center" }}>
+                        {/* The Line */}
+                        <View
+                            style={{
+                                position: "absolute",
+                                left: BUTTON_SIZE / 2,
+                                top: BUTTON_SIZE / 2 - LINE_HEIGHT / 2,
+                                width: LINE_WIDTH,
+                                height: LINE_HEIGHT,
+                                backgroundColor: "#369CFF",
+                                borderRadius: 2,
+                                opacity: 0.8,
+                            }}
+                        />
+                        <Animated.View
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                top: 0,
+                                transform: [{ translateX }],
+                                zIndex: 2,
+                            }}
+                        >
+                            <TouchableOpacity
+                                onPress={playing ? pauseAudio : playAudio}
+                                activeOpacity={0.8}
+                                style={{
+                                    width: BUTTON_SIZE,
+                                    height: BUTTON_SIZE,
+                                    backgroundColor: "#2380F7",
+                                    borderRadius: BUTTON_SIZE / 2,
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    elevation: 2,
+                                    shadowColor: "#2380F7",
+                                    shadowOpacity: 0.12,
+                                    shadowRadius: 8,
+                                }}
+                            >
+                                <View style={{
+                                    width: 0,
+                                    height: 0,
+                                    borderLeftWidth: 16,
+                                    borderTopWidth: 11,
+                                    borderBottomWidth: 11,
+                                    borderLeftColor: "#fff",
+                                    borderTopColor: "transparent",
+                                    borderBottomColor: "transparent",
+                                    marginLeft: 3,
+                                }} />
+                            </TouchableOpacity>
+                        </Animated.View>
+                    </View>
+                    <Text style={{
+                        marginLeft: 8,
+                        color: "#444",
+                        fontWeight: "100",
+                        fontSize: 10,
+                        alignSelf: "center",
+                        minWidth: 28,
+                    }}>
+                        {shownDuration}
+                    </Text>
+                </View>
+            </View>
+        </View>
+    );
+}
+
+const audioStyles = StyleSheet.create({
+    bubble: {
+        backgroundColor: "#D8F1FF",
+        borderRadius: 18,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        marginVertical: 2,
+        minWidth: 160,
+        maxWidth: 270,
+        alignSelf: "flex-start",
+        // Optional shadow
+        shadowColor: "#51b8ff",
+        shadowOpacity: 0.06,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+    },
+    inner: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+});
+const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, allMessages, index, AudioBubble }) => {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
-    const MAX_TEXT_LENGTH = 350;
     const centerAlignedTypes = ["VOTE", "NOTIFY"];
     const isCenterAligned = centerAlignedTypes.includes(msg.type);
     const Container = onLongPress ? TouchableOpacity : View;
     const [sound, setSound] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [pinned, setPinned] = useState(false);
     const emojiMap = {
+
         1: '❤️',
         2: '😂',
         3: '😢',
@@ -94,45 +295,33 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
         : null;
 
 
-    const getFileExtension = (url) => {
+    const getFileExtension = useCallback((url) => {
         if (!url) return '';
-
-        const fileName = url.includes('/')
-            ? url.substring(url.lastIndexOf('/') + 1)
-            : url;
-
+        const fileName = url.includes('/') ? url.substring(url.lastIndexOf('/') + 1) : url;
         const lastDotIndex = fileName.lastIndexOf('.');
+        return lastDotIndex !== -1 ? fileName.substring(lastDotIndex + 1).toLowerCase() : '';
+    }, []);
 
-        if (lastDotIndex !== -1) {
-            return fileName.substring(lastDotIndex + 1).toLowerCase();
-        }
-
-        return '';
-    };
-
-    const getFileIcon = (fileNameOrUrl = "") => {
+    const getFileIcon = useCallback((fileNameOrUrl = "") => {
         const extension = getFileExtension(fileNameOrUrl);
-
         switch (extension) {
-            case "pdf":
-                return require("../icons/pdf.png");
+            case "pdf": return require("../icons/pdf.png");
             case "xls":
-            case "xlsx":
-                return require("../icons/xls.png");
+            case "xlsx": return require("../icons/xls.png");
             case "doc":
-            case "docx":
-                return require("../icons/doc.png");
+            case "docx": return require("../icons/doc.png");
             case "ppt":
-            case "pptx":
-                return require("../icons/ppt.png");
-            case "txt":
-                return require("../icons/txt.png");
-            default:
-                return require("../icons/fileDefault.png");
+            case "pptx": return require("../icons/ppt.png");
+            case "txt": return require("../icons/txt.png");
+            default: return require("../icons/fileDefault.png");
         }
-    };
+    }, [getFileExtension]);
 
-    const [pinned, setPinned] = useState(false);
+
+
+
+
+    const a = 1;
 
     useEffect(() => {
         let isMounted = true;
@@ -164,6 +353,14 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
             </View>
         );
     }
+
+
+    const audioExtensions = ['mp3', 'wav', 'aac', 'ogg', 'm4a'];
+
+    const isAudioFile = (fileName = '', url = '') => {
+        const name = (fileName || url).toLowerCase();
+        return audioExtensions.some(ext => name.endsWith(`.${ext}`));
+    };
 
 
 
@@ -226,15 +423,10 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     };
 
 
-    const renderMessageContent = (msg) => {
+    const renderMessageContent = useCallback((msg) => {
         const { content, tagPositions = [] } = msg;
-
         if (!tagPositions.length) {
-            return (
-                <Text style={messageItemStyles.textContent}>
-                    {content}
-                </Text>
-            );
+            return <Text style={messageItemStyles.textContent}>{content}</Text>;
         }
 
         const sortedTags = [...tagPositions].sort((a, b) => a.start - b.start);
@@ -249,7 +441,6 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                     </Text>
                 );
             }
-
             elements.push(
                 <Text
                     key={`tag-${idx}`}
@@ -258,7 +449,6 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                     {content.slice(tag.start, tag.end)}
                 </Text>
             );
-
             lastIndex = tag.end;
         });
 
@@ -270,12 +460,8 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
             );
         }
 
-        return (
-            <Text style={messageItemStyles.textContent}>
-                {elements}
-            </Text>
-        );
-    };
+        return <Text style={messageItemStyles.textContent}>{elements}</Text>;
+    }, []);
 
     const prevMessage = allMessages[index - 1];
     const isFirstInGroup = !prevMessage ||
@@ -286,9 +472,8 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
 
     const [avatarLoaded, setAvatarLoaded] = useState(false);
     const DEFAULT_AVATAR = "https://example.com/default-avatar.png";
-    const shouldShowAvatar = React.useMemo(() => {
+    const shouldShowAvatar = useMemo(() => {
         if (isCenterAligned || !showAvatar) return false;
-
         const prevMessage = allMessages[index - 1];
         return !prevMessage ||
             prevMessage.memberId?.userId !== msg.memberId?.userId ||
@@ -447,15 +632,9 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                         (() => {
                             const lastDotIndex = msg.content.lastIndexOf('.');
                             const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
-                            if (ext === 'm4a') {
+                            if (ext === 'm4a' || ext === 'mp3') {
                                 return (
-                                    <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
-                                        <Ionicons
-                                            name={isPlaying ? 'pause' : 'play'}
-                                            size={24}
-                                            color="#086DC0"
-                                        />
-                                    </TouchableOpacity>
+                                    <AudioBubble url={msg.content} />
                                 );
                             } else {
                                 return (
@@ -812,6 +991,7 @@ function ChatBox({ messages, allMessages, currentUserId, onMessageLongPress, han
                         handlePressEmoji={handlePressEmoji}
                         isPinned={isPinned}
                         handleOpenVoteModal={handleOpenVoteModal}
+                        AudioBubble={AudioBubble}
                     />
                 );
             })}
@@ -1362,64 +1542,64 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    function PinnedMessagesSection({ pinnedMessages }) {
-        if (!pinnedMessages || pinnedMessages.length === 0) {
-            return null;
-        }
+    // function PinnedMessagesSection({ pinnedMessages }) {
+    //     if (!pinnedMessages || pinnedMessages.length === 0) {
+    //         return null;
+    //     }
 
-        return (
-            <View style={pinnedMessageStyles.container}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    //     return (
+    //         <View style={pinnedMessageStyles.container}>
+    //             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
 
-                    <View key={pinnedMessages._id} style={pinnedMessageStyles.messageItem}>
-                        <Text style={pinnedMessageStyles.messageContent} numberOfLines={1}>
-                            {pinnedMessages.content || "Nội dung đã ghim"}
-                        </Text>
-                        <Text style={pinnedMessageStyles.pinnedBy}>
-                            Được ghim bởi {pinnedMessages.pinnedBy.name || "ai đó"}
-                        </Text>
-                    </View>
+    //                 <View key={pinnedMessages._id} style={pinnedMessageStyles.messageItem}>
+    //                     <Text style={pinnedMessageStyles.messageContent} numberOfLines={1}>
+    //                         {pinnedMessages.content || "Nội dung đã ghim"}
+    //                     </Text>
+    //                     <Text style={pinnedMessageStyles.pinnedBy}>
+    //                         Được ghim bởi {pinnedMessages.pinnedBy.name || "ai đó"}
+    //                     </Text>
+    //                 </View>
 
-                </ScrollView>
-            </View>
-        );
-    }
+    //             </ScrollView>
+    //         </View>
+    //     );
+    // }
 
-    const pinnedMessageStyles = StyleSheet.create({
-        container: {
-            width: '100%',
-            minHeight: 50,
-            backgroundColor: 'white',
-            backgroundColor: "#D8EDFF",
-            height: 'auto',
-        },
-        title: {
-            fontSize: 12,
-            fontWeight: '600',
-            color: '#666',
-            marginBottom: 4,
-        },
-        messageItem: {
-            backgroundColor: '#f0f8ff',
-            paddingVertical: 6,
-            paddingHorizontal: 12,
-            borderRadius: 16,
-            marginRight: 8,
-            borderWidth: 1,
-            borderColor: '#e0e0e0',
-            width: '100%',
-            maxWidth: '100%',
-        },
-        messageContent: {
-            fontSize: 14,
-            fontWeight: '500',
-        },
-        pinnedBy: {
-            fontSize: 10,
-            color: '#888',
-            marginTop: 2,
-        }
-    });
+    // const pinnedMessageStyles = StyleSheet.create({
+    //     container: {
+    //         width: '100%',
+    //         minHeight: 50,
+    //         backgroundColor: 'white',
+    //         backgroundColor: "#D8EDFF",
+    //         height: 'auto',
+    //     },
+    //     title: {
+    //         fontSize: 12,
+    //         fontWeight: '600',
+    //         color: '#666',
+    //         marginBottom: 4,
+    //     },
+    //     messageItem: {
+    //         backgroundColor: '#f0f8ff',
+    //         paddingVertical: 6,
+    //         paddingHorizontal: 12,
+    //         borderRadius: 16,
+    //         marginRight: 8,
+    //         borderWidth: 1,
+    //         borderColor: '#e0e0e0',
+    //         width: '100%',
+    //         maxWidth: '100%',
+    //     },
+    //     messageContent: {
+    //         fontSize: 14,
+    //         fontWeight: '500',
+    //     },
+    //     pinnedBy: {
+    //         fontSize: 10,
+    //         color: '#888',
+    //         marginTop: 2,
+    //     }
+    // });
 
     const checkaddChannel = (conversation, memberId) => {
         if (conversation?.leaderId === memberId?.toString()) return true;
@@ -1435,25 +1615,11 @@ export default function ChatScreen({ route, navigation }) {
 
     function HeaderSingleChat({ handleAddChannel, checkaddChannel, onChannelChange, nameG, avatarG, conversationId, currentChannelId }) {
         const navigation = useNavigation();
-        const [localPinnedMessages, setLocalPinnedMessages] = useState([]);
-
-
 
         const handleChannelPress = (channelId) => {
             onChannelChange(channelId);
         };
 
-
-        useEffect(() => {
-            const loadPinnedMessages = async () => {
-                const messages = await handlePinnedMessages();
-                setLocalPinnedMessages(messages);
-            };
-
-            loadPinnedMessages();
-        }, [conversation, pinnedMessages]);
-
-        const lastMessage = localPinnedMessages[localPinnedMessages.length - 1];
         return (
             <View style={headerStyles.container}>
                 <View style={headerStyles.headerContent}>
@@ -1512,15 +1678,13 @@ export default function ChatScreen({ route, navigation }) {
                     {checkaddChannel(conversation, memberId) && (
                         <TouchableOpacity
                             style={{ position: 'absolute', right: 5, top: 10 }}
-                            onPress={() => handleAddChannel('123')}
+                            onPress={() => handleAddChannel()}
                         >
                             <Image source={addChannel} style={{ height: 20, width: 20 }} />
                         </TouchableOpacity>
                     )}
                 </View>
-                <TouchableOpacity style={[{ width: '100%', color: "black", display: 'flex', padding: 0, margin: 0 }]}>
-                    <PinnedMessagesSection pinnedMessages={lastMessage} />
-                </TouchableOpacity>
+
 
             </View>
         );
@@ -2405,16 +2569,16 @@ export default function ChatScreen({ route, navigation }) {
 
                                 <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
                                     <View><Image source={require('../icons/Delete.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Xoá</Text>
+                                    <Text style={styles.modalButtonText}>Delete</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
                                     <View><Image source={require('../icons/forward.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+                                    <Text style={styles.modalButtonText}>Forward</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
                                     <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Đọc tin nhắn</Text>
+                                    <Text style={styles.modalButtonText}>Read Mesage</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.modalButton}
@@ -2424,7 +2588,7 @@ export default function ChatScreen({ route, navigation }) {
                                     }}>
 
                                     <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Trả lời</Text>
+                                    <Text style={styles.modalButtonText}>Reply</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
@@ -2440,11 +2604,11 @@ export default function ChatScreen({ route, navigation }) {
                                     <Text style={styles.modalButtonText}>
                                         {selectedMessage && isMessagePinned(selectedMessage?._id) ? <View style={{ alignItems: 'center' }}>
                                             <View><Image source={require('../icons/Unpin.png')} style={{ width: 25, height: 25 }} /></View>
-                                            <Text style={styles.modalButtonText}>Gỡ ghim</Text>
+                                            <Text style={styles.modalButtonText}>Un pin message</Text>
 
                                         </View> : <View style={{ alignItems: 'center' }}>
                                             <View><Image source={require('../icons/Pin_action.png')} style={{ width: 25, height: 25 }} /></View>
-                                            <Text style={styles.modalButtonText}>Ghim</Text>
+                                            <Text style={styles.modalButtonText}>Pin message</Text>
 
                                         </View>}
                                     </Text>
@@ -2453,7 +2617,7 @@ export default function ChatScreen({ route, navigation }) {
                                     canRecall && (
                                         <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
                                             <View><Image source={require('../icons/undo.png')} style={{ width: 25, height: 25 }} /></View>
-                                            <Text style={styles.modalButtonText}>Thu hồi</Text>
+                                            <Text style={styles.modalButtonText}>Recall</Text>
                                         </TouchableOpacity>
                                     )}
                             </View>
