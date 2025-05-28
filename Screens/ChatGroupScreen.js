@@ -70,9 +70,6 @@ function dedupeMessages(msgs) {
 
 
 
-/**
- * Message Bubble Component with support for onLongPress to show message options.
- */
 const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, allMessages, index }) => {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
@@ -1181,6 +1178,7 @@ export default function ChatScreen({ route, navigation }) {
         setSelectedMessage(message);
         setModalVisible(true);
     }, []);
+
     useEffect(() => {
         const load = async () => {
             const res = await axios.get(`/api/messages/${conversationId}`);
@@ -1936,6 +1934,8 @@ export default function ChatScreen({ route, navigation }) {
             throw error;
         }
     }
+
+
     useEffect(() => {
         const handleReactS = (message) => {
             setMessages(prevMessages =>
@@ -2019,7 +2019,7 @@ export default function ChatScreen({ route, navigation }) {
 
 
 
-    const handleSendMessage = async (message, members) => {
+    const handleSendMessage = useCallback(async (message, members) => {
         if (!isRemoved) {
             Alert.alert("Lỗi", "Bạn không còn trong nhóm này");
             return;
@@ -2091,7 +2091,7 @@ export default function ChatScreen({ route, navigation }) {
         } catch (err) {
             Alert.alert("Cannot send message", err.response?.data?.message || err.message);
         }
-    };
+    });
 
     // useEffect(() => {
     //     if (isRemoved) {
@@ -2294,7 +2294,7 @@ export default function ChatScreen({ route, navigation }) {
                         </TouchableOpacity>
                     </View>
                 )}
-                {isRemoved && (
+                {isRemoved ? (
                     <MessageInput
                         input={input}
                         setInput={setInput}
@@ -2308,6 +2308,10 @@ export default function ChatScreen({ route, navigation }) {
                         membersinconversation={members}
                         memberNames={memberTags}
                     />
+                ) : (
+                    <Text style={{ textAlign: 'center', padding: 10, color: 'gray' }}>
+                        Hiện bạn đã bị xoá khỏi nhóm và không thể trả lời.
+                    </Text>
                 )}
                 <EmojiPicker
                     onEmojiSelected={(emoji) => setInput((prev) => prev + emoji.emoji)}
