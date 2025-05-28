@@ -9,14 +9,29 @@ const AddChannelModal = ({ visible, onCancel, onCreate, memberId, conversation }
     const [channelName, setChannelName] = useState('');
 
 
+    const [isRemoved, setIsRemoved] = useState(false);
 
     useEffect(() => {
         const handleCreateS = (newChannel) => {
+            if (isRemoved) return;
             onCreate(newChannel.name);
-        }
+        };
+
+        const handleLeaveConversation = (data) => {
+
+            if (data.conversationId === conversation) {
+                setIsRemoved(true);
+            }
+        };
+
         socket.on(SOCKET_EVENTS.NEW_CHANNEL, handleCreateS);
-        return () => { socket.off(SOCKET_EVENTS.NEW_CHANNEL, handleCreateS); }
-    }, [socket])
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+
+        return () => {
+            socket.off(SOCKET_EVENTS.NEW_CHANNEL, handleCreateS);
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+        };
+    }, [socket, conversation, onCreate, isRemoved]);
 
 
     const handleCreate = async () => {

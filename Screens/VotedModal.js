@@ -17,7 +17,7 @@ import userService from '../api/userService';
 import { socket } from "../utils/socketClient";
 import { SOCKET_EVENTS } from "../utils/constant";
 
-const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
+const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation }) => {
 
     const [selectedOptions, setSelectedOptions] = useState([]);
     const [msg, setMsg] = useState(null);
@@ -25,7 +25,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
     const [dynamicOptions, setDynamicOptions] = useState([]);
     const [newOptionText, setNewOptionText] = useState('');
     const [member, setMember] = useState(memberId);
-
+    const [isRemoved, setIsRemoved] = useState(false);
     useEffect(() => {
         if (memberId) {
             setMember(memberId);
@@ -142,16 +142,26 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId }) => {
         }
     };
 
-
     useEffect(() => {
         const handleVoteOptionSelectS = (selectoption) => {
+            if (isRemoved) return;
             onSubmit(selectoption);
-        }
+        };
+        const handleLeaveConversation = (data) => {
+
+            if (data.conversationId === conversation._id) {
+                setIsRemoved(true);
+            }
+        };
+
         socket.on(SOCKET_EVENTS.VOTE_OPTION_SELECTED, handleVoteOptionSelectS);
-        return () => { socket.off(SOCKET_EVENTS.VOTE_OPTION_SELECTED, handleVoteOptionSelectS); }
-    }, [socket])
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
 
-
+        return () => {
+            socket.off(SOCKET_EVENTS.VOTE_OPTION_SELECTED, handleVoteOptionSelectS);
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+        };
+    }, [socket, conversation, onSubmit, isRemoved]);
 
 
 

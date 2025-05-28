@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, use } from "react";
 import {
     View,
     Text,
@@ -1183,7 +1183,8 @@ export default function ChatScreen({ route, navigation }) {
     const [isRemoved, setIsRemoved] = useState(false);
     const [canRecall, setCanRecall] = useState(false);
 
-
+    const [readMess, setReadMess] = useState(true)
+    const [forwardadndDelete, setForwardandDelete] = useState(true);
 
     useEffect(() => {
         const load = async () => {
@@ -1445,17 +1446,28 @@ export default function ChatScreen({ route, navigation }) {
 
     useEffect(() => {
         const handlePinMessagesS = (message) => {
-            setMessages(prevMessages =>
-                prevMessages.map(msg =>
-                    msg._id === message.messageId
-                        ? { ...msg, isPinned: true }
-                        : msg
+            if (!isRemoved) return;
+            setMessages((prevMessages) =>
+                prevMessages.map((msg) =>
+                    msg._id === message.messageId ? { ...msg, isPinned: true } : msg
                 )
             );
-        }
+        };
+
+        const handleLeaveConversation = (data) => {
+            if (data.conversationId === conversationId) {
+                setIsRemoved(false);
+            }
+        };
+
         socket.on(SOCKET_EVENTS.PIN_MESSAGE, handlePinMessagesS);
-        return () => { socket.off(SOCKET_EVENTS.PIN_MESSAGE, handlePinMessagesS); }
-    }, [socket])
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+
+        return () => {
+            socket.off(SOCKET_EVENTS.PIN_MESSAGE, handlePinMessagesS);
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+        };
+    }, [socket, conversationId, setMessages, isRemoved]);
 
 
     const handlePinMessages = async (message) => {
@@ -1492,20 +1504,28 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-
     useEffect(() => {
         const handleUnpinS = (message) => {
-            setMessages(prevMessages =>
-                prevMessages.map(msg =>
-                    msg._id === message.messageId
-                        ? { ...msg, isPinned: true }
-                        : msg
+            if (!isRemoved) return;
+            setMessages((prevMessages) =>
+                prevMessages.map((msg) =>
+                    msg._id === message.messageId ? { ...msg, isPinned: false } : msg
                 )
             );
-        }
+        };
+        const handleLeaveConversation = (data) => {
+            if (data.conversationId === conversationId) {
+                setIsRemoved(false);
+            }
+        };
         socket.on(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinS);
-        return () => { socket.off(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinS); }
-    }, [socket])
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+
+        return () => {
+            socket.off(SOCKET_EVENTS.UNPIN_MESSAGE, handleUnpinS);
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+        };
+    }, [socket, conversationId, setMessages, isRemoved]);
 
     const handleUnpinMessage = async (messageId) => {
         try {
@@ -1533,15 +1553,6 @@ export default function ChatScreen({ route, navigation }) {
     };
 
 
-
-    const handlePinnedMessages = async () => {
-        try {
-            const response = await axios.get(`/api/pin-messages/${conversationId}`);
-            return response.data;
-        } catch (err) {
-            return [];
-        }
-    };
 
     // function PinnedMessagesSection({ pinnedMessages }) {
     //     if (!pinnedMessages || pinnedMessages.length === 0) {
@@ -2411,9 +2422,28 @@ export default function ChatScreen({ route, navigation }) {
         setCanRecall(result);
     }, [selectedMessage, userId]);
 
+    useEffect(() => {
+        if (
+            selectedMessage === null ||
+            !["FILE", "IMAGE", "VIDEO", "VOTE"].includes(selectedMessage.type)
+        ) {
+            setReadMess(true);
+        } else {
+            setReadMess(false);
+        }
+    }, [selectedMessage, setReadMess]);
 
 
-
+    useEffect(() => {
+        if (
+            selectedMessage === null ||
+            !["VOTE"].includes(selectedMessage.type)
+        ) {
+            setForwardandDelete(true);
+        } else {
+            setForwardandDelete(false);
+        }
+    }, [selectedMessage, setForwardandDelete]);
     return (
 
         <View style={chatScreenStyles.container}>
@@ -2486,7 +2516,7 @@ export default function ChatScreen({ route, navigation }) {
                 <CreateVoteModal
                     visible={showVoteModal}
                     channelId={currentChannelId}
-                    conversationId={conversationId}
+                    conversationId={conversation}
                     memberId={memberId}
                     onClose={() => setVoteShowModal(false)}
                     onCreate={handleCreatePoll}
@@ -2497,6 +2527,7 @@ export default function ChatScreen({ route, navigation }) {
                     message={selectedMessage}
                     memberId={memberId}
                     onSubmit={handleVoteSubmit}
+                    conversation={conversation}
                 />
 
                 <VoiceRecordModal
@@ -2568,30 +2599,36 @@ export default function ChatScreen({ route, navigation }) {
                             </View>
                             <View style={{ width: 300, height: 'auto', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 10, backgroundColor: "#fff", padding: 10, borderRadius: 10 }}>
 
-                                <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
-                                    <View><Image source={require('../icons/Delete.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Delete</Text>
-                                </TouchableOpacity>
+                                {forwardadndDelete && (
+                                    <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
+                                        <View><Image source={require('../icons/Delete.png')} style={{ width: 25, height: 25 }} /></View>
+                                        <Text style={styles.modalButtonText}>Delete</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {forwardadndDelete && (
+                                    <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
+                                        <View><Image source={require('../icons/forward.png')} style={{ width: 25, height: 25 }} /></View>
+                                        <Text style={styles.modalButtonText}>Forward</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {readMess && (
+                                    <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
+                                        <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
+                                        <Text style={styles.modalButtonText}>Read Mesage</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {forwardadndDelete && (
+                                    <TouchableOpacity
+                                        style={styles.modalButton}
+                                        onPress={() => {
+                                            setReplyingMessage(selectedMessage);
+                                            setModalVisible(false);
+                                        }}>
 
-                                <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
-                                    <View><Image source={require('../icons/forward.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Forward</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
-                                    <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Read Mesage</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.modalButton}
-                                    onPress={() => {
-                                        setReplyingMessage(selectedMessage);
-                                        setModalVisible(false);
-                                    }}>
-
-                                    <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
-                                    <Text style={styles.modalButtonText}>Reply</Text>
-                                </TouchableOpacity>
-
+                                        <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
+                                        <Text style={styles.modalButtonText}>Reply</Text>
+                                    </TouchableOpacity>
+                                )}
                                 <TouchableOpacity
                                     style={styles.modalButton}
                                     onPress={() => {

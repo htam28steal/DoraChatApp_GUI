@@ -22,6 +22,8 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
     const [options, setOptions] = useState(['', '']);
     const [allowMultiple, setAllowMultiple] = useState(false);
     const [isAnonymous, setIsAnonymous] = useState(false);
+    const [isRemoved, setIsRemoved] = useState(false);
+
     const handleOptionChange = (text, index) => {
         const updated = [...options];
         updated[index] = text;
@@ -79,17 +81,27 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
 
     useEffect(() => {
         const handleCreateVoteS = (newVote) => {
+            if (isRemoved) return;
             onCreate(newVote);
-        }
+        };
+
+        const handleLeaveConversation = (data) => {
+            console.log(`HAHA HA DATA`, data)
+            if (data.conversationId === conversationId) {
+                setIsRemoved(true);
+            }
+        };
+
         socket.on(SOCKET_EVENTS.CREATE_VOTE, handleCreateVoteS);
-        socket.on(SOCKET_EVENTS.ADD_VOTE_OPTION, handleCreateVoteS)
+        socket.on(SOCKET_EVENTS.ADD_VOTE_OPTION, handleCreateVoteS);
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+
         return () => {
             socket.off(SOCKET_EVENTS.CREATE_VOTE, handleCreateVoteS);
-            socket.off(SOCKET_EVENTS.ADD_VOTE_OPTION, handleCreateVoteS)
-
-        }
-    }, [socket])
-
+            socket.off(SOCKET_EVENTS.ADD_VOTE_OPTION, handleCreateVoteS);
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+        };
+    }, [socket, conversationId, onCreate, isRemoved]);
 
 
 
