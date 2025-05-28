@@ -21,6 +21,8 @@ export default function GroupDetail({ route, navigation }) {
   const [groupName, setGroupName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
+  const [loading, setLoading] = useState(true);
+
 
 
   const { conversationId } = route.params;
@@ -58,6 +60,7 @@ const [inviteLinkModalVisible, setInviteLinkModalVisible] = useState(false);
 const [inviteLink, setInviteLink] = useState('');
 const [sendingLinkTo, setSendingLinkTo] = useState(''); // Friend ID while sending
 
+
 // returns the conversationId for a 1-on-1 chat between me and friendId
 // ——————————————————————————————
 // Helper: get or create a 1-on-1 DM with friendId
@@ -73,6 +76,7 @@ const getOrCreateDMChannel = async (friendId) => {
   // Backend returns the full conversation object; extract its ID:
   return res.data._id || res.data.id || res.data.conversationId;
 };
+
 
 
 
@@ -240,18 +244,23 @@ useEffect(() => {
 
 
 useEffect(() => {
-  ;(async () => {
+  (async () => {
     try {
+      setLoading(true); // set loading when data fetching starts
       const res = await axios.get(`/api/conversations/${conversationId}`);
       const convo = res.data;
       setIsJoinApproval(!!convo.isJoinFromLink);
       setGroupName(convo.name || '');
       setGroupAvatar(convo.avatar || 'https://placehold.co/120x120?text=Group');
+      // you may want to fetch members or any other info you need before setLoading(false)
     } catch (err) {
       console.error("Couldn't load conversation details:", err);
+    } finally {
+      setLoading(false); // loading done!
     }
   })();
 }, [conversationId]);
+
 
 
   // whenever `showJoinRequestsModal` flips to true, fetch
@@ -511,8 +520,18 @@ useEffect(() => {
       </View>
     </TouchableOpacity>
   );
-
+if (loading) {
   return (
+    <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)' }]}>
+      <TouchableOpacity     onPress={() => navigation.goBack()}  style={{position:'absolute',top:40, left:25, }}>
+        <Image source={require('../icons/back.png')} style={{width:25, height:20}}></Image>
+      </TouchableOpacity>
+      <ActivityIndicator size="large" color="#086DC0" />
+    </View>
+  );
+}
+  return (
+    
           <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
     <SafeAreaView style={styles.container}>
 

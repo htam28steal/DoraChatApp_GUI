@@ -1110,33 +1110,50 @@ export default function GroupsScreen({ navigation }) {
       >
         <View style={styles.modalContainer}>
           <View style={styles.pickerModal}>
+      <TouchableOpacity
+        style={styles.closeButton}
+        onPress={() => setConvPickerVisible(false)}
+      >
+        <Text style={styles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
             <Text style={styles.manageTitle}>Chọn hội thoại</Text>
             <FlatList
               data={allConversations}
               keyExtractor={c => normalizeId(c._id)}
-              renderItem={({ item }) => {
-                const isSelected = selectedList.includes(item._id);
+             renderItem={({ item }) => {
+  const isSelected = selectedList.includes(item._id);
 
-                // if it's a one‐on‐one chat (type=false), show the other member's name
-                let displayName;
-                if (item.type) {
-                  // group
-                  displayName = item.name;
-                } else {
-                  // single chat → find the membership whose userId ≠ current user
-                  const otherMember = item.members.find(m => m.userId !== userId);
-                  displayName = otherMember?.name || 'Unknown';
-                }
-                return (
-                  <TouchableOpacity
-                    style={styles.classifyRow}
-                    onPress={() => toggleAssignConversation(item._id)}
-                  >
-                    <Text style={{ flex: 1 }}>{displayName}</Text>
-                    {isSelected && <Text>✓</Text>}
-                  </TouchableOpacity>
-                );
-              }}
+  // Determine displayName and avatarUrl
+  let displayName = '';
+  let avatarUrl = '';
+  if (item.type) {
+    // group chat
+    displayName = item.name;
+    avatarUrl = item.avatar;
+  } else {
+    // 1-1 chat: find other member
+    const otherMember = item.members.find(m => m.userId !== userId);
+    displayName = otherMember?.name || 'Unknown';
+    avatarUrl = otherMember?.avatar;
+  }
+  return (
+    <TouchableOpacity
+      style={[styles.classifyRow, { alignItems: 'center' }]}
+      onPress={() => toggleAssignConversation(item._id)}
+    >
+      <Image
+        source={avatarUrl ? { uri: avatarUrl } : userIcon}
+        style={{ width: 36, height: 36, borderRadius: 18, marginRight: 12, backgroundColor: '#eee' }}
+      />
+      <Text style={{ flex: 1 }}>{displayName}</Text>
+      <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+      {isSelected ? <View style={styles.radioDot} /> : null}
+    </View>
+
+    </TouchableOpacity>
+  );
+}}
+
             />
 
             <TouchableOpacity
@@ -1640,6 +1657,38 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
   },
+  radioCircle: {
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  borderWidth: 2,
+  borderColor: '#086DC0',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginLeft: 12,
+},
+radioCircleSelected: {
+  borderColor: '#086DC0',
+},
+radioDot: {
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: '#086DC0',
+},
+closeButton: {
+  position: 'absolute',
+  top: 10,
+  right: 10,
+  zIndex: 10,
+  padding: 8,
+},
+closeButtonText: {
+  fontSize: 22,
+  color: 'red',
+  fontWeight: 'bold',
+},
+
 
 
 });
