@@ -17,7 +17,7 @@ import {
     Animated,
     Easing
 } from "react-native";
-
+import Toast from "react-native-toast-message";
 
 
 
@@ -1645,12 +1645,42 @@ export default function ChatScreen({ route, navigation }) {
                         <TouchableOpacity style={headerStyles.iconButton}>
                             <Image source={VideoCallIcon} style={headerStyles.icon} />
                         </TouchableOpacity>
-                        <TouchableOpacity
-                            style={headerStyles.iconButton}
-                            onPress={() => navigation.navigate('GroupDetailScreen', { conversationId })}
-                        >
-                            <Image source={DetailChatIcon} style={headerStyles.icon} />
-                        </TouchableOpacity>
+<TouchableOpacity
+    style={headerStyles.iconButton}
+    onPress={async () => {
+        try {
+            // get userId from storage (adjust as needed)
+            const userId = await AsyncStorage.getItem('userId');
+            // fetch member info
+            const res = await axios.get(`/api/conversations/${conversationId}/members`);
+            // find current member
+            const currentMember = res.data.find(m => m.userId === userId);
+            if (!currentMember) {
+                                  Toast.show({
+        type: "error",
+        text1: "You are not a member of this group.",
+      });
+                return;
+            }
+            if (currentMember.active === false) {
+                                  Toast.show({
+        type: "error",
+        text1: "You are no longer an active member of this group.",
+      });
+                return;
+            }
+            // navigate if all ok
+            navigation.navigate('GroupDetailScreen', { conversationId });
+        } catch (err) {
+                  Toast.show({
+        type: "error",
+        text1: "Cannot check membership status",
+      });
+        }
+    }}
+>
+    <Image source={DetailChatIcon} style={headerStyles.icon} />
+</TouchableOpacity>
                     </View>
                 </View>
 
