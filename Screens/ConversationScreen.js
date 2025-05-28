@@ -62,7 +62,7 @@ const messIcon   = require('../icons/mess.png');
       const [friends, setFriends] = useState([]);
 
 
-      
+
 
       useEffect(() => {
   const handleNewMessage = (message) => {
@@ -195,23 +195,20 @@ const onlyFalse = Array.isArray(res.data)
               : [...prev, id]
           );
         }, []);
-      
 const filteredConversations = useMemo(() => {
-  const base = Array.isArray(conversations) ? conversations : []
-  
+  const base = Array.isArray(conversations) ? conversations : [];
   // apply tag filters (if any)
   let convs = selectedFilters.length > 0
-    ? base.filter(c => c && selectedFilters
-         .flatMap(tagId => classifies
-           .find(t => t._id === tagId)
-           ?.conversationIds || [])
-         .includes(c._id)
+    ? base.filter(c =>
+        c && selectedFilters.some(tagId =>
+          (classifies.find(t => t._id === tagId)?.conversationIds || []).includes(c._id)
+        )
       )
-    : base
+    : base;
+  // only keep those with type === false
+  return convs.filter(c => c?.type === false);
+}, [conversations, classifies, selectedFilters]);
 
-  // finally only keep those with type===true, but guard c
-   return base.filter(c => c?.type === false)
-}, [conversations, classifies, selectedFilters])
 
         
           
@@ -260,7 +257,16 @@ const filteredConversations = useMemo(() => {
           };
           const { data } = await axios.put(`/api/classifies/${editingId}`, body);
           const { data: latest } = await axios.get('/api/classifies');
-          setClassifies(latest);
+          const normalized = latest.map(c => ({
+  ...c,
+  _id: typeof c._id === 'object' && c._id.$oid ? c._id.$oid : String(c._id),
+  conversationIds: (c.conversationIds || []).map(idObj =>
+    typeof idObj === 'object' && idObj.$oid
+      ? idObj.$oid
+      : String(idObj)
+  ),
+}));
+          setClassifies(normalized);
       
           setEditTagModalVisible(false);
         } catch (err) {
@@ -403,7 +409,18 @@ if (!token) {
                 }
               });
           
-
+   const data = res.data.map(c => ({
+      ...c,
+      _id:
+        typeof c._id === 'object' && c._id.$oid
+          ? c._id.$oid
+          : String(c._id),
+      conversationIds: (c.conversationIds || []).map(idObj =>
+        typeof idObj === 'object' && idObj.$oid
+          ? idObj.$oid
+          : String(idObj)
+      ),
+    }));
           
               setClassifies(res.data);
               setClassifyModalVisible(true);
@@ -608,36 +625,44 @@ useEffect(() => {
           <View style={styles.modalContainer}>
             <View style={styles.classifyModal}>
               <Text style={styles.modalTitle}>Theo thẻ phân loại</Text>
-              <FlatList
-        data={classifies}
-        keyExtractor={c => c._id}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => {
-          const isChecked = selectedFilters.includes(item._id);
-          return (
-            <TouchableOpacity
-              style={styles.classifyRow}
-              onPress={() => toggleFilter(item._id)}
-            >
-              {/* simple square checkbox */}
-              <View
-                style={[
-                  styles.checkbox,
-                  isChecked && styles.checkboxChecked
-                ]}
-              />
-              {/* your colored dot */}
-              <View
-                style={[
-                  styles.colorDot,
-                  { backgroundColor: item.color?.code || '#ccc' }
-                ]}
-              />
-              <Text style={styles.classifyLabel}>{item.name}</Text>
-            </TouchableOpacity>
-          );
-        }}
-      />
+  <FlatList
+  data={classifies}
+  keyExtractor={c => c._id}
+  ItemSeparatorComponent={() => <View style={styles.separator} />}
+     renderItem={({ item }) => {
+      const isChecked = selectedFilters.includes(item._id);
+      return (
+        <TouchableOpacity
+          style={[
+            styles.classifyRow,
+            isChecked && { backgroundColor: '#F1F6FF' }
+          ]}
+          onPress={() => {
+          if (isChecked) {
+            setSelectedFilters([]);
+          } else {
+            setSelectedFilters([item._id]);
+          }
+          }}
+        >
+          <View
+            style={[
+              styles.checkbox,
+              isChecked && styles.checkboxChecked
+            ]}
+          />
+          <View
+            style={[
+              styles.colorDot,
+              { backgroundColor: item.color?.code || '#ccc' }
+            ]}
+          />
+          <Text style={styles.classifyLabel}>{item.name}</Text>
+        </TouchableOpacity>
+      );
+    }}
+/>
+
       
       
               <View style={styles.separator} />
@@ -795,32 +820,47 @@ useEffect(() => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.pickerModal}>
-            <Text style={styles.manageTitle}>Chọn hội thoại</Text>
-            <FlatList
-              data={allConversations}
-              keyExtractor={c => c._id}
-              renderItem={({ item }) => {
-                const isSelected = assignedConversations.includes(item._id);
-                let displayName;
-                if (item.type) {
-                  displayName = item.name; // group
-                } else {
-                  // single chat
-                  const other = Array.isArray(conv.members) ? conv.members.find(m => m.userId !== userId) : {};
-
-                  displayName = friendsById[other.userId]?.name || other.name || 'Unknown';
-                }
-                return (
-                  <TouchableOpacity
-                    style={styles.classifyRow}
-                    onPress={() => toggleAssignConversation(item._id)}
+            <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setConvPickerVisible(false)}
                   >
-                    <Text style={{ flex: 1 }}>{displayName}</Text>
-                    {isSelected && <Text>✓</Text>}
-                  </TouchableOpacity>
-                );
-              }}
-            />
+                    <Text style={styles.closeButtonText}>✕</Text>
+                    </TouchableOpacity>
+            <Text style={styles.manageTitle}>Chọn hội thoại</Text>
+          <FlatList
+  data={allConversations}
+  keyExtractor={c => c._id}
+  renderItem={({ item }) => {
+    const isSelected = assignedConversations.includes(item._id);
+    let displayName;
+    let avatarUri = null;
+    if (item.type) {
+      displayName = item.name; // group
+      avatarUri = item.avatar || null;
+    } else {
+      // single chat
+      const other = Array.isArray(item.members) ? item.members.find(m => m.userId !== userId) : {};
+      displayName = friendsById[other.userId]?.name || other.name || 'Unknown';
+      avatarUri = other.avatar || null;
+    }
+    return (
+      <TouchableOpacity
+        style={styles.classifyRow}
+        onPress={() => toggleAssignConversation(item._id)}
+      >
+        <Image
+          source={avatarUri ? { uri: avatarUri } : require('../Images/avt.png')}
+          style={{ width: 36, height: 36, borderRadius: 18, marginRight: 12 }}
+        />
+        <Text style={{ flex: 1 }}>{displayName}</Text>
+        <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+          {isSelected ? <View style={styles.radioDot} /> : null}
+        </View>
+      </TouchableOpacity>
+    );
+  }}
+/>
+
             <TouchableOpacity
               style={[styles.confirmButton, { marginTop: 12 }]}
               onPress={() => setConvPickerVisible(false)}
@@ -1323,5 +1363,38 @@ const styles = StyleSheet.create({
       
       email:{
         maxWidth:'80%'
-      }
+      },
+      radioCircle: {
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  borderWidth: 2,
+  borderColor: '#086DC0',
+  marginLeft: 8,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+radioDot: {
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: '#086DC0',
+},
+radioCircleSelected: {
+  borderColor: '#086DC0',
+  borderWidth: 2,
+},
+closeButton: {
+  position: 'absolute',
+  right: 10,
+  top: 10,
+  zIndex: 10,
+  padding: 8,
+},
+closeButtonText: {
+  fontSize: 22,
+  color: 'red',
+  fontWeight: 'bold',
+},
+
 });
