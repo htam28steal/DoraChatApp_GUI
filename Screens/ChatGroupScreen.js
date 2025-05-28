@@ -280,13 +280,13 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     const [isPlaying, setIsPlaying] = useState(false);
     const [pinned, setPinned] = useState(false);
     const emojiMap = {
-
-        1: '❤️',
-        2: '😂',
-        3: '😢',
-        4: '👍',
-        5: '👎',
-        6: '😮',
+        0: '👍', // Like
+        1: '❤️', // Love
+        2: '😆', // Haha
+        3: '😮', // Wow
+        4: '😢', // Sad
+        5: '😣', // Angry
+        6: '🤗', // Care
     };
 
 
@@ -1244,12 +1244,13 @@ export default function ChatScreen({ route, navigation }) {
 
 
     const emojiToType = {
-        '❤️': 1,
-        '😂': 2,
-        '😢': 3,
-        '👍': 4,
-        '👎': 5,
-        '😮': 6,
+        "👍": 0,
+        "❤️": 1,
+        "😆": 2,
+        "😮": 3,
+        "😢": 4,
+        "😣": 5,
+        "🤗": 6,
     };
 
 
@@ -2545,7 +2546,7 @@ export default function ChatScreen({ route, navigation }) {
                                     width: '100%',
                                     marginTop: 10
                                 }}>
-                                    {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
+                                    {['👍', '❤️', '😆', '😮', '😢', '😣', '🤗'].map((emoji) => (
                                         <TouchableOpacity
                                             key={emoji}
                                             onPress={() => {
@@ -2635,12 +2636,13 @@ export default function ChatScreen({ route, navigation }) {
                                 keyExtractor={(item) => item.userId}
                                 renderItem={({ item }) => {
                                     const emojiMap = {
-                                        1: '❤️',
-                                        2: '😂',
-                                        3: '😢',
-                                        4: '👍',
-                                        5: '👎',
-                                        6: '😮',
+                                        0: '👍', // Like
+                                        1: '❤️', // Love
+                                        2: '😆', // Haha
+                                        3: '😮', // Wow
+                                        4: '😢', // Sad
+                                        5: '😣', // Angry
+                                        6: '🤗', // Care
                                     };
 
                                     const emoji = emojiMap[item.type];

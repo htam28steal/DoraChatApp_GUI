@@ -385,13 +385,13 @@ const MessageItem = forwardRef(function MessageItem(
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
   const emojiMap = {
-    1: '👍',
-    2: '❤️',
-    3: '😆',
-    4: '😮',
-    5: '😢',
-    6: '😣',
-    7: '🤗'
+    0: '👍', // Like
+    1: '❤️', // Love
+    2: '😆', // Haha
+    3: '😮', // Wow
+    4: '😢', // Sad
+    5: '😣', // Angry
+    6: '🤗', // Care
   };
   const innerRef = useRef();
 
@@ -1660,13 +1660,13 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   const emojiToType = {
-    '👍': 1,
-    '❤️': 2,
-    '😆': 3,
-    '😮': 4,
-    '😢': 5,
-    '😣': 6,
-    '🤗': 7
+    '👍': 0, // Like
+    '❤️': 1, // Love
+    '😆': 2, // Haha
+    '😮': 3, // Wow
+    '😢': 4, // Sad
+    '😣': 5, // Angry
+    '🤗': 6, // Care
   };
 
 
@@ -1803,12 +1803,12 @@ export default function ChatScreen({ route, navigation }) {
     try {
       const { data: conversations } = await axios.get("/api/conversations");
       const filteredConversations = conversations.filter(c => c._id !== conversationId);
-      
+
 
 
       // split out groups vs. private
       const groupConvs = filteredConversations
-  .filter(c => c.type === true && c.members.some(m => m.userId === userId && m.active !== false)); // 👈 THIS LINE CHANGED
+        .filter(c => c.type === true && c.members.some(m => m.userId === userId && m.active !== false)); // 👈 THIS LINE CHANGED
       const privateConvs = filteredConversations.filter(c => c.type !== true);
 
       // 1️⃣ build group→channels list exactly as you had it
@@ -2343,17 +2343,17 @@ export default function ChatScreen({ route, navigation }) {
       // ❌ skip messages sent by me
       if (message.memberId.userId === userId) return;
 
-setMessages(prev => {
-  // Remove any pending optimistic for this message
-  let filtered = prev.filter(m =>
-    !(m.pending && m.content === message.content &&
-      Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 5000)
-  );
-  // Add the new message
-  filtered.push(message);
-  // Deduplicate by _id (keeps last occurrence, just like your dedupeMessages)
-  return dedupeMessages(filtered);
-});
+      setMessages(prev => {
+        // Remove any pending optimistic for this message
+        let filtered = prev.filter(m =>
+          !(m.pending && m.content === message.content &&
+            Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 5000)
+        );
+        // Add the new message
+        filtered.push(message);
+        // Deduplicate by _id (keeps last occurrence, just like your dedupeMessages)
+        return dedupeMessages(filtered);
+      });
 
     };
 
@@ -2480,7 +2480,7 @@ setMessages(prev => {
               {/* 1) Reaction bar */}
 
               <View style={styles.reactionBar}>
-                {['👍', '❤️', '😆', '😮', '😢', '😣','🤗'].map((emoji) => (
+                {['👍', '❤️', '😆', '😮', '😢', '😣', '🤗'].map((emoji) => (
                   <TouchableOpacity
                     key={emoji}
                     onPress={() => {
@@ -2650,13 +2650,13 @@ setMessages(prev => {
 
                 renderItem={({ item }) => {
                   const emojiMap = {
-                    0: "👍", // Like
-                    1: "❤️", // Love
-                    2: "😆", // Haha
-                    3: "😮", // Wow
-                    4: "😢", // Sad
-                    5: "😣", // Angry
-                    6: "🤗", // Care
+                    0: '👍', // Like
+                    1: '❤️', // Love
+                    2: '😆', // Haha
+                    3: '😮', // Wow
+                    4: '😢', // Sad
+                    5: '😣', // Angry
+                    6: '🤗', // Care
                   };
 
 
