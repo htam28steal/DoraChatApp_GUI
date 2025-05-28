@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, use } from "react";
+import React, { useState, useEffect, useRef, useCallback, } from "react";
 import {
     View,
     Text,
@@ -15,8 +15,6 @@ import {
     FlatList,
     KeyboardAvoidingView
 } from "react-native";
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import Toast from "react-native-toast-message";
 
 
 
@@ -75,7 +73,7 @@ function dedupeMessages(msgs) {
 /**
  * Message Bubble Component with support for onLongPress to show message options.
  */
-const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, allMessages }) => {
+const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, allMessages, index }) => {
     const isMe = msg.memberId?.userId === currentUserId;
     const content = msg.content || "";
     const MAX_TEXT_LENGTH = 350;
@@ -178,7 +176,7 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
         const lastDotIndex = msg.content.lastIndexOf('.');
 
         const ext = lastDotIndex !== -1 ? msg.content.slice(lastDotIndex + 1).toLowerCase() : '';
-        if (ext !== 'm4a') return;
+        if (ext !== 'm4a' || ext !== 'mp3') return;
 
         let isMounted = true;
         let audioSound = null;
@@ -282,6 +280,25 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
         );
     };
 
+    const prevMessage = allMessages[index - 1];
+    const isFirstInGroup = !prevMessage ||
+        prevMessage.memberId?.userId !== msg.memberId?.userId ||
+        prevMessage.type === "NOTIFY" ||
+        msg.type === "NOTIFY";
+
+
+    const [avatarLoaded, setAvatarLoaded] = useState(false);
+    const DEFAULT_AVATAR = "https://example.com/default-avatar.png";
+    const shouldShowAvatar = React.useMemo(() => {
+        if (isCenterAligned || !showAvatar) return false;
+
+        const prevMessage = allMessages[index - 1];
+        return !prevMessage ||
+            prevMessage.memberId?.userId !== msg.memberId?.userId ||
+            prevMessage.type === "NOTIFY" ||
+            msg.type === "NOTIFY";
+    }, [allMessages, index, msg.memberId?.userId, msg.type, isCenterAligned, showAvatar]);
+
 
 
     return (
@@ -297,8 +314,14 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                         : messageItemStyles.leftAlign,
             ]}
         >
-            {!isCenterAligned && (showAvatar ? (
-                <Image source={{ uri: msg.memberId.avatar }} style={messageItemStyles.avatar} />
+
+            {!isCenterAligned && (shouldShowAvatar ? (
+                <Image
+                    source={{ uri: msg.memberId?.avatar || DEFAULT_AVATAR }}
+                    style={messageItemStyles.avatar}
+                    onLoad={() => setAvatarLoaded(true)}
+                    key={`avatar-${msg._id}-${avatarLoaded}`} // Force re-render khi avatar thay đổi
+                />
             ) : (
                 <View style={messageItemStyles.avatarPlaceholder} />
             ))}
@@ -530,7 +553,9 @@ const messageItemStyles = StyleSheet.create({
     },
     leftAlign: { justifyContent: "flex-start" },
     rightAlign: { flexDirection: "row-reverse" },
-    avatar: { width: 40, height: 40, borderRadius: 20 },
+    avatar: {
+        width: 40, height: 40, borderRadius: 20, backgroundColor: '#e0e0e0',
+    },
     avatarPlaceholder: { width: 40, height: 40 },
 
     contentContainer: {
@@ -781,6 +806,7 @@ function ChatBox({ messages, allMessages, currentUserId, onMessageLongPress, han
                     <MessageItem
                         key={key}
                         msg={msg}
+                        index={index}
                         allMessages={allMessages}
                         showAvatar={isFirstInGroup}
                         showTime={isLastInGroup}
@@ -977,8 +1003,9 @@ export default function ChatScreen({ route, navigation }) {
     const [members, setMembers] = useState(null);
     const [memberTags, setMemberTags] = useState([])
     const [allMessages, setAllMessages] = useState([]);
-
     const [isRemoved, setIsRemoved] = useState(false);
+    const [canRecall, setCanRecall] = useState(false);
+
 
 
     useEffect(() => {
@@ -1267,10 +1294,9 @@ export default function ChatScreen({ route, navigation }) {
             const response = await axios.post('/api/pin-messages', {
                 messageId: message._id,
                 conversationId: message.conversationId,
-                pinnedBy: message.memberId._id,
+                pinnedBy: memberId
             });
 
-            // Chỉ cập nhật trạng thái pin cho message cụ thể
             setMessages(prevMessages =>
                 prevMessages.map(msg =>
                     msg._id === message._id
@@ -1305,11 +1331,6 @@ export default function ChatScreen({ route, navigation }) {
     const handleUnpinMessage = async (messageId) => {
         try {
             const memberResponse = await axios.get(`/api/members/${conversationId}/${userId}`);
-
-
-
-
-            // setIsRemoved(memberResponse.data.active);
 
             const memberId = memberResponse.data.data?._id;
 
@@ -1368,11 +1389,11 @@ export default function ChatScreen({ route, navigation }) {
 
     const pinnedMessageStyles = StyleSheet.create({
         container: {
-            width: '60%',
-            minHeight: 60,
+            width: '100%',
+            minHeight: 50,
             backgroundColor: 'white',
             backgroundColor: "#D8EDFF",
-
+            height: 'auto',
         },
         title: {
             fontSize: 12,
@@ -1388,7 +1409,8 @@ export default function ChatScreen({ route, navigation }) {
             marginRight: 8,
             borderWidth: 1,
             borderColor: '#e0e0e0',
-            maxWidth: 200,
+            width: '100%',
+            maxWidth: '100%',
         },
         messageContent: {
             fontSize: 14,
@@ -1616,18 +1638,15 @@ export default function ChatScreen({ route, navigation }) {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             quality: 1,
-            allowsEditing: false, // Bạn có thể bật chế độ chỉnh sửa nếu cần
+            allowsEditing: false,
         });
         if (!result.canceled && result.assets.length > 0) {
             const selectedImage = result.assets[0];
-            console.log(selectedImage); // Kiểm tra thông tin của hình ảnh được chọn
 
-            // Lấy URI hình ảnh
             const imageUri = selectedImage.uri;
             const fileName = selectedImage.uri.split('/').pop(); // Lấy tên file từ URI
             const mimeType = selectedImage.mimeType;
 
-            // Tạo một đối tượng `File` cho FormData
             const file = {
                 uri: imageUri,
                 name: fileName,
@@ -1656,7 +1675,6 @@ export default function ChatScreen({ route, navigation }) {
                     createdAt: new Date().toISOString(),
                 };
 
-                // Cập nhật danh sách tin nhắn với ảnh mới
                 setMessages((prev) => [...prev, newMsg]);
 
 
@@ -1713,7 +1731,6 @@ export default function ChatScreen({ route, navigation }) {
                     : response.data[0]?.content;
 
 
-                console.log(`MEDIA URL`, content);
                 const newMsg = {
                     _id: String(Date.now()),
                     memberId: { userId: userId || "" },
@@ -2089,6 +2106,8 @@ export default function ChatScreen({ route, navigation }) {
         if (!socket || !conversationId || !isRemoved) return;
 
         const receiveHandler = (message) => {
+
+
             if (!isRemoved) return;
             setMessages(prev => {
                 if (message.memberId?.userId === userId) {
@@ -2217,6 +2236,17 @@ export default function ChatScreen({ route, navigation }) {
         };
     }, [socket]);
 
+    const checkRecall = () => {
+        if (selectedMessage === null) return false;
+        const mb = selectedMessage.memberId.userId;
+        return mb === userId;
+    };
+    useEffect(() => {
+        const result = checkRecall();
+        setCanRecall(result);
+    }, [selectedMessage, userId]);
+
+
 
 
     return (
@@ -2329,57 +2359,99 @@ export default function ChatScreen({ route, navigation }) {
                         onPressOut={() => setModalVisible(false)}
                     >
                         <View style={styles.modalContainer}>
-                            <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
-                                <Text style={styles.modalButtonText}>Thu hồi</Text>
-                            </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
-                                <Text style={styles.modalButtonText}>Xoá</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
-                                <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
-                                <Text style={styles.modalButtonText}>Đọc tin nhắn</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.modalButton}
-                                onPress={() => {
-                                    setReplyingMessage(selectedMessage);
-                                    setModalVisible(false);
+                            <View style={{
+                                width: 300,
+                                backgroundColor: "#fff",
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                paddingBottom: 10,
+                                paddingLeft: 10,
+                                paddingRight: 10,
+                                borderRadius: 10
+                            }}>
+                                <View style={{
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-evenly',
+                                    alignItems: 'center',
+                                    width: '100%',
+                                    marginTop: 10
                                 }}>
-                                <Text style={styles.modalButtonText}>Trả lời</Text>
-                            </TouchableOpacity>
+                                    {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
+                                        <TouchableOpacity
+                                            key={emoji}
+                                            onPress={() => {
+                                                const type = emojiToType[emoji];
+                                                handleReact(selectedMessage, type);
+                                                setModalVisible(false);
+                                            }}
+                                            style={{
+                                                width: 30,
+                                                height: 30,
+                                                justifyContent: 'center',
+                                                alignItems: 'center'
+                                            }}
+                                        >
+                                            <Text style={{ fontSize: 25 }}>{emoji}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                            <View style={{ width: 300, height: 'auto', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 10, backgroundColor: "#fff", padding: 10, borderRadius: 10 }}>
 
-                            <TouchableOpacity
-                                style={styles.modalButton}
-                                onPress={() => {
-                                    if (selectedMessage && isMessagePinned(selectedMessage._id)) {
-                                        handleUnpinMessage(selectedMessage);
-                                    } else {
-                                        handlePinMessages(selectedMessage);
-                                    }
-                                }}
-                            >
-                                <Text style={styles.modalButtonText}>
-                                    {selectedMessage && isMessagePinned(selectedMessage?._id) ? "Gỡ ghim" : "Ghim"}
-                                </Text>
-                            </TouchableOpacity>
+                                <TouchableOpacity style={styles.modalButton} onPress={handleDeleteAction}>
+                                    <View><Image source={require('../icons/Delete.png')} style={{ width: 25, height: 25 }} /></View>
+                                    <Text style={styles.modalButtonText}>Xoá</Text>
+                                </TouchableOpacity>
 
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 }}>
-                                {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
-                                    <TouchableOpacity
-                                        key={emoji}
-                                        onPress={() => {
-                                            const type = emojiToType[emoji];
-                                            handleReact(selectedMessage, type);
-                                            setModalVisible(false);
-                                        }}
-                                    >
-                                        <Text style={{ fontSize: 24 }}>{emoji}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                                <TouchableOpacity style={styles.modalButton} onPress={handleForwardAction}>
+                                    <View><Image source={require('../icons/forward.png')} style={{ width: 25, height: 25 }} /></View>
+                                    <Text style={styles.modalButtonText}>Chuyển tiếp</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.modalButton} onPress={handleReadMessage}>
+                                    <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
+                                    <Text style={styles.modalButtonText}>Đọc tin nhắn</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.modalButton}
+                                    onPress={() => {
+                                        setReplyingMessage(selectedMessage);
+                                        setModalVisible(false);
+                                    }}>
+
+                                    <View><Image source={require('../icons/reply.png')} style={{ width: 25, height: 25 }} /></View>
+                                    <Text style={styles.modalButtonText}>Trả lời</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.modalButton}
+                                    onPress={() => {
+                                        if (selectedMessage && isMessagePinned(selectedMessage._id)) {
+                                            handleUnpinMessage(selectedMessage);
+                                        } else {
+                                            handlePinMessages(selectedMessage);
+                                        }
+                                    }}
+                                >
+                                    <Text style={styles.modalButtonText}>
+                                        {selectedMessage && isMessagePinned(selectedMessage?._id) ? <View style={{ alignItems: 'center' }}>
+                                            <View><Image source={require('../icons/Unpin.png')} style={{ width: 25, height: 25 }} /></View>
+                                            <Text style={styles.modalButtonText}>Gỡ ghim</Text>
+
+                                        </View> : <View style={{ alignItems: 'center' }}>
+                                            <View><Image source={require('../icons/Pin_action.png')} style={{ width: 25, height: 25 }} /></View>
+                                            <Text style={styles.modalButtonText}>Ghim</Text>
+
+                                        </View>}
+                                    </Text>
+                                </TouchableOpacity>
+                                {
+                                    canRecall && (
+                                        <TouchableOpacity style={styles.modalButton} onPress={handleRecallAction}>
+                                            <View><Image source={require('../icons/undo.png')} style={{ width: 25, height: 25 }} /></View>
+                                            <Text style={styles.modalButtonText}>Thu hồi</Text>
+                                        </TouchableOpacity>
+                                    )}
                             </View>
                         </View>
                     </TouchableOpacity>
@@ -2445,22 +2517,24 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     modalContainer: {
-        backgroundColor: "#fff",
-        padding: 20,
+
         borderRadius: 10,
+        paddingLeft: 10,
+        paddingRight: 10,
         width: "80%",
         alignItems: "center",
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: "space-between"
     },
     modalButton: {
-        paddingVertical: 10,
-        width: "100%",
-        alignItems: "center",
-        borderBottomWidth: 1,
-        borderColor: "#ccc",
+        width: '30%',
+        alignItems: 'center',
+        marginBottom: 10,
     },
     modalButtonText: {
-        fontSize: 16,
-        color: "#086DC0",
+        fontSize: 12,
+        textAlign: 'center',
     },
     replyPreview: {
         flexDirection: 'row',
