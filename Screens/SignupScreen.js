@@ -23,6 +23,24 @@ const genderData = [
   { label: 'Female', value: 'female' },
 ];
 
+// --- Validation helpers ---
+const nameRegex = /^[a-zA-ZÀ-ỹ\s'-]+$/;
+const emailRegex = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+const passwordRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+=-]).{8,}$/;
+
+function validateDateOfBirth(date) {
+  if (!date) return false;
+  if (!(date instanceof Date) || isNaN(date)) return false;
+  const year = date.getFullYear();
+  if (year < 1900) return false;
+
+  // Must be at least 10 years ago
+  const tenYearsLater = new Date(date);
+  tenYearsLater.setFullYear(year + 10);
+  if (tenYearsLater > new Date()) return false;
+  return true;
+}
+
 const SignupScreen = () => {
   // Set default date to December 22, 1990
   const defaultDOB = new Date("1990-12-22");
@@ -30,6 +48,7 @@ const SignupScreen = () => {
   // Date picker states - these remain here if you plan to re-enable later
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [dateOfBirth, setDateOfBirth] = useState(defaultDOB);
+const [formErrors, setFormErrors] = useState({});
 
   const route = useRoute();
   const { email } = route.params || {};
@@ -79,49 +98,51 @@ const SignupScreen = () => {
       [field]: value,
     }));
   };
-  const validateForm = () => {
-    const {
-      firstName,
-      lastName,
-      contact,
-      gender,
-      dateOfBirth,
-      password,
-      passwordConfirm,
-    } = formData;
-  
-    console.log('Validating form with data:', {
-      firstName,
-      lastName,
-      contact,
-      gender,
-      dateOfBirth,
-      password,
-      passwordConfirm,
-    });
+const validateForm = () => {
+  const errors = {};
 
-    
-  
-    if (
-      !firstName ||
-      !lastName ||
-      !contact ||
-      !gender ||
-      !dateOfBirth ||
-      !password ||
-      !passwordConfirm
-    ) {
-      Alert.alert('Validation Error', 'Please fill in all required fields.');
-      return false;
-    }
-  
-    if (password !== passwordConfirm) {
-      Alert.alert('Validation Error', 'Passwords do not match.');
-      return false;
-    }
-  
-    return true;
-  };
+  // Name validation
+  if (!formData.firstName || !formData.firstName.trim() || formData.firstName.length > 50 || !nameRegex.test(formData.firstName.trim())) {
+    errors.firstName = "Letters and spaces, max 50 characters*";
+  }
+  if (!formData.lastName || !formData.lastName.trim() || formData.lastName.length > 50 || !nameRegex.test(formData.lastName.trim())) {
+    errors.lastName = "Letters and spaces, max 50 characters*";
+  }
+
+  // Email
+  if (!formData.contact || !formData.contact.trim() || !emailRegex.test(formData.contact.trim().toLowerCase())) {
+    errors.contact = "Please enter a valid email address.";
+  }
+
+  // Gender
+  if (!formData.gender || !['male', 'female'].includes(formData.gender)) {
+    errors.gender = "Please select your gender.";
+  }
+
+  // DOB
+  if (!validateDateOfBirth(formData.dateOfBirth)) {
+    errors.dateOfBirth = "Invalid date of birth. You must be at least 10 years old.";
+  }
+
+  // Password
+  if (!formData.password || !formData.password.trim()) {
+    errors.password = "Please enter your password*";
+  } else if (!passwordRegex.test(formData.password)) {
+    errors.password = "Password must have at least 8 characters, including uppercase, lowercase, number and special character*";
+  } else if (formData.password.length > 50) {
+    errors.password = "Password cannot exceed 50 characters*";
+  }
+
+  // Password confirm
+  if (formData.password !== formData.passwordConfirm) {
+    errors.passwordConfirm = "Passwords do not match*";
+  }
+
+  setFormErrors(errors);
+
+  return Object.keys(errors).length === 0;
+};
+
   
   const handleLogin = () => {
     navigation.navigate("LoginScreen");
@@ -168,6 +189,7 @@ const SignupScreen = () => {
         </View>
 
         <View style={styles.signUpSection}>
+                  {formErrors.firstName && <Text style={styles.errorText}>{formErrors.firstName}</Text>}
           <TextInput
             style={styles.usernameInput}
             placeholder="First name"
@@ -175,6 +197,7 @@ const SignupScreen = () => {
             value={formData.firstName}
             onChangeText={(text) => handleInputChange('firstName', text)}
           />
+            {formErrors.lastName && <Text style={styles.errorText}>{formErrors.lastName}</Text>}
           <TextInput
             style={styles.usernameInput}
             placeholder="Last name"
@@ -217,7 +240,7 @@ const SignupScreen = () => {
               */}
             </View>
           </View>
-
+          {formErrors.password && <Text style={styles.errorText}>{formErrors.password}</Text>}
           <TextInput
   style={styles.usernameInput}
   placeholder="Enter your password"
@@ -226,6 +249,7 @@ const SignupScreen = () => {
   onChangeText={(text) => handleInputChange('password', text)}
   secureTextEntry
 />
+{formErrors.passwordConfirm && <Text style={styles.errorText}>{formErrors.passwordConfirm}</Text>}
 <TextInput
   style={styles.usernameInput}
   placeholder="Enter your password again"
@@ -233,8 +257,7 @@ const SignupScreen = () => {
   value={formData.passwordConfirm}
   onChangeText={(text) => handleInputChange('passwordConfirm', text)}
   secureTextEntry
-/>
-
+/>  
         </View>
 
         <TouchableOpacity style={styles.signupBtn} onPress={handleNext} disabled={loading}>
@@ -313,7 +336,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 20,
     marginTop: 30,
-    marginBottom: 30,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -362,6 +384,13 @@ const styles = StyleSheet.create({
   input:{
     paddingTop:5,
     marginBottom:-5
+  },
+  errorText:{
+    color:'red',
+    fontSize:14,
+    alignSelf:'flex-start',
+    marginLeft:8
+
   }
 });
 
