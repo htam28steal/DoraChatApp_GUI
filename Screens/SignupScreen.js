@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   signUpSection: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 100,
+
   },
   usernameInput: {
     borderWidth: 1,
@@ -336,6 +336,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 20,
     marginTop: 30,
+    marginBottom:20,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -362,6 +363,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#086DC0',
     fontWeight: 'bold',
+    paddingRight:20
   },
   inputContainer: {
     flexDirection: 'row',
