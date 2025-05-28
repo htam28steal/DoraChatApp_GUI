@@ -40,6 +40,8 @@ export default function ListRequestFriendScreen({ navigation }) {
 const [searchResults, setSearchResults] = useState([]);
 const [stateFriend, setStateFriend] = useState(null);
 const [sentInvites, setSentInvites] = useState(null);
+const [notFound, setNotFound] = useState(false);
+
 
 const handleSearch = async (searchValue) => {
   setNotFound(false); // reset for each new search
