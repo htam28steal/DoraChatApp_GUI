@@ -298,7 +298,6 @@ function renderTextWithLinks(content, onInvitePress) {
             alignSelf: "flex-start",
           }}
           onPress={() => {
-            console.log('[InviteLink] User pressed invite link:', part);
             onInvitePress && onInvitePress(part);
           }}
         >
@@ -386,12 +385,13 @@ const MessageItem = forwardRef(function MessageItem(
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
   const emojiMap = {
-    1: '❤️',
-    2: '😂',
-    3: '😢',
-    4: '👍',
-    5: '👎',
-    6: '😮',
+    1: '👍',
+    2: '❤️',
+    3: '😆',
+    4: '😮',
+    5: '😢',
+    6: '😣',
+    7: '🤗'
   };
   const innerRef = useRef();
 
@@ -1331,14 +1331,12 @@ export default function ChatScreen({ route, navigation }) {
     setInviteError(null);
 
 
-    console.log("[Invite] Opening invite modal for token:", token, "from link:", inviteLink);
-
     try {
       const res = await axios.get(`/api/conversations/invite/${token}`);
-      console.log("[Invite] Invite info fetched:", res.data);
+
       setInviteInfo(res.data);
     } catch (e) {
-      console.log("[Invite] Failed to fetch invite info:", e.response?.data || e);
+
       setInviteError(e.response?.data?.message || e.message);
       setInviteInfo(null);
     } finally {
@@ -1535,7 +1533,7 @@ export default function ChatScreen({ route, navigation }) {
     if (!message) return;
 
     try {
-      console.log("📌 Attempting to pin message:", message);
+
 
       // ✅ Get memberId from backend (to avoid relying on potentially stale UI state)
       const memberRes = await axios.get(`/api/members/${conversationId}/${userId}`);
@@ -1547,7 +1545,7 @@ export default function ChatScreen({ route, navigation }) {
         pinnedBy: message.memberId._id, // ✅ safest
       };
 
-      console.log("📦 Sending pin payload:", payload);
+
 
       await axios.post("/api/pin-messages", payload);
 
@@ -1589,8 +1587,7 @@ export default function ChatScreen({ route, navigation }) {
 
       if (!memberId) throw new Error("Không tìm thấy thành viên.");
 
-      console.log("🔎 message.pinnedBy:", message.pinnedBy, "→ type:", typeof message.pinnedBy);
-      console.log("🔎 Your memberId:", memberId);
+
 
 
       // Step 2: Check if this user is the one who pinned the message
@@ -1663,12 +1660,13 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   const emojiToType = {
-    '❤️': 1,
-    '😂': 2,
-    '😢': 3,
-    '👍': 4,
-    '👎': 5,
-    '😮': 6,
+    '👍': 1,
+    '❤️': 2,
+    '😆': 3,
+    '😮': 4,
+    '😢': 5,
+    '😣': 6,
+    '🤗': 7
   };
 
 
@@ -1718,7 +1716,6 @@ export default function ChatScreen({ route, navigation }) {
         })
       );
 
-      console.log("✅ Final reactors:", reactors);
       setSelectedReactors(reactors);
       setReactDetailModalVisible(true);
     } catch (err) {
@@ -1769,14 +1766,14 @@ export default function ChatScreen({ route, navigation }) {
     if (!selectedMessage || selectedMessage.type !== "TEXT") return;
 
     try {
-      console.log("✉️ Sending TTS request for text:", selectedMessage.content);
+
       const res = await axios.post("/api/messages/tts", {
         text: selectedMessage.content,
       });
-      console.log("✅ TTS response:", res.data);
+
 
       const { url } = res.data;
-      console.log("▶️ Playing audio from:", url);
+
 
       // 1) Create a new Sound object
       const { sound } = await Audio.Sound.createAsync(
@@ -1787,7 +1784,7 @@ export default function ChatScreen({ route, navigation }) {
       // 2) Optionally track when it’s done
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.didJustFinish) {
-          console.log("🔈 Finished playing TTS");
+
           sound.unloadAsync();
         }
       });
@@ -1868,7 +1865,7 @@ export default function ChatScreen({ route, navigation }) {
         ...allGroupChannels.flat(),
       ];
 
-      console.log("Full forward list:", fullList);
+
       setConversationsList(fullList);
       setModalVisible(false);
       setForwardModalVisible(true);
@@ -2055,11 +2052,10 @@ export default function ChatScreen({ route, navigation }) {
         fileName: selectedMessage.fileName,
       };
 
-      console.log("📤 Forward payload:", body);
+
 
       const res = await axios.post("/api/messages/text", body);
 
-      console.log("📥 Forward response:", res.data);
     } catch (err) {
       // log everything we can from the AxiosError
       console.error("🔄 Forward error:", err);
@@ -2082,7 +2078,6 @@ export default function ChatScreen({ route, navigation }) {
     try {
       setMessages((prev) => prev.filter((m) => m._id !== selectedMessage._id));
 
-      console.log(selectedMessage._id);
       await axios.delete(`/api/messages/${selectedMessage._id}/only`, {
         data: {
           conversationId: conversationId
@@ -2193,7 +2188,6 @@ export default function ChatScreen({ route, navigation }) {
     setUploading(true);
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: "*/*" });
-      console.log("[FilePicker] Result:", result);
 
       if (result.type !== "success" && !result.assets) {
         setUploading(false);
@@ -2214,7 +2208,6 @@ export default function ChatScreen({ route, navigation }) {
       }
 
       const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      console.log("[FilePicker] fileInfo:", fileInfo);
 
       if (!fileInfo.exists) {
         Alert.alert("Error", "File not found.");
@@ -2253,12 +2246,11 @@ export default function ChatScreen({ route, navigation }) {
       }
 
       // 3️⃣ Do upload
-      console.log("[FileUpload] Sending file to server...");
       const response = await axios.post("/api/messages/file", formData, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 30000,
       });
-      console.log("[FileUpload] Server response:", response.data);
+
 
       // 4️⃣ Swap out placeholder
       const realMsg = Array.isArray(response.data) ? response.data[0] : response.data;
@@ -2269,17 +2261,6 @@ export default function ChatScreen({ route, navigation }) {
 
     } catch (error) {
       console.log("[FileUpload] ERROR sending file:", error);
-
-      if (error.response) {
-        console.log("[FileUpload] Error response data:", error.response.data);
-        Alert.alert("Upload error", error.response.data?.message || "Server error.");
-      } else if (error.request) {
-        console.log("[FileUpload] No response received:", error.request);
-        Alert.alert("Upload error", "No response from server.");
-      } else {
-        console.log("[FileUpload] General error:", error.message);
-        Alert.alert("Upload error", error.message);
-      }
 
       // Remove placeholder if failed
       setMessages(prev => prev.filter(m => !m._id.startsWith("tmp_")));
@@ -2341,8 +2322,6 @@ export default function ChatScreen({ route, navigation }) {
     const messageId = message._id;
     const reacts = message.reacts;
 
-    console.log("🆕 Updating message", messageId, "with reacts:", reacts);
-
     setMessages((prev) =>
       prev.map((msg) =>
         msg._id === messageId ? { ...msg, reacts } : msg
@@ -2376,7 +2355,6 @@ export default function ChatScreen({ route, navigation }) {
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
     socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, recallHandler);
 
-    console.log("➡️ Joining conversation with userId:", userId, "conversationId:", conversationId);
 
     socket.emit(SOCKET_EVENTS.JOIN, userId);
 
@@ -2491,7 +2469,7 @@ export default function ChatScreen({ route, navigation }) {
               {/* 1) Reaction bar */}
 
               <View style={styles.reactionBar}>
-                {['❤️', '😂', '😢', '👍', '👎', '😮'].map((emoji) => (
+                {['👍', '❤️', '😆', '😮', '😢', '😣','🤗'].map((emoji) => (
                   <TouchableOpacity
                     key={emoji}
                     onPress={() => {
@@ -2661,12 +2639,13 @@ export default function ChatScreen({ route, navigation }) {
 
                 renderItem={({ item }) => {
                   const emojiMap = {
-                    1: '❤️',
-                    2: '😂',
-                    3: '😢',
-                    4: '👍',
-                    5: '👎',
-                    6: '😮',
+                    0: "👍", // Like
+                    1: "❤️", // Love
+                    2: "😆", // Haha
+                    3: "😮", // Wow
+                    4: "😢", // Sad
+                    5: "😣", // Angry
+                    6: "🤗", // Care
                   };
 
 
@@ -2759,11 +2738,9 @@ export default function ChatScreen({ route, navigation }) {
                       setJoining(true);
                       setJoinError(null);
                       try {
-                        console.log("[Invite] Attempting to join group with token:", inviteToken);
                         const response = await axios.post(`/api/conversations/join/${inviteToken}`);
 
 
-                        console.log("[Invite] Join response:", response.data);
 
                         if (response.data.status === "joined") {
                           setInviteModalVisible(false);
@@ -2773,7 +2750,6 @@ export default function ChatScreen({ route, navigation }) {
                           Alert.alert("Yêu cầu gửi", "Yêu cầu tham gia nhóm đã được gửi. Vui lòng chờ duyệt!");
                         }
                       } catch (err) {
-                        console.log("[Invite] Join failed:", err.response?.data || err);
                         setJoinError(err.response?.data?.message || "Lỗi khi tham gia nhóm");
                       } finally {
                         setJoining(false);
