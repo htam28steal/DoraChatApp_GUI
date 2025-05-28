@@ -70,7 +70,6 @@ const SignupScreen = () => {
     passwordConfirm: '',
     gender: null,
     dateOfBirth: defaultDOB,
-    bio: '',
   });
   
 
@@ -139,7 +138,6 @@ const SignupScreen = () => {
         password: formData.password,
         dateOfBirth: getFormattedDate(formData.dateOfBirth),
         gender: formData.gender,
-        bio: formData.bio.trim(),
       };
   
       const response = await axios.post('/api/auth/register', payload);
@@ -237,14 +235,6 @@ const SignupScreen = () => {
   secureTextEntry
 />
 
-
-          <TextInput
-            style={styles.usernameInput}
-            placeholder="Bio"
-            placeholderTextColor="#666"
-            value={formData.bio}
-            onChangeText={(text) => handleInputChange('bio', text)}
-          />
         </View>
 
         <TouchableOpacity style={styles.signupBtn} onPress={handleNext} disabled={loading}>

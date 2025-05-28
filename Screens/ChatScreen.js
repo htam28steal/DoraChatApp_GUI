@@ -1065,7 +1065,7 @@ function ChatBox({
         return (
 
           <MessageItem
-            key={msg._id}
+            key={key}
             ref={ref => (messageRefs.current[msg._id] = ref)}
             msg={msg}
             allMessages={allMessages}
@@ -2343,7 +2343,18 @@ export default function ChatScreen({ route, navigation }) {
       // ❌ skip messages sent by me
       if (message.memberId.userId === userId) return;
 
-      setMessages(prev => [...prev, message]);
+setMessages(prev => {
+  // Remove any pending optimistic for this message
+  let filtered = prev.filter(m =>
+    !(m.pending && m.content === message.content &&
+      Math.abs(new Date(m.createdAt) - new Date(message.createdAt)) < 5000)
+  );
+  // Add the new message
+  filtered.push(message);
+  // Deduplicate by _id (keeps last occurrence, just like your dedupeMessages)
+  return dedupeMessages(filtered);
+});
+
     };
 
     socket.on(SOCKET_EVENTS.RECEIVE_MESSAGE, receiveHandler);
