@@ -1806,10 +1806,12 @@ export default function ChatScreen({ route, navigation }) {
     try {
       const { data: conversations } = await axios.get("/api/conversations");
       const filteredConversations = conversations.filter(c => c._id !== conversationId);
+      
 
 
       // split out groups vs. private
-      const groupConvs = filteredConversations.filter(c => c.type === true);
+      const groupConvs = filteredConversations
+  .filter(c => c.type === true && c.members.some(m => m.userId === userId && m.active !== false)); // 👈 THIS LINE CHANGED
       const privateConvs = filteredConversations.filter(c => c.type !== true);
 
       // 1️⃣ build group→channels list exactly as you had it
@@ -2566,9 +2568,9 @@ export default function ChatScreen({ route, navigation }) {
             <View style={styles.forwardModal}>
               {/* Header */}
               <View style={styles.forwardHeader}>
-                <Text style={styles.forwardTitle}>Chuyển tiếp tới</Text>
+                <Text style={styles.forwardTitle}>Forward to</Text>
                 <Text style={styles.forwardSubtitle}>
-                  Chọn nơi bạn muốn chia sẻ tin nhắn này.
+                  Select conversation to forward.
                 </Text>
 
                 <TouchableOpacity
@@ -2647,7 +2649,7 @@ export default function ChatScreen({ route, navigation }) {
             <View style={styles.reactModalContainer}>
               {/* Header */}
               <View style={styles.reactModalHeader}>
-                <Text style={styles.reactModalTitle}>Cảm xúc về tin nhắn</Text>
+                <Text style={styles.reactModalTitle}>Reactions</Text>
                 <TouchableOpacity onPress={() => setReactDetailModalVisible(false)}>
                   <Image source={require('../icons/Close.png')} style={styles.reactModalClose} />
                 </TouchableOpacity>
