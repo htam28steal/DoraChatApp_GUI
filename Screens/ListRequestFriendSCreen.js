@@ -40,6 +40,8 @@ export default function ListRequestFriendScreen({ navigation }) {
 const [searchResults, setSearchResults] = useState([]);
 const [stateFriend, setStateFriend] = useState(null);
 const [sentInvites, setSentInvites] = useState(null);
+const [notFound, setNotFound] = useState(false);
+
 
 const handleSearch = async (searchValue) => {
   setNotFound(false); // reset for each new search
@@ -101,6 +103,10 @@ const handleThuHoi = async (friendId) => {
     await FriendService.deleteInviteWasSend(friendId);
     setSentInvites(null);
     setStateFriend(false);
+        socket.emit(SOCKET_EVENTS.DELETED_INVITE_WAS_SEND, {
+      senderId: userId,
+      receiverId: friendId,
+    });
   } catch (error) {
     console.error('Lỗi khi thu hồi lời mời:', error);
     Alert.alert('Lỗi', 'Không thể thu hồi lời mời. Vui lòng thử lại.');
@@ -185,6 +191,21 @@ const renderSearchItem = ({ item }) => (
     };
     fetchUser();
   }, []);
+// Handle when *you* deleted a sent invite, or someone canceled an invite TO you
+const handleDeletedInviteWasSend = (data) => {
+  // Data may contain senderId, receiverId or just userId
+  // Remove from friend requests if it matches
+   const id = typeof data === 'string' ? data : data?.receiverId || data?.senderId || data?.userId;
+  if (!id) return;
+
+  setFriends(prev => prev.filter(f => f._id !== id));
+
+  // Also update state for search, if user matches
+  if (searchResults.length > 0 && searchResults[0]._id === id) {
+    setStateFriend(false);
+    setSentInvites(null);
+  }
+};
 
   useEffect(() => {
     if (userId && token) {
@@ -278,11 +299,13 @@ const handleFriendInviteDeleted = (senderId) => {
   socket.on(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
   socket.on(SOCKET_EVENTS.SEND_FRIEND_INVITE, onNewInvite);
   socket.on(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
+  socket.on(SOCKET_EVENTS.DELETED_INVITE_WAS_SEND, handleDeletedInviteWasSend);
   return () => {
     socket.off(SOCKET_EVENTS.DELETED_FRIEND_INVITE, onInviteDeleted);
     socket.off(SOCKET_EVENTS.ACCEPT_FRIEND, onFriendAccepted);
     socket.off(SOCKET_EVENTS.SEND_FRIEND_INVITE, onNewInvite);
      socket.off(SOCKET_EVENTS.DELETED_FRIEND, onFriendDeleted);
+      socket.off(SOCKET_EVENTS.DELETED_INVITE_WAS_SEND, handleDeletedInviteWasSend);
   };
 }, [currentUser, searchResults]);
 

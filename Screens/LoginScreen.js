@@ -37,13 +37,22 @@ if (response && response.data?.token) {
   navigation.navigate("GroupsScreen", { token: accessToken, uID: id });
 }
 
-    } catch (error) {
+}catch (error) {
       console.log('Login error:', error);
-
+      if (error.message === 'Account unactivated. OTP resent.' && error.status === 400) {
+        navigation.navigate('OtpScreen', {
+          email: username,
+        });
+        Toast.show({
+          type: "error",
+          text1: "Account not activated. OTP has been resent.",
+        });
+      } else {
         Toast.show({
           type: "error",
           text1: "Invalid email or password",
         });
+      }
     } finally {
       setLoading(false);
       console.log('handleLogin finished');

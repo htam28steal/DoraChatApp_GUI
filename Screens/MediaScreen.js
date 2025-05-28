@@ -143,7 +143,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderColor: '#eee'
+    borderColor: '#eee',
+    paddingTop:20
   },
   backButton: { marginRight: 16 },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#086DC0' },

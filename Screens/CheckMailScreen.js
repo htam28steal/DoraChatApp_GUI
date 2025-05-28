@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   signUpSection: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 100,
+    marginBottom:30
   },
   usernameInput: {
     borderWidth: 1,
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     paddingTop: 5,
     paddingBottom: 5,
-    marginBottom: 20,
+
   },
   signupBtn: {
     backgroundColor: '#086DC0',
@@ -149,7 +149,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     borderRadius: 20,
-    marginTop: 30,
     marginBottom: 30,
     flexDirection: 'row',
     alignItems: 'center',
@@ -169,12 +168,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     width: 360,
     marginBottom: 10,
+    paddingRight:30
   },
   noAccountText: {
-    fontSize: 12,
+    fontSize: 15,
   },
   signInText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#086DC0',
     fontWeight: 'bold',
   },

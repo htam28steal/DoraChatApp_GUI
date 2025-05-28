@@ -279,32 +279,6 @@ useEffect(() => {
         
 
     
-       <View style={styles.options}>
-        <View style={styles.optionsLeft}>
-          <View style={styles.iconCircle}>
-            <Image
-              source={require('../icons/Notification.png')}
-              style={styles.icon}
-            />
-          </View>
-          <Text style={styles.optionsText}>Mute messages</Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.toggleTrack,
-            isMuted && styles.toggleTrackActive
-          ]}
-          onPress={() => setIsMuted(m => !m)}
-        >
-          <View
-            style={[
-              styles.toggleThumb,
-              isMuted ? styles.thumbRight : styles.thumbLeft
-            ]}
-          />
-        </TouchableOpacity>
-      </View>
 
    
  
