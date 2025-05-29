@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
-const API_URL = 'http:/54.179.190.85:3001';
+const API_URL = 'http://54.179.190.85:3001';
 
 
 
