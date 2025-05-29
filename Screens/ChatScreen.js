@@ -381,7 +381,7 @@ const MessageItem = forwardRef(function MessageItem(
   };
 
 
-  const isMe = msg.memberId?.userId === currentUserId;
+  const isMe = msg.memberId && msg.memberId.userId === currentUserId;
   const content = msg.content || "";
   const MAX_TEXT_LENGTH = 350;
   const emojiMap = {
@@ -405,7 +405,7 @@ const MessageItem = forwardRef(function MessageItem(
 
 
   const repliedMsg = msg.replyMessageId
-    ? allMessages.find(m => m._id === msg.replyMessageId)
+    ? allMessages.find(m => m && m._id === msg.replyMessageId)
     : null;
 
 
@@ -1839,7 +1839,7 @@ export default function ChatScreen({ route, navigation }) {
 
 
         const memberRes = await axios.get(`/api/members/${conv._id}/${otherM.userId}`);
-        const memberRec = memberRes.data.data;            
+        const memberRec = memberRes.data.data;
 
 
         const userRec = await UserService.getUserById(otherM.userId);
@@ -1848,8 +1848,8 @@ export default function ChatScreen({ route, navigation }) {
         return {
           _id: conv._id,
           type: "private",
-          channelName: userRec.name,        
-          groupName: memberRec.name,      
+          channelName: userRec.name,
+          groupName: memberRec.name,
           groupAvatar: userRec.avatar,
         };
       });

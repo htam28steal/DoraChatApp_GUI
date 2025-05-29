@@ -2250,6 +2250,7 @@ export default function ChatScreen({ route, navigation }) {
                 pending: true,
                 replyTo: replyingMessage ? replyingMessage._id : undefined,
                 replyToMessage: replyingMessage || undefined,
+                replyMessageId: replyingMessage?._id || undefined,
             };
 
 
@@ -2271,6 +2272,7 @@ export default function ChatScreen({ route, navigation }) {
                 channelId: currentChannelId,
             };
             if (replyingMessage) payload.replyTo = replyingMessage._id;
+            if (replyingMessage) payload.replyMessageId = replyingMessage._id;
 
             if (validTags.length > 0) {
                 payload.tags = validTags;
@@ -2309,25 +2311,26 @@ export default function ChatScreen({ route, navigation }) {
 
         const receiveHandler = (message) => {
 
-
             if (!isRemoved) return;
             setMessages(prev => {
-                if (message.memberId?.userId === userId) {
-                    return prev.map(m =>
-                        m.pending && m.content === message.content
-                            ? message
-                            : m
-                    );
+                const filtered = prev.filter(m => !(m.pending && m.content === message.content));
+
+                if (message.replyMessageId) {
+                    const replyToId = typeof message.replyMessageId === "object"
+                        ? message.replyMessageId._id
+                        : message.replyMessageId;
+                    message.replyToMessage = prev.find(m => m._id === replyToId);
                 }
 
-                const existingIndex = prev.findIndex(m => m._id === message._id);
+                const existingIndex = filtered.findIndex(m => m._id === message._id);
+
                 if (existingIndex !== -1) {
-                    const newMessages = [...prev];
+                    const newMessages = [...filtered];
                     newMessages[existingIndex] = message;
                     return newMessages;
                 }
 
-                return [...prev, message];
+                return [...filtered, message];
             });
         };
 
