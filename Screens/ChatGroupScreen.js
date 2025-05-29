@@ -43,8 +43,7 @@ import AddNewChannel from './AddChannelModal';
 import memberService from "../api/memberService";
 
 const AvatarImage = require("../Images/avt.png");
-const CallIcon = require("../assets/video_call.png");
-const VideoCallIcon = require("../assets/VideoCall.png");
+const CallIcon = require("../icons/video_call.png");
 const DetailChatIcon = require("../icons/detail_chat.png");
 const FileIcon = require("../icons/paperclip.png");
 const PictureIcon = require("../icons/picture.png");
