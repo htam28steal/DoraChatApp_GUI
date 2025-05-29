@@ -20,6 +20,25 @@ const voteService = {
             throw err;
         }
     },
+
+    deselectOption: async (memberId, optionId, voteId) => {
+
+
+        try {
+            const response = await api.delete(
+                `/api/votes/option/deselect/${voteId}/${optionId}`,
+                {
+                    data: { memberId }
+                }
+            );
+            return response.data;
+
+        } catch (err) {
+            console.log(err)
+        }
+    },
+
+
     createVote: async (voteData) => {
         try {
             const response = await api.post('/api/votes/', voteData);

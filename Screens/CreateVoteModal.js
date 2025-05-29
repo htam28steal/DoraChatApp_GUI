@@ -46,8 +46,15 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
             .map((text) => ({ name: text.trim() }))
             .filter(opt => opt.name !== '');
 
+        const optionNames = filteredOptions.map(opt => opt.name.toLowerCase());
+        const uniqueOptions = new Set(optionNames);
+        if (optionNames.length !== uniqueOptions.size) {
+            Alert.alert('Các lựa chọn không được trùng nhau');
+            return;
+        }
+
         if (!question.trim() || filteredOptions.length < 2) {
-            alert('Vui lòng nhập câu hỏi và ít nhất 2 lựa chọn');
+            Alert.alert('Vui lòng nhập câu hỏi và ít nhất 2 lựa chọn');
             return;
         }
 
@@ -86,7 +93,6 @@ const PollCreatorModal = ({ visible, onClose, onCreate, memberId, conversationId
         };
 
         const handleLeaveConversation = (data) => {
-            console.log(`HAHA HA DATA`, data)
             if (data.conversationId === conversationId) {
                 setIsRemoved(true);
             }
