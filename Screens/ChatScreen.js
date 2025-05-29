@@ -1837,19 +1837,19 @@ export default function ChatScreen({ route, navigation }) {
         const otherM = conv.members.find(m => m.userId !== userId);
         if (!otherM) return null;
 
-        // fetch their member record (alias)
-        const memberRes = await axios.get(`/api/members/${conv._id}/${otherM.userId}`);
-        const memberRec = memberRes.data.data;            // { name: "Tran Tam", ... }
 
-        // fetch the actual user record
+        const memberRes = await axios.get(`/api/members/${conv._id}/${otherM.userId}`);
+        const memberRec = memberRes.data.data;            
+
+
         const userRec = await UserService.getUserById(otherM.userId);
-        // { name: "Quang Hoang", avatar: "..." }
+
 
         return {
           _id: conv._id,
           type: "private",
-          channelName: userRec.name,        // real name on top
-          groupName: memberRec.name,      // alias below
+          channelName: userRec.name,        
+          groupName: memberRec.name,      
           groupAvatar: userRec.avatar,
         };
       });
