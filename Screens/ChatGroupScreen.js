@@ -1229,7 +1229,6 @@ export default function ChatScreen({ route, navigation }) {
             });
 
         } catch (err) {
-            console.error("❌ TTS error:", err);
             Alert.alert("Error", err.response?.data?.message || err.message);
         } finally {
             setModalVisible(false);

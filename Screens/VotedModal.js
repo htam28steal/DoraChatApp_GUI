@@ -30,12 +30,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
 
 
-    // useEffect(() => {
-    //     const hasVoted = dynamicOptions.some(opt =>
-    //         opt.members?.some(m => m.memberId === member)
-    //     );
-    //     setVoted(hasVoted);
-    // }, [dynamicOptions, member]);
+
     useEffect(() => {
         if (memberId) {
             setMember(memberId);
@@ -76,7 +71,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     const toggleOption = (optionId) => {
         const selectedOption = dynamicOptions.find(opt => opt._id === optionId);
-        const isAlreadyVoted = selectedOption?.members?.some(m => m.memberId === member);
 
         if (msg?.isMultipleChoice) {
             if (selectedOptions.includes(optionId)) {
@@ -203,7 +197,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
                 msg._id
             );
             const serverUpdatedVote = result;
-            console.log(`RESULT`, serverUpdatedVote)
             if (serverUpdatedVote) {
                 onSubmit(serverUpdatedVote);
                 Alert.alert("Thành công", "Đã bỏ bình chọn!");
@@ -246,6 +239,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
     useEffect(() => {
         const handleVoteOptionSelectS = (selectoption) => {
             if (isRemoved) return;
+
             onSubmit(selectoption);
         };
         const handleLeaveConversation = (data) => {
@@ -255,9 +249,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
             }
         };
 
-
-
-
         socket.on(SOCKET_EVENTS.VOTE_OPTION_SELECTED, handleVoteOptionSelectS);
         socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
 
@@ -266,6 +257,32 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
             socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
         };
     }, [socket, conversation, onSubmit, isRemoved]);
+
+
+    useEffect(() => {
+        const handleDeSelect = (selectoption) => {
+            setDynamicOptions(prev => [...prev, selectoption]);
+
+            if (isRemoved) return;
+
+            onSubmit(selectoption);
+        };
+        const handleLeaveConversation = (data) => {
+            setDynamicOptions(prev => [...prev, data]);
+            if (data.conversationId === conversation._id) {
+                setIsRemoved(true);
+            }
+        };
+
+        socket.on(SOCKET_EVENTS.VOTE_OPTION_DESELECTED, handleDeSelect);
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+
+        return () => {
+            socket.off(SOCKET_EVENTS.VOTE_OPTION_DESELECTED, handleDeSelect);
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+        };
+    }, [socket, onSubmit, isRemoved, conversation]);
+
 
 
 
