@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, BackHandler } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, BackHandler,Image } from "react-native";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "../api/apiConfig";
@@ -130,6 +130,9 @@ export default function DailyVideoCallScreen({ navigation, route }) {
   if (loading || !roomUrl || !token) {
     return (
       <View style={styles.loader}>
+        <TouchableOpacity  onPress={() => navigation.goBack()}  style={{position:'absolute',top:40, left:25, }}>
+        <Image source={require('../icons/back.png')} style={{width:25, height:20}}></Image>
+      </TouchableOpacity>
         <ActivityIndicator color="#086DC0" size="large" />
         <Text style={{ marginTop: 10, color: "#086DC0" }}>Đang kết nối tới phòng họp…</Text>
       </View>

@@ -53,6 +53,8 @@ const hobbiesOptions = [
 
 export default function ProfileScreen({ navigation }) {
   const [coverUrl, setCoverUrl] = useState('');
+  const [nameError, setNameError] = useState('');
+
 
   const [screen, setScreen] = useState('home');
 const [userInfo, setUserInfo] = useState(null);
@@ -76,9 +78,22 @@ const [selectedHobbies, setSelectedHobbies] = useState([]);
   // State for success message
   const [successMessage, setSuccessMessage] = useState('');
 
+
+
+  const validateName = (name) => {
+  const regex = /^[a-zA-ZÀ-ỹ\s'-]+$/;
+  return regex.test(name);
+};
+
+
 const handleSaveProfile = async () => {
+
+  if (!validateName(editedProfile?.name || '')) {
+    setNameError("Name is invalid*");
+    return;
+  }
+  setNameError(''); // Clear error if valid
   try {
-    // Remove dateOfBirth from editedProfile before sending
     const { dateOfBirth, ...profileWithoutDOB } = editedProfile;
 
     const payload = {
@@ -401,19 +416,34 @@ else if (type === 'cover') {
         {screen === 'home' && (
           <View>
 <View style={styles.fRow}>
-  <View style={styles.fPro}><Text style={styles.txtPro}>Name</Text></View>
+  <View style={styles.fPro}>
+    <Text style={styles.txtPro}>Name</Text>
+  </View>
   <View style={styles.fTxtInput}>
     {editMode ? (
-      <TextInput
-        style={styles.txtInput}
-        value={editedProfile?.name}
-        onChangeText={t => setEditedProfile(p => ({ ...p, name: t }))}
-      />
+      <>
+        {nameError ? (
+          <Text style={{ color: 'red',  marginBottom: 60, position:'absolute', right:10,  }}>{nameError}</Text>
+        ) : null}
+        <TextInput
+          style={styles.txtInput}
+          value={editedProfile?.name}
+          onChangeText={t => {
+            setEditedProfile(p => ({ ...p, name: t }));
+            if (!validateName(t)) {
+              setNameError("Name is invalid*");
+            } else {
+              setNameError('');
+            }
+          }}
+        />
+      </>
     ) : (
       <Text style={styles.txtInput} numberOfLines={1}>{userInfo?.name}</Text>
     )}
   </View>
 </View>
+
 
             <View style={styles.fRow}>
               <View style={styles.fHalfRow}>
