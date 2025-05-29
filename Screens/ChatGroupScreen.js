@@ -43,9 +43,9 @@ import AddNewChannel from './AddChannelModal';
 import memberService from "../api/memberService";
 
 const AvatarImage = require("../Images/avt.png");
-const CallIcon = require("../assets/Call.png");
+const CallIcon = require("../assets/video_call.png");
 const VideoCallIcon = require("../assets/VideoCall.png");
-const DetailChatIcon = require("../icons/userdetail.png");
+const DetailChatIcon = require("../icons/detail_chat.png");
 const FileIcon = require("../icons/paperclip.png");
 const PictureIcon = require("../icons/picture.png");
 const EmojiIcon = require("../icons/emoji.png");
@@ -1652,9 +1652,6 @@ export default function ChatScreen({ route, navigation }) {
                             navigation.navigate('CallScreen', { conversationId, channelId: currentChannelId })
                         }}>
                             <Image source={CallIcon} style={headerStyles.icon} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={headerStyles.iconButton}>
-                            <Image source={VideoCallIcon} style={headerStyles.icon} />
                         </TouchableOpacity>
 <TouchableOpacity
     style={headerStyles.iconButton}
