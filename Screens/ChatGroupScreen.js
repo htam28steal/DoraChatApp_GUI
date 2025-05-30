@@ -1062,7 +1062,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
                         <ScrollView>
                             {filteredMembers.map(member => (
                                 <TouchableOpacity
-                                    key={member.id}
+                                    key={member._id}
                                     style={messageInputStyles.mentionItem}
                                     onPress={() => { handleSelectMention(member.name) }}
                                 >
