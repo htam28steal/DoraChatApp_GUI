@@ -387,8 +387,8 @@ export default function GroupsScreen({ navigation }) {
 
   useEffect(() => {
     // 🔧 Debug: am I connected?
-    socket.on('connect', () => console.log('✅ socket connected'));
-    socket.on('disconnect', () => console.log('❌ socket disconnected'));
+    socket.on('connect');
+    socket.on('disconnect');
 
     // 🔧 Debug: log every incoming event
     socket.onAny((event, payload) => {

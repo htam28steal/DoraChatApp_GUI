@@ -67,11 +67,10 @@ const [sendingLinkTo, setSendingLinkTo] = useState(''); // Friend ID while sendi
 // ——————————————————————————————
 const getOrCreateDMChannel = async (friendId) => {
   const userId = await AsyncStorage.getItem('userId');
-  console.log('🔹 Requesting individual convo for:', userId, friendId);
+
 
   // POST /api/conversations/individuals/:userId
   const res = await axios.post(`/api/conversations/individuals/${friendId}`);
-  console.log('✅ Individual convo response:', res.data);
 
   // Backend returns the full conversation object; extract its ID:
   return res.data._id || res.data.id || res.data.conversationId;
@@ -270,12 +269,12 @@ useEffect(() => {
   (async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
-      console.log('🔹 Fetching join requests for user:', userId);
+
       const res = await axios.get(
         `/api/conversations/${conversationId}/groupRequest`,
         { params: { userId } }
       );
-      console.log('🔹 Raw joinRequests payload:', JSON.stringify(res.data, null, 2));
+
       setJoinRequests(res.data || []);
     } catch (err) {
       console.error("❌ Failed loading join requests:", err);
@@ -289,17 +288,16 @@ useEffect(() => {
 const handleAccept = async (requestingUserId) => {
   try {
     const userId = await AsyncStorage.getItem('userId');
-    console.log('🔹 handleAccept → requestingUserId:', requestingUserId);
-    console.log('🔹 handleAccept → body userId:', userId);
+
 
     const url = `/api/conversations/${conversationId}/groupRequest/accept/${requestingUserId}`;
-    console.log('🔹 handleAccept → POST to:', url);
+
 
     await axios.post(url, { userId });
     setJoinRequests(js => js.filter(r => (r.userId ?? r._id) !== requestingUserId));
-    console.log('✅ Accepted request for', requestingUserId);
+
   } catch (err) {
-    console.error('❌ Accept failed:', err.response?.data || err.message);
+
     Alert.alert('Error', err.response?.data?.message || 'Could not accept request.');
   }
 };
@@ -309,18 +307,17 @@ const handleAccept = async (requestingUserId) => {
 const handleReject = async (requestId) => {
   try {
     const userId = await AsyncStorage.getItem('userId');
-    console.log('🔹 handleReject → requestId:', requestId);
-    console.log('🔹 handleReject → body userId:', userId);
+
 
     const url = `/api/conversations/${conversationId}/groupRequest/reject/${requestId}`;
-    console.log('🔹 handleReject → DElETE to:', url);
+
 
     await axios.delete(url, { userId });
     // remove from local list by _id, not userId
     setJoinRequests(js => js.filter(r => r._id !== requestId));
-    console.log('✅ Rejected request', requestId);
+
   } catch (err) {
-    console.error('❌ Reject failed:', err.response?.data || err.message);
+
     Alert.alert('Error', err.response?.data?.message || 'Could not reject request.');
   }
 };
@@ -735,12 +732,10 @@ if (loading) {
     alignItems: 'center',
   }}
 onPress={async () => {
-  console.log('🔹 Creating invitation link for conversation:', conversationId);
   try {
     const res = await axios.post(
       `/api/conversations/${conversationId}/invite/link`
     );
-    console.log('✅ Link creation response:', res.data);
     setInviteLink(res.data.inviteLink); // <-- ONLY the string!
     await fetchModalData();
     setInviteLinkModalVisible(true);
@@ -884,18 +879,16 @@ onPress={async () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log("🚨 Attempting to disband group:", conversationId, "by user:", userId);
       
               const response = await axios.delete(
                 `/api/conversations/disband/${conversationId}`,
                 { data: { userId } }
               );
       
-              console.log("✅ Group disbanded on server:", response.data);
+
       
               // Emit socket event
               socket.emit(SOCKET_EVENTS.DISBANDED_CONVERSATION, { conversationId });
-              console.log("📤 Emitted socket event: disbanded-conversation", { conversationId });
       
               Alert.alert('Thành công', 'Nhóm đã được giải tán.');
               navigation.navigate('GroupsScreen');
@@ -930,7 +923,7 @@ onPress={async () => {
 
 
       <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
-      <TouchableOpacity>
+      {/* <TouchableOpacity>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
@@ -942,7 +935,7 @@ onPress={async () => {
       </TouchableOpacity>
 
       <Text style={{marginLeft:10, fontSize:15, color:'#BDE1FE',marginRight:10}}>|</Text>
-      
+       */}
 <TouchableOpacity
   onPress={async () => {
     try {
@@ -955,7 +948,6 @@ socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
   conversationId,
   userId: item.userId
 });
-      console.log("📤 Emitted leave‑conversation:", { conversationId, userId });
 
       Alert.alert('Thành công', 'Bạn đã rời nhóm.');
       navigation.navigate('GroupsScreen')
@@ -1091,7 +1083,6 @@ socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
               setRemoveModalVisible(false);
           
               // 2) Emit socket
-              console.log("📤 Emitting LEAVE_CONVERSATION for removed member:", selectedMemberId);
               socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
                 conversationId,
                 userId
@@ -1486,7 +1477,7 @@ socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
       // 1) get/create the DM channel
       const dmChannelId = await getOrCreateDMChannel(item._id);
 
-    console.log('🔹 Sending invite link in DM channel:', dmChannelId);
+
 
       // 2) send the text in that channel
       const { data } = await axios.post('/api/messages/text', {
@@ -1495,7 +1486,6 @@ socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, {
         type: 'TEXT'
       });
 
-      console.log('✅ Message send response:', data);
       Alert.alert('Sent!', `Invitation link sent to ${item.name}.`);
     } catch (err) {
       console.error('❌ Send link failed:', err.response?.data || err.message);

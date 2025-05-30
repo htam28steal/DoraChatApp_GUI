@@ -123,7 +123,6 @@ const handleSearch = async (searchValue) => {
         setSentInvites('pending');
       }
     } catch (error) {
-      console.error('Error sending friend request:', error);
       Alert.alert('Không thể gửi lời mời kết bạn');
     }
   };
@@ -135,7 +134,6 @@ const handleSearch = async (searchValue) => {
       setSentInvites(null);
       setStateFriend(false);
     } catch (error) {
-      console.error('Lỗi khi thu hồi lời mời:', error);
       Alert.alert('Lỗi', 'Không thể thu hồi lời mời. Vui lòng thử lại.');
     }
   };    
@@ -160,7 +158,6 @@ const handleFriendAccepted = async (data) => {
       setSentInvites(null);
     }
   } catch (err) {
-    console.warn('Could not fetch full user after accept:', err);
     // Fallback to use partial data if needed
     setFriends((prev) => [...prev, data]);
   }
@@ -232,9 +229,7 @@ const handleFriendInviteDeleted = (userIdDeclined) => {
     };
     fetchMe();
   }, []);
-socket.onAny((event, data) => {
-  console.log('Socket Event:', event, data);
-});
+
 
   // Initial load of friends
   useEffect(() => {
@@ -279,7 +274,7 @@ socket.onAny((event, data) => {
           
         });
       } catch (err) {
-        console.error('Error opening chat:', err);
+
         Alert.alert('Không thể mở trò chuyện', err.message);
       }
     }}

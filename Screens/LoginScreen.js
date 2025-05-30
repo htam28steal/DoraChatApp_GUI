@@ -13,10 +13,7 @@ const LoginScreen = () => {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    console.log('handleLogin started');
-    console.log(username, password);
     if (!username || !password) {
-      console.log('Validation failed');
       return;
     }
     try {
@@ -33,12 +30,10 @@ if (response && response.data?.token) {
   await AsyncStorage.setItem('refreshToken', refreshToken); 
   await AsyncStorage.setItem('userInfo', JSON.stringify(user)); 
 
-  console.log('Logged in userId:', id);
   navigation.navigate("GroupsScreen", { token: accessToken, uID: id });
 }
 
 }catch (error) {
-      console.log('Login error:', error);
       if (error.message === 'Account unactivated. OTP resent.' && error.status === 400) {
         navigation.navigate('OtpScreen', {
           email: username,
@@ -55,7 +50,6 @@ if (response && response.data?.token) {
       }
     } finally {
       setLoading(false);
-      console.log('handleLogin finished');
     }
   };
 
@@ -89,7 +83,6 @@ if (response && response.data?.token) {
             onChangeText={setPassword}
           />
           <TouchableOpacity style={styles.forgotPasswordBtn} onPress={() => {
-            console.log('Login button pressed');
             handleForgotPassword();
           }}>
             <Text style={styles.forgotPasswordText}>Forgot password</Text>
@@ -98,7 +91,6 @@ if (response && response.data?.token) {
         <TouchableOpacity
           style={styles.loginBtn}
           onPress={() => {
-            console.log('Login button pressed');
             handleLogin();
           }}
         >

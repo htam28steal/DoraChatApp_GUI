@@ -325,14 +325,11 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     useEffect(() => {
         let isMounted = true;
         const checkPinned = async () => {
-            try {
                 const result = await isPinned(msg);
                 if (isMounted) {
                     setPinned(result);
                 }
-            } catch (err) {
-                console.log(err);
-            }
+
 
         };
         checkPinned();
@@ -1223,7 +1220,6 @@ export default function ChatScreen({ route, navigation }) {
 
             sound.setOnPlaybackStatusUpdate((status) => {
                 if (status.didJustFinish) {
-                    console.log("🔈 Finished playing TTS");
                     sound.unloadAsync();
                 }
             });
@@ -1408,14 +1404,12 @@ export default function ChatScreen({ route, navigation }) {
     useEffect(() => { })
 
     const isPinned = async (msg) => {
-        try {
+
             const response = await axios.get(`/api/pin-messages/${conversationId}`);
 
             const listPinMess = response.data;
             return listPinMess.some(p => p.messageId === msg._id);
-        } catch (err) {
-            console.log(err)
-        }
+
 
     };
 
@@ -1947,83 +1941,9 @@ export default function ChatScreen({ route, navigation }) {
         }
     };
 
-    // const pickVideo = async () => {
-    //   const formData = new FormData();
 
-    //   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    //   if (!permission.granted) {
-    //     Alert.alert("Permission denied", "Gallery access needed.");
-    //     return;
-    //   }
-    //   const result = await ImagePicker.launchImageLibraryAsync({
-    //     mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-    //     quality: 1,
-    //     allowsEditing: false,
-    //   });
-    //   if (!result.canceled && result.assets.length > 0) {
-    //     const selectedVideo = result.assets[0];
-    //     console.log(selectedVideo);
-    //     const videoUri = selectedVideo.uri;
-    //     const fileName = selectedVideo.uri.split('/').pop();
-    //     const mimeType = selectedVideo.mimeType || 'video/mp4';
 
-    //     const file = {
-    //       uri: videoUri,
-    //       name: fileName,
-    //       type: mimeType,
-    //     };
-
-    //     formData.append('id', userId);
-    //     formData.append('video', file);
-    //     formData.append('conversationId', conversationId);
-
-    //     try {
-    //       // Gửi tệp lên server
-    //       const response = await axios.post('/api/messages/videos', formData, {
-    //         headers: {
-    //           'Content-Type': 'multipart/form-data',
-    //         },
-    //         timeout: 30000,
-    //       });
-
-    //       const videoUrl = response.data?.file?.url;
-    //       const newMsg = {
-    //         _id: String(Date.now()),
-    //         memberId: { userId: userId || "" },
-    //         type: "VIDEO",
-    //         content: videoUrl,
-    //         createdAt: new Date().toISOString(),
-    //       };
-
-    //       setMessages((prev) => [...prev, newMsg]);
-    //       console.log('Video uploaded successfully:', videoUrl);
-
-    //     } catch (err) {
-    //       console.log('Error uploading video:', err);
-    //       Alert.alert('Error', 'Failed to upload video');
-    //     }
-    //   }
-    // };
-
-    const base64ToBlob = (base64Data, contentType = '', sliceSize = 512) => {
-        const byteCharacters = atob(base64Data); // decode base64
-        const byteArrays = [];
-
-        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-            const slice = byteCharacters.slice(offset, offset + sliceSize);
-
-            const byteNumbers = new Array(slice.length);
-            for (let i = 0; i < slice.length; i++) {
-                byteNumbers[i] = slice.charCodeAt(i);
-            }
-
-            const byteArray = new Uint8Array(byteNumbers);
-            byteArrays.push(byteArray);
-        }
-
-        return new Blob(byteArrays, { type: contentType });
-    };
-
+    
     const pickDocument = async () => {
         try {
             const result = await DocumentPicker.getDocumentAsync({
@@ -2104,7 +2024,7 @@ export default function ChatScreen({ route, navigation }) {
     }
 
     const handlePressEmoji = async (msg) => {
-        try {
+
             const reactors = await Promise.all(
                 msg.reacts.map(async (react) => {
                     const member = await handleGetMember(react.memberId);
@@ -2117,9 +2037,7 @@ export default function ChatScreen({ route, navigation }) {
 
             setSelectedReactors(reactors);
             setReactDetailModalVisible(true);
-        } catch (err) {
-            console.log(err);
-        }
+
 
     };
 

@@ -17,7 +17,8 @@ import {
   KeyboardAvoidingView,
   SafeAreaView,
   Animated,
-  Easing
+  Easing,
+  PermissionsAndroid,
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -35,6 +36,8 @@ dayjs.extend(relativeTime);
 import { Video } from "expo-av";
 import UserService from "../api/userService";
 import { Audio } from "expo-av";
+import * as IntentLauncher from 'expo-intent-launcher';
+
 
 
 const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -357,28 +360,266 @@ const MessageItem = forwardRef(function MessageItem(
   const navigation = useNavigation();
   const [recordingModal, setRecordingModal] = useState(false);
   const audioExtensions = ['mp3', 'wav', 'aac', 'ogg', 'm4a'];
+  
 
   const isAudioFile = (fileName = '', url = '') => {
     // Simple extension check (could enhance with mimetype if you have it)
     const name = (fileName || url).toLowerCase();
     return audioExtensions.some(ext => name.endsWith(`.${ext}`));
   };
+const showDownloadSuccess = async (fileUri, fileName, displayPath) => {
+  Alert.alert(
+    "Download Complete",
+    `${fileName}`,
+    [
+      {
+        text: "Open File",
+        onPress: () => openFile(fileUri, fileName)
+      },
+      {
+        text: "OK",
+        style: "cancel"
+      }
+    ]
+  );
+};
+const getMimeType = (extension) => {
+  const mimeTypes = {
+    // Image types
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    
+    // Video types
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    avi: 'video/x-msvideo',
+    mkv: 'video/x-matroska',
+    
+    // Audio types
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    m4a: 'audio/mp4',
+    ogg: 'audio/ogg',
+    
+    // Document types
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    txt: 'text/plain',
+    
+    // Archive types
+    zip: 'application/zip',
+    rar: 'application/x-rar-compressed',
+    '7z': 'application/x-7z-compressed',
+  };
+  
+  return mimeTypes[extension.toLowerCase()] || 'application/octet-stream';
+};
+
+const requestStoragePermission = async () => {
+  if (Platform.OS === 'android') {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission required',
+        'Please grant storage permissions to save files to your device'
+      );
+      return false;
+    }
+    return true;
+  }
+  return true;
+};
+
+const saveToDownloads = async (tempUri, fileName) => {
+  try {
+    if (Platform.OS === 'android') {
+      // For Android 10+ we need to use SAF to save to Downloads
+      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      
+      if (!permissions.granted) {
+        throw new Error('Storage permission not granted');
+      }
+
+      const destinationUri = await FileSystem.StorageAccessFramework.createFileAsync(
+        permissions.directoryUri,
+        fileName,
+        getMimeType(fileName.split('.').pop())
+      );
+      
+      const fileContent = await FileSystem.readAsStringAsync(tempUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      await FileSystem.StorageAccessFramework.writeAsStringAsync(
+        destinationUri,
+        fileContent,
+        { encoding: FileSystem.EncodingType.Base64 }
+      );
+      
+      return {
+        uri: destinationUri,
+        displayPath: permissions.directoryUri.includes('downloads') ? 
+          'Downloads folder' : 'selected location'
+      };
+    } else {
+      // On iOS, save to Documents directory
+      const saveDir = `${FileSystem.documentDirectory}Downloads/`;
+      await FileSystem.makeDirectoryAsync(saveDir, { intermediates: true });
+      const newUri = `${saveDir}${fileName}`;
+      await FileSystem.copyAsync({ from: tempUri, to: newUri });
+      return {
+        uri: newUri,
+        displayPath: 'Files app (Downloads folder)'
+      };
+    }
+  } catch (error) {
+    console.error('Error saving to downloads:', error);
+    throw error;
+  }
+};
 
 
-  const downloadFile = async (url, fileName = 'downloaded_file') => {
+const promptSaveLocation = async (fileName) => {
+  if (Platform.OS === 'android') {
+    return new Promise((resolve) => {
+      Alert.alert(
+        'Save file',
+        'Where would you like to save the file?',
+        [
+          { 
+            text: 'Downloads folder', 
+            onPress: () => resolve('downloads') 
+          },
+          { 
+            text: 'Choose location', 
+            onPress: () => resolve('picker') 
+          },
+          { 
+            text: 'Cancel', 
+            style: 'cancel', 
+            onPress: () => resolve('cancel') 
+          }
+        ]
+      );
+    });
+  } else {
+    // On iOS, we'll use the document picker to choose location
     try {
+      const dir = await DocumentPicker.getDocumentAsync({
+        type: 'public.folder',
+        copyToCacheDirectory: false,
+      });
+      return dir.canceled ? 'cancel' : 'picker';
+    } catch (error) {
+      console.error('Error picking directory:', error);
+      return 'cancel';
+    }
+  }
+};
+
+const downloadFile = async (url, fileName = 'downloaded_file') => {
+  try {
+    // Clean filename
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9\-._]/g, '_');
+    
+    // Always download to app's cache directory first
+    const tempUri = `${FileSystem.cacheDirectory}${safeFileName}`;
+    
+    // Check if file already exists
+    const fileInfo = await FileSystem.getInfoAsync(tempUri);
+    if (!fileInfo.exists) {
       const downloadResumable = FileSystem.createDownloadResumable(
         url,
-        FileSystem.documentDirectory + fileName
+        tempUri,
+        {},
+        (downloadProgress) => {
+          const progress = Math.round(
+            (downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100
+          );
+        }
       );
-
+      
       const { uri } = await downloadResumable.downloadAsync();
-      Alert.alert("Success", `File downloaded to:\n${uri}`);
-    } catch (error) {
-      console.error("Download error:", error);
-      Alert.alert("Error", "Failed to download the file.");
+      
+      // Ask user where to save the file
+      const saveAction = await promptSaveLocation(safeFileName);
+      
+      if (saveAction === 'cancel') {
+        // User cancelled, keep file in cache
+        showDownloadSuccess(uri, safeFileName, 'temporary storage');
+        return uri;
+      } else {
+        // For both 'downloads' and 'picker' we'll use the same method on Android
+        // since we need to use SAF for both cases
+        const { uri: finalUri, displayPath } = await saveToDownloads(uri, safeFileName);
+        showDownloadSuccess(finalUri, safeFileName, displayPath);
+        return finalUri;
+      }
+    } else {
+      // File already exists in cache
+      showDownloadSuccess(tempUri, safeFileName, 'temporary storage');
+      return tempUri;
     }
-  };
+  } catch (error) {
+    console.error("Download error:", error);
+    Alert.alert(
+      "Download Failed",
+      error.message || "Failed to download the file. Please try again."
+    );
+    throw error;
+  }
+};
+
+const openFile = async (fileUri, fileName) => {
+  try {
+    const mimeType = getMimeType(fileName.split('.').pop());
+    
+    // First ensure the file exists
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists) {
+      throw new Error("File doesn't exist");
+    }
+
+    if (Platform.OS === 'android') {
+      try {
+        // Try to get content URI
+        const contentUri = await FileSystem.getContentUriAsync(fileUri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+          type: mimeType,
+        });
+      } catch (contentUriError) {
+        
+        // Fallback to sharing the file
+        await Sharing.shareAsync(fileUri, {
+          mimeType,
+          dialogTitle: `Open ${fileName}`,
+        });
+      }
+    } else {
+      // iOS implementation
+      await Sharing.shareAsync(fileUri, {
+        mimeType,
+        dialogTitle: `Open ${fileName}`,
+      });
+    }
+  } catch (error) {
+    console.error("Error opening file:", error);
+    Alert.alert(
+      "Cannot Open File",
+      error.message || "No application found to open this file type."
+    );
+  }
+};
 
 
   const isMe = msg.memberId && msg.memberId.userId === currentUserId;
@@ -632,7 +873,9 @@ const MessageItem = forwardRef(function MessageItem(
                 onPress={() => downloadFile(msg.content, msg.fileName)}
                 onLongPress={onLongPress}
                 activeOpacity={0.7}
+                disabled={!msg.content}
               >
+              
                 <Image
                   source={getFileIcon(msg.content)}
                   style={messageItemStyles.fileIcon}
@@ -1632,7 +1875,6 @@ export default function ChatScreen({ route, navigation }) {
       const response = await axios.get(`/api/pin-messages/${conversationId}`);
       return response.data;
     } catch (err) {
-      console.log(err);
       return [];
     }
   };
@@ -2238,12 +2480,7 @@ export default function ChatScreen({ route, navigation }) {
         type: mimeType,
       });
 
-      // Logging FormData keys (values not accessible directly in React Native)
-      if (formData._parts) {
-        for (let [k, v] of formData._parts) {
-          console.log(`[FormData] ${k}:`, v);
-        }
-      }
+
 
       // 3️⃣ Do upload
       const response = await axios.post("/api/messages/file", formData, {
@@ -2260,8 +2497,6 @@ export default function ChatScreen({ route, navigation }) {
       ]));
 
     } catch (error) {
-      console.log("[FileUpload] ERROR sending file:", error);
-
       // Remove placeholder if failed
       setMessages(prev => prev.filter(m => !m._id.startsWith("tmp_")));
     } finally {

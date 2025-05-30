@@ -63,38 +63,30 @@ export default function ContactScreen({ navigation }) {
   useEffect(() => {
     if (!currentUser?._id) return;
 
-    console.log('[SOCKET] JOIN_USER →', currentUser._id);
+
     socket.emit(SOCKET_EVENTS.JOIN_USER, currentUser._id);
 
     const onFriendAccepted = (data) => {
-      console.log('[SOCKET] ACCEPT_FRIEND received:', data);
+
 
       // The server sends the user object that was accepted (i.e. receiver/sender)
       const acceptedUserId = data?._id;
       if (!acceptedUserId) return;
 
-      console.log(
-        '[SOCKET] CurrentUser:',
-        currentUser._id,
-        'AcceptedUserId:',
-        acceptedUserId
-      );
 
       // Remove from sentRequests if we had sent to this person
       setSentRequests((prev) => {
         const next = prev.filter((id) => id !== acceptedUserId);
-        console.log('[SOCKET] Updated sentRequests:', next);
         return next;
       });
 
       // Refresh friend list to reflect the new friend
       FriendService.getListFriends().then((friendsList) => {
-        console.log('[SOCKET] New friends list:', friendsList);
+
         setFriends(friendsList);
       });
     };
     const onFriendDeleted = (data) => {
-      console.log('[SOCKET] DELETED_FRIEND received:', data);
 
       const deletedUserId = data?._id;
       if (!deletedUserId) return;
@@ -104,13 +96,13 @@ export default function ContactScreen({ navigation }) {
         const next = prev.filter(
           (f) => f._id !== deletedUserId && f.userId !== deletedUserId
         );
-        console.log('[SOCKET] Updated friends list after deletion:', next);
+
         return next;
       });
     };
 
     const onFriendInviteDeleted = (data) => {
-      console.log('[SOCKET] DELETED_FRIEND_INVITE received:', data);
+
       const declinerId = typeof data === 'string' ? data : data.receiverId;
       if (!declinerId) return;
 
@@ -235,7 +227,7 @@ setPhoneBookUsers(foundUsers);
   useEffect(() => {
     (async () => {
       const token = await AsyncStorage.getItem('userToken');
-      console.log('🔍 Retrieved token in ConversationScreen:', token);
+
     })();
   }, []);
 
@@ -246,13 +238,7 @@ useEffect(() => {
     const q = query.toLowerCase();
     const cleanQ = query.replace(/\D/g, '');
 
-    // Debug log!
-    phoneBookUsers.forEach(u => {
-      console.log(
-        'Contact:', u.name, '| phoneNumber:', u.phoneNumber, '| Digits:', u.phoneNumber && u.phoneNumber.replace(/\D/g, '')
-      );
-    });
-    console.log('Search input:', query, '| cleanQ:', cleanQ);
+
 
     setFilteredContacts(
       phoneBookUsers.filter(

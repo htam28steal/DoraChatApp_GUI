@@ -19,6 +19,7 @@ export default function SingleChatDetail({ route, navigation }) {
   const { conversationId } = route.params;
 const [pinnedMessages, setPinnedMessages] = useState([]);
 const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
 
 
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -95,7 +96,7 @@ const enrichedPins = pins.map(pin => {
 setPinnedMessages(enrichedPins);
 setPinModalVisible(true);
   } catch (err) {
-    console.error("❌ Failed to fetch pinned messages:", err);
+
     Alert.alert("Error", "Could not load pinned messages.");
   }
 };
@@ -106,6 +107,7 @@ setPinModalVisible(true);
         // 1. load current user
         const uid = await AsyncStorage.getItem('userId');
         setCurrentUserId(uid);
+         setLoading(true);
 
         // 2. fetch conversation by ID
         //    If you really need the "individuals" POST, replace this with your existing axios.post(...)
@@ -113,7 +115,7 @@ setPinModalVisible(true);
           `/api/conversations/${conversationId}`
         );
         setConversation(conv);
-        console.log('Fetched conversation:', conv); 
+
         setIsMuted(!!conv.isMuted);
 
         // 3. find the “other” member in a 1-on-1 chat
@@ -123,12 +125,15 @@ setPinModalVisible(true);
         if (other) {
           setOtherMember(other);            // ← store the other user
           setTempName(other.name);     
-          console.log('Identified otherMember:', other);     // ← initialize edit buffer
+
         }
       } catch (err) {
         console.error('❌ load single-chat detail failed', err);
         Alert.alert('Error', 'Không thể tải chi tiết trò chuyện.');
       }
+        finally {
+      setLoading(false); // loading done!
+    }
     })();
   }, [conversationId]);
    useEffect(() => {
@@ -149,40 +154,31 @@ setPinModalVisible(true);
 
 useEffect(() => {
   const handleNameUpdate = ({ conversationId: convId, userId, name }) => {
-    console.log("📥 Received update-member-name socket event:");
-    console.log("   conversationId:", convId);
-    console.log("   userId:", userId);
-    console.log("   newName:", name);
-    console.log("   local conversationId:", conversationId);
-    console.log("   local otherMember?.userId:", otherMember?.userId);
 
     if (convId !== conversationId) {
-      console.log("❌ Ignored: conversationId mismatch");
+
       return;
     }
 
     if (userId !== otherMember?.userId) {
-      console.log("❌ Ignored: userId mismatch");
+
       return;
     }
-
-    console.log("✅ Matched! Updating name in local state.");
     setOtherMember(prev => ({ ...prev, name: name }));
   };
 
   socket.on(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
-  console.log("🔗 Subscribed to UPDATE_MEMBER_NAME socket event");
+
 
   return () => {
     socket.off(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
-    console.log("❌ Unsubscribed from UPDATE_MEMBER_NAME socket event");
+
   };
 }, [conversationId, otherMember?.userId]);
 
 
 
   const handleSaveName = async () => {
-    console.log('handleSaveName called with tempName:', tempName, 'for user:', otherMember?.userId);
     if (!otherMember) return;
     setIsSaving(true);
     try {
@@ -197,10 +193,10 @@ useEffect(() => {
       });
       // Update local state
       setOtherMember(prev => ({ ...prev, name: tempName }));
-      console.log('PATCH success—name updated on server');     
+    
       setIsEditingName(false);
     } catch (err) {
-      console.log('PATCH error:', err);  
+
       Alert.alert('Error', 'Không thể cập nhật tên thành viên.');
     } finally {
       setIsSaving(false);
@@ -213,7 +209,16 @@ useEffect(() => {
 
 
  
-
+if (loading) {
+  return (
+    <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)' }]}>
+      <TouchableOpacity     onPress={() => navigation.goBack()}  style={{position:'absolute',top:40, left:25, }}>
+        <Image source={require('../icons/back.png')} style={{width:25, height:20}}></Image>
+      </TouchableOpacity>
+      <ActivityIndicator size="large" color="#086DC0" />
+    </View>
+  );
+}
   return (
         <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
     <SafeAreaView style={styles.container}>
@@ -333,7 +338,7 @@ useEffect(() => {
 
 
 
-      <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
+      {/* <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
       <TouchableOpacity>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
@@ -346,7 +351,7 @@ useEffect(() => {
       </TouchableOpacity>
     
 
-    </View>
+    </View> */}
 <Modal
   visible={pinModalVisible}
   transparent
@@ -357,7 +362,7 @@ useEffect(() => {
     <View style={styles.pinModalContainer}>
       {/* Header */}
       <View style={styles.pinModalHeader}>
-        <Text style={styles.pinModalTitle}>Tin nhắn đã ghim</Text>
+        <Text style={styles.pinModalTitle}>Pinned messages</Text>
         <TouchableOpacity onPress={() => setPinModalVisible(false)}>
           <Image
             source={require('../icons/Close.png')}
@@ -368,7 +373,7 @@ useEffect(() => {
 
       {/* Message list */}
       <FlatList
-        data={pinnedMessages}
+       data={[...pinnedMessages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => {
           const isImage = item.message?.type === 'IMAGE';
@@ -392,12 +397,14 @@ useEffect(() => {
                   style={styles.pinnedAvatar}
                 />
                 <Text style={styles.pinnedSender}>{sender}</Text>
-                <Text style={styles.pinnedTime}>
-                  {new Date(item.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </Text>
+<Text style={styles.pinnedTime}>
+  {new Date(item.createdAt).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit'
+  })}, {''}
+  {new Date(item.createdAt).toLocaleDateString('en-GB')}
+</Text>
+
               </View>
 
               {isImage ? (
