@@ -294,6 +294,7 @@ const MessageItem = React.memo(
         allMessages,
         index,
         AudioBubble,
+        navigation
     }) => {
         const isMe = msg.memberId?.userId === currentUserId;
         const content = msg.content || "";
@@ -452,6 +453,27 @@ const MessageItem = React.memo(
 
         const renderMessageContent = useCallback((msg) => {
             const { content, tagPositions = [] } = msg;
+
+            const handlePressTaggedUser = async (memberId) => {
+                console.log(`LOG MEMBERID`, memberId)
+                try {
+                    if (!navigation) {
+                        console.warn('Navigation is not available');
+                        return;
+                    }
+
+                    const response = await axios.get(`api/members/member/${memberId}`);
+
+                    console.log(`DATA`, response.data)
+                    const userData = response.data.data;
+                    navigation.navigate('YourFriendScreen', {
+                        userId: userData.userId,
+                    });
+                } catch (error) {
+                    console.error('Error fetching member data:', error);
+                }
+            };
+
             if (!tagPositions.length) {
                 return <Text style={messageItemStyles.textContent}>{content}</Text>;
             }
@@ -471,6 +493,7 @@ const MessageItem = React.memo(
                         </Text>
                     );
                 }
+
                 elements.push(
                     <Text
                         key={`tag-${idx}`}
@@ -478,10 +501,12 @@ const MessageItem = React.memo(
                             messageItemStyles.textContent,
                             messageItemStyles.taggedText,
                         ]}
+                        onPress={() => handlePressTaggedUser(tag.memberId)}
                     >
                         {content.slice(tag.start, tag.end)}
                     </Text>
                 );
+
                 lastIndex = tag.end;
             });
 
@@ -494,7 +519,7 @@ const MessageItem = React.memo(
             }
 
             return <Text style={messageItemStyles.textContent}>{elements}</Text>;
-        }, []);
+        }, [navigation]);
 
         const prevMessage = allMessages[index - 1];
         const isFirstInGroup =
@@ -1025,6 +1050,7 @@ function ChatBox({
     isPinned,
     handleOpenVoteModal,
     channelId,
+    navigation
 }) {
     const scrollViewRef = useRef(null);
     const scrollPosition = useRef(0);
@@ -1079,6 +1105,7 @@ function ChatBox({
                         isPinned={isPinned}
                         handleOpenVoteModal={handleOpenVoteModal}
                         AudioBubble={AudioBubble}
+                        navigation={navigation}
                     />
                 );
             })}
@@ -2570,6 +2597,7 @@ export default function ChatScreen({ route, navigation }) {
                         isPinned={isPinned}
                         handleOpenVoteModal={handleOpenVoteModal}
                         channelId={channels}
+                        navigation={navigation}
                     />
                 </View>
                 {replyingMessage && (
