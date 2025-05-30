@@ -149,7 +149,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
                 )
             );
 
-            const serverUpdatedVote = results[0]?.data || results[0];
+            const serverUpdatedVote = results;
             if (serverUpdatedVote) {
                 onSubmit(serverUpdatedVote);
                 Alert.alert("Thành công", "Bình chọn thành công!");
@@ -176,45 +176,38 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
         try {
             const optimisticUpdate = {
                 ...msg,
-                options: msg.options.map(opt => {
-                    if (selectedOptions.includes(opt._id)) {
-                        return {
-                            ...opt,
-                            members: opt.members?.filter(m => m.memberId !== member) || []
-                        };
-                    }
-                    return opt;
-                })
+                options: msg.options.map(opt => ({
+                    ...opt,
+                    members: selectedOptions.includes(opt._id)
+                        ? opt.members?.filter(m => m.memberId !== member) || []
+                        : opt.members
+                }))
             };
             onSubmit(optimisticUpdate);
 
-            console.log(`votedID`, msg._id)
-            console.log(`option`, selectedOptions[0])
-            console.log(`member`, member)
-            const result = await voteService.deselectOption(
-                member,
-                selectedOptions[0],
-                msg._id
-            );
-            const serverUpdatedVote = result;
-            if (serverUpdatedVote) {
-                onSubmit(serverUpdatedVote);
-                Alert.alert("Thành công", "Đã bỏ bình chọn!");
-                onClose();
+            for (const optionId of selectedOptions) {
+                try {
+                    await voteService.deselectOption(member, optionId, msg._id);
+                } catch (err) {
+                    console.error(`Lỗi khi bỏ chọn option ${optionId}:`, err);
+                }
             }
+
+            Alert.alert("Thành công", "Đã bỏ bình chọn!");
+            onClose();
         } catch (error) {
-            console.error('Lỗi khi bỏ bình chọn:', error);
-            Alert.alert("Lỗi", error.response?.data?.message || "Bỏ bình chọn thất bại");
+            console.error('Lỗi chung khi bỏ bình chọn:', error);
+            Alert.alert("Lỗi", "Có lỗi xảy ra khi bỏ bình chọn");
             onSubmit(msg);
         }
     };
-
 
 
     const handleAddOption = async () => {
         const trimmed = newOptionText.trim();
         if (!trimmed || !msg || !user) return;
 
+        // Kiểm tra trùng lặp
         const isDuplicate = dynamicOptions.some(
             opt => opt.name.toLowerCase() === trimmed.toLowerCase()
         );
@@ -260,6 +253,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     useEffect(() => {
         const handleDeSelect = (selectoption) => {
+            setDynamicOptions(prev => [...prev, selectoption]);
 
             if (isRemoved) return;
 
@@ -324,8 +318,8 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
                 </View>
 
                 <ScrollView style={styles.optionsList}>
-                    {dynamicOptions.map((opt) => (
-                        <View key={opt._id} style={{ position: 'relative' }}>
+                    {dynamicOptions.map((opt, index) => (
+                        <View key={`${opt._id}-${index}`} style={{ position: 'relative' }}>
                             <TouchableOpacity
                                 style={[
                                     styles.optionItem,
