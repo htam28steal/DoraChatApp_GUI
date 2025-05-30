@@ -598,7 +598,6 @@ const openFile = async (fileUri, fileName) => {
           type: mimeType,
         });
       } catch (contentUriError) {
-        console.log("Content URI failed, trying direct share", contentUriError);
         
         // Fallback to sharing the file
         await Sharing.shareAsync(fileUri, {
@@ -1876,7 +1875,6 @@ export default function ChatScreen({ route, navigation }) {
       const response = await axios.get(`/api/pin-messages/${conversationId}`);
       return response.data;
     } catch (err) {
-      console.log(err);
       return [];
     }
   };
@@ -2482,12 +2480,7 @@ export default function ChatScreen({ route, navigation }) {
         type: mimeType,
       });
 
-      // Logging FormData keys (values not accessible directly in React Native)
-      if (formData._parts) {
-        for (let [k, v] of formData._parts) {
-          console.log(`[FormData] ${k}:`, v);
-        }
-      }
+
 
       // 3️⃣ Do upload
       const response = await axios.post("/api/messages/file", formData, {
@@ -2504,8 +2497,6 @@ export default function ChatScreen({ route, navigation }) {
       ]));
 
     } catch (error) {
-      console.log("[FileUpload] ERROR sending file:", error);
-
       // Remove placeholder if failed
       setMessages(prev => prev.filter(m => !m._id.startsWith("tmp_")));
     } finally {
