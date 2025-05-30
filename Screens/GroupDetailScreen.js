@@ -547,9 +547,6 @@ if (loading) {
           >
             <Image source={AddMember} style={{ width: 14, height: 14 }} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.pinButton}>
-            <Image source={require('../icons/Pin.png')} />
-          </TouchableOpacity>
         </View>
       </View>
 
