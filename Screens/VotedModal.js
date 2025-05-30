@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -28,8 +28,23 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
     const [isRemoved, setIsRemoved] = useState(false);
     const [voted, setVoted] = useState(true)
 
+    const [showUpdateButton, setShowUpdateButton] = useState(false);
 
+    console.log(`LOG Dynamic`, dynamicOptions);
 
+    useEffect(() => {
+        if (visible) {
+            setSelectedOptions([]);
+            setNewOptionText('');
+            setShowUpdateButton(false);
+            setVoted(false);
+
+            if (message) {
+                setMsg(message);
+                setDynamicOptions(message.options || []);
+            }
+        }
+    }, [visible, message]);
 
     useEffect(() => {
         if (memberId) {
@@ -69,25 +84,141 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
         fetchUserId();
     }, [message]);
 
-    const toggleOption = (optionId) => {
-        const selectedOption = dynamicOptions.find(opt => opt._id === optionId);
 
+
+    const checkSelectedOptionsStatus = useCallback(() => {
+        if (selectedOptions.length === 0) return false;
+
+        let hasVotedOption = false;
+        let hasNotVotedOption = false;
+
+        for (const optionId of selectedOptions) {
+            const option = dynamicOptions.find(opt => opt._id === optionId);
+            if (!option) continue;
+
+            const isVoted = option.members?.some(m => m.memberId === member);
+
+            if (isVoted) {
+                hasVotedOption = true;
+            } else {
+                hasNotVotedOption = true;
+            }
+        }
+
+        return hasVotedOption && hasNotVotedOption;
+    }, [selectedOptions, dynamicOptions, member]);
+
+    useEffect(() => {
+        const updateStatus = () => {
+            const hasMixedSelection = checkSelectedOptionsStatus();
+            setShowUpdateButton(hasMixedSelection);
+
+            if (!hasMixedSelection) {
+                const hasVoted = dynamicOptions.some(opt =>
+                    selectedOptions.includes(opt._id) &&
+                    opt.members?.some(m => m.memberId === member)
+                );
+                setVoted(hasVoted);
+            }
+        };
+
+        updateStatus();
+    }, [selectedOptions, dynamicOptions, member, checkSelectedOptionsStatus]);
+
+    const handleUpdateVote = async () => {
+        if (selectedOptions.length === 0) {
+            Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một phương án.');
+            return;
+        }
+
+        if (!member) {
+            Alert.alert('Lỗi', 'Không xác định được người dùng');
+            return;
+        }
+
+        try {
+            const updatedOptions = [...dynamicOptions];
+
+            const changes = selectedOptions.map(optionId => {
+                const option = updatedOptions.find(opt => opt._id === optionId);
+                const isVoted = option?.members?.some(m => m.memberId === member);
+
+                return {
+                    optionId,
+                    shouldVote: !isVoted
+                };
+            });
+
+            const optimisticUpdate = {
+                ...msg,
+                options: updatedOptions.map(opt => {
+                    const change = changes.find(c => c.optionId === opt._id);
+                    if (!change) return opt;
+
+                    if (change.shouldVote) {
+                        return {
+                            ...opt,
+                            members: [
+                                ...(opt.members || []),
+                                {
+                                    _id: member,
+                                    name: user.name,
+                                    avatar: user.avatar,
+                                    avatarColor: user.avatarColor
+                                }
+                            ]
+                        };
+                    } else {
+                        return {
+                            ...opt,
+                            members: opt.members?.filter(m => m.memberId !== member) || []
+                        };
+                    }
+                })
+            };
+
+            onSubmit(optimisticUpdate);
+
+            await Promise.all(
+                changes.map(({ optionId, shouldVote }) =>
+                    shouldVote
+                        ? voteService.selectOption({
+                            voteId: msg._id,
+                            optionId: optionId,
+                            memberId: member,
+                            memberInfo: {
+                                name: user.name,
+                                avatar: user.avatar,
+                                avatarColor: user.avatarColor
+                            }
+                        })
+                        : voteService.deselectOption(member, optionId, msg._id)
+                )
+            );
+
+            Alert.alert("Thành công", "Cập nhật bình chọn thành công!");
+            onClose();
+        } catch (error) {
+            console.error('Lỗi khi cập nhật bình chọn:', error);
+            Alert.alert("Lỗi", error.response?.data?.message || "Cập nhật bình chọn thất bại");
+            onSubmit(msg);
+        }
+    };
+
+
+
+    const toggleOption = (optionId) => {
         if (msg?.isMultipleChoice) {
             if (selectedOptions.includes(optionId)) {
-                setSelectedOptions(selectedOptions.filter(id => id !== optionId));
+                setSelectedOptions(prev => prev.filter(id => id !== optionId));
             } else {
-                setSelectedOptions([...selectedOptions, optionId]);
+                setSelectedOptions(prev => [...prev, optionId]);
             }
         } else {
             setSelectedOptions([optionId]);
         }
-
-        const anyVoted = dynamicOptions.some(opt =>
-            selectedOptions.includes(opt._id) &&
-            opt.members?.some(m => m.memberId === member)
-        );
-        setVoted(anyVoted);
     };
+
     useEffect(() => {
         const hasVoted = dynamicOptions.some(opt =>
             selectedOptions.includes(opt._id) &&
@@ -176,46 +307,37 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
         try {
             const optimisticUpdate = {
                 ...msg,
-                options: msg.options.map(opt => {
-                    if (selectedOptions.includes(opt._id)) {
-                        return {
-                            ...opt,
-                            members: opt.members?.filter(m => m.memberId !== member) || []
-                        };
-                    }
-                    return opt;
-                })
+                options: msg.options.map(opt => ({
+                    ...opt,
+                    members: selectedOptions.includes(opt._id)
+                        ? opt.members?.filter(m => m.memberId !== member) || []
+                        : opt.members
+                }))
             };
             onSubmit(optimisticUpdate);
 
-            console.log(`votedID`, msg._id)
-            console.log(`option`, selectedOptions[0])
-            console.log(`member`, member)
-            const result = await voteService.deselectOption(
-                member,
-                selectedOptions[0],
-                msg._id
-            );
-            const serverUpdatedVote = result;
-            if (serverUpdatedVote) {
-                onSubmit(serverUpdatedVote);
-                Alert.alert("Thành công", "Đã bỏ bình chọn!");
-                onClose();
+            for (const optionId of selectedOptions) {
+                try {
+                    await voteService.deselectOption(member, optionId, msg._id);
+                } catch (err) {
+                    console.error(`Lỗi khi bỏ chọn option ${optionId}:`, err);
+                }
             }
+
+            Alert.alert("Thành công", "Đã bỏ bình chọn!");
+            onClose();
         } catch (error) {
-            console.error('Lỗi khi bỏ bình chọn:', error);
-            Alert.alert("Lỗi", error.response?.data?.message || "Bỏ bình chọn thất bại");
+            console.error('Lỗi chung khi bỏ bình chọn:', error);
+            Alert.alert("Lỗi", "Có lỗi xảy ra khi bỏ bình chọn");
             onSubmit(msg);
         }
     };
-
 
 
     const handleAddOption = async () => {
         const trimmed = newOptionText.trim();
         if (!trimmed || !msg || !user) return;
 
-        // Kiểm tra trùng lặp
         const isDuplicate = dynamicOptions.some(
             opt => opt.name.toLowerCase() === trimmed.toLowerCase()
         );
@@ -238,8 +360,11 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     useEffect(() => {
         const handleVoteOptionSelectS = (selectoption) => {
+
+
             if (isRemoved) return;
 
+            setDynamicOptions(selectoption.options || []);
             onSubmit(selectoption);
         };
         const handleLeaveConversation = (data) => {
@@ -261,14 +386,13 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     useEffect(() => {
         const handleDeSelect = (selectoption) => {
-            setDynamicOptions(prev => [...prev, selectoption]);
 
             if (isRemoved) return;
 
+            setDynamicOptions(selectoption.options || []);
             onSubmit(selectoption);
         };
         const handleLeaveConversation = (data) => {
-            setDynamicOptions(prev => [...prev, data]);
             if (data.conversationId === conversation._id) {
                 setIsRemoved(true);
             }
@@ -285,7 +409,12 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
 
 
-
+    useEffect(() => {
+        const hasVoted = dynamicOptions.some(opt =>
+            opt.members?.some(m => m.memberId === member)
+        );
+        setVoted(hasVoted);
+    }, [dynamicOptions, member]);
 
     const { content, options = [] } = message || {};
 
@@ -326,8 +455,8 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
                 </View>
 
                 <ScrollView style={styles.optionsList}>
-                    {dynamicOptions.map((opt) => (
-                        <View key={opt._id} style={{ position: 'relative' }}>
+                    {dynamicOptions.map((opt, index) => (
+                        <View key={`${opt._id}-${index}`} style={{ position: 'relative' }}>
                             <TouchableOpacity
                                 style={[
                                     styles.optionItem,
@@ -354,7 +483,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
                                             <Text style={{ fontSize: 10 }}>{opt.members.length}</Text>
                                         </View>
                                     ) : (
-                                        // Hiển thị avatar nếu không phải ẩn danh
                                         <>
                                             {opt.members.slice(0, 2).map((member, i) => (
                                                 <Image
@@ -396,22 +524,37 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
                     ))}
                 </ScrollView>
 
+
                 <View style={styles.buttonRow}>
                     <TouchableOpacity onPress={onClose} style={[styles.button, { backgroundColor: '#ccc' }]}>
                         <Text>Đóng</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={voted ? handleDeselect : handleSubmit}
-                        style={[styles.button, { backgroundColor: voted ? '#ff4444' : '#2F80ED' }]}
-                    >
-                        <Text style={{ color: 'white' }}>
-                            {voted ? 'Bỏ bình chọn' : 'Bình chọn'}
-                        </Text>
-                    </TouchableOpacity>
+                    {showUpdateButton ? (
+                        <TouchableOpacity
+                            onPress={handleUpdateVote}
+                            style={[styles.button, { backgroundColor: '#4CAF50' }]}
+                        >
+                            <Text style={{ color: 'white' }}>Cập nhật</Text>
+                        </TouchableOpacity>
+                    ) : voted ? (
+                        <TouchableOpacity
+                            onPress={handleDeselect}
+                            style={[styles.button, { backgroundColor: '#ff4444' }]}
+                        >
+                            <Text style={{ color: 'white' }}>Bỏ bình chọn</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity
+                            onPress={handleSubmit}
+                            style={[styles.button, { backgroundColor: '#2F80ED' }]}
+                        >
+                            <Text style={{ color: 'white' }}>Bình chọn</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
-        </Modal>
+        </Modal >
 
     );
 };
