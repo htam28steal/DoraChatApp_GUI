@@ -359,7 +359,7 @@ useEffect(() => {
 
       {/* Message list */}
       <FlatList
-        data={pinnedMessages}
+       data={[...pinnedMessages].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => {
           const isImage = item.message?.type === 'IMAGE';
@@ -383,12 +383,14 @@ useEffect(() => {
                   style={styles.pinnedAvatar}
                 />
                 <Text style={styles.pinnedSender}>{sender}</Text>
-                <Text style={styles.pinnedTime}>
-                  {new Date(item.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </Text>
+<Text style={styles.pinnedTime}>
+  {new Date(item.createdAt).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit'
+  })}, {''}
+  {new Date(item.createdAt).toLocaleDateString('en-GB')}
+</Text>
+
               </View>
 
               {isImage ? (
