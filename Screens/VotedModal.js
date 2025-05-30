@@ -30,7 +30,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     const [showUpdateButton, setShowUpdateButton] = useState(false);
 
-    console.log(`LOG Dynamic`, dynamicOptions);
 
     useEffect(() => {
         if (visible) {
