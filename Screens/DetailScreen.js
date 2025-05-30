@@ -19,6 +19,7 @@ export default function SingleChatDetail({ route, navigation }) {
   const { conversationId } = route.params;
 const [pinnedMessages, setPinnedMessages] = useState([]);
 const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
 
 
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -106,6 +107,7 @@ setPinModalVisible(true);
         // 1. load current user
         const uid = await AsyncStorage.getItem('userId');
         setCurrentUserId(uid);
+         setLoading(true);
 
         // 2. fetch conversation by ID
         //    If you really need the "individuals" POST, replace this with your existing axios.post(...)
@@ -129,6 +131,9 @@ setPinModalVisible(true);
         console.error('❌ load single-chat detail failed', err);
         Alert.alert('Error', 'Không thể tải chi tiết trò chuyện.');
       }
+        finally {
+      setLoading(false); // loading done!
+    }
     })();
   }, [conversationId]);
    useEffect(() => {
@@ -204,7 +209,16 @@ useEffect(() => {
 
 
  
-
+if (loading) {
+  return (
+    <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)' }]}>
+      <TouchableOpacity     onPress={() => navigation.goBack()}  style={{position:'absolute',top:40, left:25, }}>
+        <Image source={require('../icons/back.png')} style={{width:25, height:20}}></Image>
+      </TouchableOpacity>
+      <ActivityIndicator size="large" color="#086DC0" />
+    </View>
+  );
+}
   return (
         <ImageBackground source={bg} style={styles.gradient} resizeMode="cover">
     <SafeAreaView style={styles.container}>
@@ -324,7 +338,7 @@ useEffect(() => {
 
 
 
-      <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
+      {/* <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
       <TouchableOpacity>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
@@ -337,7 +351,7 @@ useEffect(() => {
       </TouchableOpacity>
     
 
-    </View>
+    </View> */}
 <Modal
   visible={pinModalVisible}
   transparent
@@ -348,7 +362,7 @@ useEffect(() => {
     <View style={styles.pinModalContainer}>
       {/* Header */}
       <View style={styles.pinModalHeader}>
-        <Text style={styles.pinModalTitle}>Tin nhắn đã ghim</Text>
+        <Text style={styles.pinModalTitle}>Pinned messages</Text>
         <TouchableOpacity onPress={() => setPinModalVisible(false)}>
           <Image
             source={require('../icons/Close.png')}
