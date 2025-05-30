@@ -98,7 +98,6 @@ const messIcon   = require('../icons/mess.png');
 
      useEffect(() => {
   const fetchUserInfo = async () => {
-    try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
         Alert.alert('Missing token', 'Cannot fetch profile without authentication.');
@@ -112,9 +111,7 @@ const messIcon   = require('../icons/mess.png');
       });
 
       setCurrentUser(data);
-    } catch (err) {
-      console.error('❌ Failed to load current user info', err);
-    }
+
   };
 
   fetchUserInfo();
@@ -180,7 +177,6 @@ const onlyFalse = Array.isArray(res.data)
         setConversations(onlyFalse);
         setFiltered(onlyFalse);
       } catch (e) {
-        console.error(e);
         Alert.alert('Error', 'Could not load conversations.');
       } finally {
         setLoading(false);
@@ -223,7 +219,6 @@ const filteredConversations = useMemo(() => {
             const { data } = await axios.get('/api/colors');
             setColors(data);
           } catch (err) {
-            console.error('❌ Failed to load colors', err);
             Alert.alert('Lỗi', 'Không thể tải danh sách màu.');
           }
         };
@@ -270,7 +265,7 @@ const filteredConversations = useMemo(() => {
       
           setEditTagModalVisible(false);
         } catch (err) {
-          console.error(err);
+
           Alert.alert('Lỗi', 'Cập nhật thất bại.');
         }
       };
@@ -284,7 +279,6 @@ const filteredConversations = useMemo(() => {
           // remove it from local state so UI updates immediately
           setClassifies(prev => prev.filter(c => c._id !== id));
         } catch (err) {
-          console.error('❌ Failed to delete classify:', err);
           Alert.alert('Lỗi', 'Không thể xóa thẻ phân loại.');
         }
       };
@@ -329,7 +323,6 @@ const filteredConversations = useMemo(() => {
           // setClassifies(prev => [...prev, data]);
       
         } catch (err) {
-          console.error('❌ Failed to add classify', err);
           Alert.alert('Lỗi', 'Không thể thêm thẻ phân loại.');
         }
       };
@@ -344,7 +337,6 @@ const filteredConversations = useMemo(() => {
           setFriends(friendRes.data);
           setConvPickerVisible(true);
         } catch (err) {
-          console.error('❌ Failed to load conversations or friends', err);
           Alert.alert('Error', 'Cannot load conversations.');
         }
       };
@@ -366,13 +358,9 @@ const filteredConversations = useMemo(() => {
       
       
           const openAddTagModal = async () => {
-            try {
               const { data } = await axios.get('/api/colors');
               setColors(data);
               setAddTagModalVisible(true);
-            } catch (err) {
-              console.error('❌ Failed to load colors', err);
-            }
           };
           
       
@@ -425,7 +413,6 @@ if (!token) {
               setClassifies(res.data);
               setClassifyModalVisible(true);
             } catch (err) {
-              console.error('❌ Failed to load classifies', err);
               Alert.alert('Error', 'Could not load your classifications.');
             }
           };
@@ -444,7 +431,6 @@ if (!token) {
         setConversations(onlyFalse);
         setFiltered(onlyFalse);
       } catch (e) {
-        console.error(e);
         Alert.alert('Error', 'Could not load conversations.');
       } finally {
         setLoading(false);

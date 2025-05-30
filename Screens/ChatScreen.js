@@ -17,7 +17,8 @@ import {
   KeyboardAvoidingView,
   SafeAreaView,
   Animated,
-  Easing
+  Easing,
+  PermissionsAndroid,
 } from "react-native";
 import axios from "../api/apiConfig";
 import * as ImagePicker from "expo-image-picker";
@@ -35,6 +36,8 @@ dayjs.extend(relativeTime);
 import { Video } from "expo-av";
 import UserService from "../api/userService";
 import { Audio } from "expo-av";
+import * as IntentLauncher from 'expo-intent-launcher';
+
 
 
 const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -357,28 +360,163 @@ const MessageItem = forwardRef(function MessageItem(
   const navigation = useNavigation();
   const [recordingModal, setRecordingModal] = useState(false);
   const audioExtensions = ['mp3', 'wav', 'aac', 'ogg', 'm4a'];
+  
 
   const isAudioFile = (fileName = '', url = '') => {
     // Simple extension check (could enhance with mimetype if you have it)
     const name = (fileName || url).toLowerCase();
     return audioExtensions.some(ext => name.endsWith(`.${ext}`));
   };
+const showDownloadSuccess = (fileUri, fileName) => {
+  // Extract file extension for icon
+  const fileExtension = fileName.split('.').pop().toLowerCase();
+  const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension);
+  const isVideo = ['mp4', 'mov', 'avi'].includes(fileExtension);
+  const isAudio = ['mp3', 'wav', 'm4a'].includes(fileExtension);
 
+  // Create buttons based on file type
+  const buttons = [
+    {
+      text: "Open File",
+      onPress: () => openFile(fileUri, fileName),
+      style: 'default'
+    },
+    {
+      text: "OK",
+      style: 'cancel'
+    }
+  ];
 
-  const downloadFile = async (url, fileName = 'downloaded_file') => {
-    try {
+  // Special handling for media files
+  if (isImage || isVideo) {
+    buttons.unshift({
+      text: "Preview",
+      onPress: () => previewMedia(fileUri, isImage ? 'image' : 'video'),
+      style: 'default'
+    });
+  }
+
+  Alert.alert(
+    "Download Complete",
+    `${fileName}\n\nwas saved successfully.`,
+    buttons,
+    { cancelable: true }
+  );
+};
+const getMimeType = (extension) => {
+  const mimeTypes = {
+    // Image types
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    
+    // Video types
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    avi: 'video/x-msvideo',
+    mkv: 'video/x-matroska',
+    
+    // Audio types
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    m4a: 'audio/mp4',
+    ogg: 'audio/ogg',
+    
+    // Document types
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    txt: 'text/plain',
+    
+    // Archive types
+    zip: 'application/zip',
+    rar: 'application/x-rar-compressed',
+    '7z': 'application/x-7z-compressed',
+  };
+  
+  return mimeTypes[extension.toLowerCase()] || 'application/octet-stream';
+};
+
+const downloadFile = async (url, fileName = 'downloaded_file') => {
+  try {
+    // Clean filename
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9\-._]/g, '_');
+    const fileExtension = safeFileName.split('.').pop().toLowerCase();
+    
+    // Always download to app's cache directory first
+    const tempUri = `${FileSystem.cacheDirectory}${safeFileName}`;
+    
+    // Check if file already exists
+    const fileInfo = await FileSystem.getInfoAsync(tempUri);
+    if (!fileInfo.exists) {
       const downloadResumable = FileSystem.createDownloadResumable(
         url,
-        FileSystem.documentDirectory + fileName
+        tempUri,
+        {},
+        (downloadProgress) => {
+          const progress = Math.round(
+            (downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100
+          );
+          console.log(`Download progress: ${progress}%`);
+        }
       );
-
+      
       const { uri } = await downloadResumable.downloadAsync();
-      Alert.alert("Success", `File downloaded to:\n${uri}`);
-    } catch (error) {
-      console.error("Download error:", error);
-      Alert.alert("Error", "Failed to download the file.");
+      showDownloadSuccess(uri, safeFileName);
+      return uri;
+    } else {
+      showDownloadSuccess(tempUri, safeFileName);
+      return tempUri;
     }
-  };
+  } catch (error) {
+    console.error("Download error:", error);
+    Alert.alert(
+      "Download Failed",
+      error.message || "Failed to download the file. Please try again."
+    );
+    throw error;
+  }
+};
+const openFile = async (fileUri, fileName) => {
+  try {
+    const mimeType = getMimeType(fileName.split('.').pop());
+    
+    if (Platform.OS === 'android') {
+      // For Android, we need to use a content URI
+      const contentUri = await FileSystem.getContentUriAsync(fileUri);
+      
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+        type: mimeType,
+      });
+    } else {
+      // iOS can use the file URI directly
+      const canOpen = await Linking.canOpenURL(fileUri);
+      if (canOpen) {
+        await Linking.openURL(fileUri);
+      } else {
+        await Share.share({
+          url: fileUri,
+          title: `Open ${fileName}`,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error opening file:", error);
+    Alert.alert(
+      "Cannot Open File",
+      error.message || "No application found to open this file type."
+    );
+  }
+};
+
 
 
   const isMe = msg.memberId && msg.memberId.userId === currentUserId;
@@ -632,7 +770,9 @@ const MessageItem = forwardRef(function MessageItem(
                 onPress={() => downloadFile(msg.content, msg.fileName)}
                 onLongPress={onLongPress}
                 activeOpacity={0.7}
+                disabled={!msg.content}
               >
+              
                 <Image
                   source={getFileIcon(msg.content)}
                   style={messageItemStyles.fileIcon}

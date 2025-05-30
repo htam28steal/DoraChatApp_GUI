@@ -95,7 +95,7 @@ const enrichedPins = pins.map(pin => {
 setPinnedMessages(enrichedPins);
 setPinModalVisible(true);
   } catch (err) {
-    console.error("❌ Failed to fetch pinned messages:", err);
+
     Alert.alert("Error", "Could not load pinned messages.");
   }
 };
@@ -113,7 +113,7 @@ setPinModalVisible(true);
           `/api/conversations/${conversationId}`
         );
         setConversation(conv);
-        console.log('Fetched conversation:', conv); 
+
         setIsMuted(!!conv.isMuted);
 
         // 3. find the “other” member in a 1-on-1 chat
@@ -123,7 +123,7 @@ setPinModalVisible(true);
         if (other) {
           setOtherMember(other);            // ← store the other user
           setTempName(other.name);     
-          console.log('Identified otherMember:', other);     // ← initialize edit buffer
+
         }
       } catch (err) {
         console.error('❌ load single-chat detail failed', err);
@@ -149,40 +149,31 @@ setPinModalVisible(true);
 
 useEffect(() => {
   const handleNameUpdate = ({ conversationId: convId, userId, name }) => {
-    console.log("📥 Received update-member-name socket event:");
-    console.log("   conversationId:", convId);
-    console.log("   userId:", userId);
-    console.log("   newName:", name);
-    console.log("   local conversationId:", conversationId);
-    console.log("   local otherMember?.userId:", otherMember?.userId);
 
     if (convId !== conversationId) {
-      console.log("❌ Ignored: conversationId mismatch");
+
       return;
     }
 
     if (userId !== otherMember?.userId) {
-      console.log("❌ Ignored: userId mismatch");
+
       return;
     }
-
-    console.log("✅ Matched! Updating name in local state.");
     setOtherMember(prev => ({ ...prev, name: name }));
   };
 
   socket.on(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
-  console.log("🔗 Subscribed to UPDATE_MEMBER_NAME socket event");
+
 
   return () => {
     socket.off(SOCKET_EVENTS.UPDATE_MEMBER_NAME, handleNameUpdate);
-    console.log("❌ Unsubscribed from UPDATE_MEMBER_NAME socket event");
+
   };
 }, [conversationId, otherMember?.userId]);
 
 
 
   const handleSaveName = async () => {
-    console.log('handleSaveName called with tempName:', tempName, 'for user:', otherMember?.userId);
     if (!otherMember) return;
     setIsSaving(true);
     try {
@@ -197,10 +188,10 @@ useEffect(() => {
       });
       // Update local state
       setOtherMember(prev => ({ ...prev, name: tempName }));
-      console.log('PATCH success—name updated on server');     
+    
       setIsEditingName(false);
     } catch (err) {
-      console.log('PATCH error:', err);  
+
       Alert.alert('Error', 'Không thể cập nhật tên thành viên.');
     } finally {
       setIsSaving(false);
