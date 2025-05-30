@@ -215,7 +215,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
         const trimmed = newOptionText.trim();
         if (!trimmed || !msg || !user) return;
 
-        // Kiểm tra trùng lặp
         const isDuplicate = dynamicOptions.some(
             opt => opt.name.toLowerCase() === trimmed.toLowerCase()
         );
@@ -261,7 +260,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     useEffect(() => {
         const handleDeSelect = (selectoption) => {
-            setDynamicOptions(prev => [...prev, selectoption]);
 
             if (isRemoved) return;
 

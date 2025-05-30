@@ -1405,7 +1405,7 @@ export default function ChatScreen({ route, navigation }) {
     };
 
 
-
+    useEffect(() => { })
 
     const isPinned = async (msg) => {
         try {
