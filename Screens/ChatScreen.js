@@ -544,7 +544,6 @@ const downloadFile = async (url, fileName = 'downloaded_file') => {
           const progress = Math.round(
             (downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100
           );
-          console.log(`Download progress: ${progress}%`);
         }
       );
       

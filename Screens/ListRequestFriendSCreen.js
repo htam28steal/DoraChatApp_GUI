@@ -167,8 +167,6 @@ const renderSearchItem = ({ item }) => (
           Authorization: `Bearer ${token}`,
         },
       });
-
-      console.log('✅ Loaded current user:', data);
       setCurrentUser(data);
     } catch (err) {
       console.error('❌ Failed to fetch current user', err);
@@ -211,7 +209,7 @@ const handleDeletedInviteWasSend = (data) => {
     if (userId && token) {
       FriendService.getListRequestFriends(userId, token)
         .then(setFriends)
-        .catch(err => console.log(err))
+        .catch(err)
         .finally(() => setLoading(false));
     }
   }, [userId, token]);
@@ -264,14 +262,12 @@ const handleFriendInviteDeleted = (senderId) => {
  useEffect(() => {
   if (!currentUser?._id) return;
 
-  console.log('[SOCKET] JOIN_USER →', currentUser._id);
   socket.emit(SOCKET_EVENTS.JOIN_USER, currentUser._id);
 
   const onInviteDeleted = handleFriendInviteDeleted;
   const onFriendAccepted = handleFriendAccepted;
 
   const onNewInvite = (user) => {
-    console.log('[SOCKET] SEND_FRIEND_INVITE received:', user);
 
     const normalizedUser = {
       _id: user._id,
