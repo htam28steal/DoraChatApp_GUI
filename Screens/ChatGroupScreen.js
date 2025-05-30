@@ -53,6 +53,7 @@ const Return = require("../icons/back.png");
 const MicIcon = require("../icons/mic.png");
 const addChannel = require("../icons/addChannel.png")
 const vote = require("../icons/ballot.png");
+const navigation = useNavigation();
 
 
 
@@ -287,6 +288,7 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
         5: '😣', // Angry
         6: '🤗', // Care
     };
+    const navigation = useNavigation();
 
 
     const replied = msg.replyMessageId
@@ -419,7 +421,7 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     };
 
 
-    const renderMessageContent = useCallback((msg) => {
+    const renderMessageContent = useCallback((msg, navigation) => {
         const { content, tagPositions = [] } = msg;
         if (!tagPositions.length) {
             return <Text style={messageItemStyles.textContent}>{content}</Text>;
@@ -437,10 +439,16 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                     </Text>
                 );
             }
+
             elements.push(
                 <Text
                     key={`tag-${idx}`}
                     style={[messageItemStyles.textContent, messageItemStyles.taggedText]}
+                    onPress={() => {
+                        navigation.navigate('YourFriendScreen', {
+                            memberId: tag.memberId
+                        });
+                    }}
                 >
                     {content.slice(tag.start, tag.end)}
                 </Text>
@@ -457,7 +465,7 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
         }
 
         return <Text style={messageItemStyles.textContent}>{elements}</Text>;
-    }, []);
+    }, [navigation]);
 
     const prevMessage = allMessages[index - 1];
     const isFirstInGroup = !prevMessage ||
@@ -935,7 +943,7 @@ const messageItemStyles = StyleSheet.create({
 /**
  * ChatBox Component to render a scrollable list of messages.
  */
-function ChatBox({ messages, allMessages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId }) {
+function ChatBox({ messages, allMessages, currentUserId, onMessageLongPress, handlePressEmoji, isPinned, handleOpenVoteModal, channelId, navigation }) {
     const scrollViewRef = useRef(null);
     const scrollPosition = useRef(0);
 
@@ -988,6 +996,7 @@ function ChatBox({ messages, allMessages, currentUserId, onMessageLongPress, han
                         isPinned={isPinned}
                         handleOpenVoteModal={handleOpenVoteModal}
                         AudioBubble={AudioBubble}
+                        navigation={navigation}
                     />
                 );
             })}
@@ -1003,11 +1012,20 @@ const chatBoxStyles = StyleSheet.create({
 /**
  * MessageInput Component for composing messages.
  */
-function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmojiPress, onVotePress, onRecord, membersinconversation, memberNames }) {
-
+function MessageInput({
+    input,
+    setInput,
+    onSend,
+    onPickMedia,
+    onPickFile,
+    onEmojiPress,
+    onVotePress,
+    onRecord,
+    membersinconversation,
+    memberNames,
+}) {
     const [showMentionList, setShowMentionList] = useState(false);
     const [filteredMembers, setFilteredMembers] = useState([]);
-
 
     const handleInputChange = (text) => {
         setInput(text);
@@ -1015,7 +1033,7 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
         const mentionMatch = text.toString().match(/@(\w*)$/);
         if (mentionMatch) {
             const query = mentionMatch[1].toLowerCase();
-            const filtered = memberNames.filter(member =>
+            const filtered = memberNames.filter((member) =>
                 member.name.toLowerCase().includes(query)
             );
             setFilteredMembers(filtered);
@@ -1038,11 +1056,12 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
         setShowMentionList(false);
     };
 
-
-
     return (
         <View style={messageInputStyles.container}>
-            <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickFile}>
+            <TouchableOpacity
+                style={messageInputStyles.iconButton}
+                onPress={onPickFile}
+            >
                 <Image source={FileIcon} style={messageInputStyles.icon} />
             </TouchableOpacity>
             <View style={messageInputStyles.inputContainer}>
@@ -1054,36 +1073,61 @@ function MessageInput({ input, setInput, onSend, onPickMedia, onPickFile, onEmoj
                     onSubmitEditing={handleSend}
                     returnKeyType="send"
                     multiline
-
                 />
 
                 {showMentionList && (
                     <View style={messageInputStyles.mentionList}>
                         <ScrollView>
-                            {filteredMembers.map(member => (
+                            {filteredMembers.map((member) => (
                                 <TouchableOpacity
                                     key={member._id}
                                     style={messageInputStyles.mentionItem}
-                                    onPress={() => { handleSelectMention(member.name) }}
+                                    onPress={() => {
+                                        handleSelectMention(member.name);
+                                    }}
                                 >
-                                    <Image source={{ uri: member.avatar }} style={{ width: 20, height: 20, borderRadius: 25 }} />
-                                    <Text style={{ marginLeft: 10, fontWeight: 'bold', color: 'black' }}>{member.name}</Text>
+                                    <Image
+                                        source={{ uri: member.avatar }}
+                                        style={{ width: 20, height: 20, borderRadius: 25 }}
+                                    />
+                                    <Text
+                                        style={{
+                                            marginLeft: 10,
+                                            fontWeight: "bold",
+                                            color: "black",
+                                        }}
+                                    >
+                                        {member.name}
+                                    </Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                     </View>
                 )}
 
-                <TouchableOpacity style={messageInputStyles.iconButton} onPress={onPickMedia}>
+                <TouchableOpacity
+                    style={messageInputStyles.iconButton}
+                    onPress={onPickMedia}
+                >
                     <Image source={PictureIcon} style={messageInputStyles.icon} />
                 </TouchableOpacity>
-                <TouchableOpacity style={messageInputStyles.iconButton} onPress={onEmojiPress}>
+                <TouchableOpacity
+                    style={messageInputStyles.iconButton}
+                    onPress={onEmojiPress}
+                >
                     <Image source={EmojiIcon} style={messageInputStyles.icon} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={onVotePress} ><Image source={vote} style={messageInputStyles.icon} /></TouchableOpacity>
-                <TouchableOpacity onPress={onRecord}><Image source={MicIcon} style={messageInputStyles.icon} /></TouchableOpacity>
+                <TouchableOpacity onPress={onVotePress}>
+                    <Image source={vote} style={messageInputStyles.icon} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onRecord}>
+                    <Image source={MicIcon} style={messageInputStyles.icon} />
+                </TouchableOpacity>
             </View>
-            <TouchableOpacity style={messageInputStyles.sendButton} onPress={handleSend}>
+            <TouchableOpacity
+                style={messageInputStyles.sendButton}
+                onPress={handleSend}
+            >
                 <Image source={SendIcon} style={messageInputStyles.sendIcon} />
             </TouchableOpacity>
         </View>
@@ -2455,6 +2499,7 @@ export default function ChatScreen({ route, navigation }) {
                         isPinned={isPinned}
                         handleOpenVoteModal={handleOpenVoteModal}
                         channelId={channels}
+                        navigation={navigation}
                     />
                 </View>
                 {replyingMessage && (
