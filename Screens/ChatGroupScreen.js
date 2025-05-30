@@ -325,10 +325,10 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
     useEffect(() => {
         let isMounted = true;
         const checkPinned = async () => {
-                const result = await isPinned(msg);
-                if (isMounted) {
-                    setPinned(result);
-                }
+            const result = await isPinned(msg);
+            if (isMounted) {
+                setPinned(result);
+            }
 
 
         };
@@ -661,7 +661,7 @@ const MessageItem = React.memo(({ msg, showAvatar, showTime, currentUserId, onLo
                                         { fontStyle: "italic", color: "#999" }
                                     ]}
                                 >
-                                    Message has been recalled
+                                    Tin nhắn đã được thu hồi
                                 </Text>
                             ) : (
                                 renderMessageContent(msg)
@@ -1401,14 +1401,52 @@ export default function ChatScreen({ route, navigation }) {
     };
 
 
-    useEffect(() => { })
+    useEffect(() => {
+        const handleRecallS = (message) => {
+            if (!isRemoved) return;
+
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m._id === message._id
+                        ? {
+                            ...m,
+                            content: "Tin nhắn đã được thu hồi",
+                            isDeleted: true,
+                            type: "RECALL",
+                            updatedAt: message.updatedAt
+                        }
+                        : m
+                ));
+
+
+        };
+
+        const handleLeaveConversation = (data) => {
+            console.log('Data received from MEMBER_REMOVED event:', data);
+            if (data.conversationId === conversationId) {
+                setIsRemoved(false);
+            }
+        };
+
+        socket.on(SOCKET_EVENTS.MESSAGE_RECALLED, handleRecallS);
+        socket.on(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+
+        return () => {
+            socket.off(SOCKET_EVENTS.MESSAGE_RECALLED, handleRecallS);
+            socket.off(SOCKET_EVENTS.MEMBER_REMOVED, handleLeaveConversation);
+        };
+    }, [socket, conversationId, setMessages, isRemoved]);
+
+
+
+
 
     const isPinned = async (msg) => {
 
-            const response = await axios.get(`/api/pin-messages/${conversationId}`);
+        const response = await axios.get(`/api/pin-messages/${conversationId}`);
 
-            const listPinMess = response.data;
-            return listPinMess.some(p => p.messageId === msg._id);
+        const listPinMess = response.data;
+        return listPinMess.some(p => p.messageId === msg._id);
 
 
     };
@@ -1943,7 +1981,7 @@ export default function ChatScreen({ route, navigation }) {
 
 
 
-    
+
     const pickDocument = async () => {
         try {
             const result = await DocumentPicker.getDocumentAsync({
@@ -2025,18 +2063,18 @@ export default function ChatScreen({ route, navigation }) {
 
     const handlePressEmoji = async (msg) => {
 
-            const reactors = await Promise.all(
-                msg.reacts.map(async (react) => {
-                    const member = await handleGetMember(react.memberId);
-                    return {
-                        ...member,
-                        type: react.type,
-                    };
-                })
-            );
+        const reactors = await Promise.all(
+            msg.reacts.map(async (react) => {
+                const member = await handleGetMember(react.memberId);
+                return {
+                    ...member,
+                    type: react.type,
+                };
+            })
+        );
 
-            setSelectedReactors(reactors);
-            setReactDetailModalVisible(true);
+        setSelectedReactors(reactors);
+        setReactDetailModalVisible(true);
 
 
     };
