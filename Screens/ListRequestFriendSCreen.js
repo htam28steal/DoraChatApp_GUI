@@ -209,7 +209,7 @@ const handleDeletedInviteWasSend = (data) => {
     if (userId && token) {
       FriendService.getListRequestFriends(userId, token)
         .then(setFriends)
-        .catch(err)
+        .catch(err => console.log(err))
         .finally(() => setLoading(false));
     }
   }, [userId, token]);

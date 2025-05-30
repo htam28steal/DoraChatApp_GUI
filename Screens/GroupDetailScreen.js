@@ -547,6 +547,9 @@ if (loading) {
           >
             <Image source={AddMember} style={{ width: 14, height: 14 }} />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.pinButton}>
+            <Image source={require('../icons/Pin.png')} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -920,7 +923,7 @@ onPress={async () => {
 
 
       <View style={{flexDirection:'row',bottom:20, position:'absolute', alignItems:'center', width:'100%', justifyContent:'center' }}>
-      {/* <TouchableOpacity>
+      <TouchableOpacity>
         <View style={{flexDirection:'row', justifyContent:'center', alignItems:'center'}} >
           <View style={{width:30, height:30, alignItems:'center', backgroundColor:'#D8EDFF',
           borderRadius:15, justifyContent:'center', marginRight:10
@@ -932,7 +935,7 @@ onPress={async () => {
       </TouchableOpacity>
 
       <Text style={{marginLeft:10, fontSize:15, color:'#BDE1FE',marginRight:10}}>|</Text>
-       */}
+      
 <TouchableOpacity
   onPress={async () => {
     try {

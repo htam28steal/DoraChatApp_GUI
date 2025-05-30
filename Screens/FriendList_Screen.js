@@ -229,6 +229,9 @@ const handleFriendInviteDeleted = (userIdDeclined) => {
     };
     fetchMe();
   }, []);
+socket.onAny((event, data) => {
+  console.log('Socket Event:', event, data);
+});
 
 
   // Initial load of friends
