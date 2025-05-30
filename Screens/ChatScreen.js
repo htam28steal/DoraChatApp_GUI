@@ -367,40 +367,20 @@ const MessageItem = forwardRef(function MessageItem(
     const name = (fileName || url).toLowerCase();
     return audioExtensions.some(ext => name.endsWith(`.${ext}`));
   };
-const showDownloadSuccess = (fileUri, fileName) => {
-  // Extract file extension for icon
-  const fileExtension = fileName.split('.').pop().toLowerCase();
-  const isImage = ['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension);
-  const isVideo = ['mp4', 'mov', 'avi'].includes(fileExtension);
-  const isAudio = ['mp3', 'wav', 'm4a'].includes(fileExtension);
-
-  // Create buttons based on file type
-  const buttons = [
-    {
-      text: "Open File",
-      onPress: () => openFile(fileUri, fileName),
-      style: 'default'
-    },
-    {
-      text: "OK",
-      style: 'cancel'
-    }
-  ];
-
-  // Special handling for media files
-  if (isImage || isVideo) {
-    buttons.unshift({
-      text: "Preview",
-      onPress: () => previewMedia(fileUri, isImage ? 'image' : 'video'),
-      style: 'default'
-    });
-  }
-
+const showDownloadSuccess = async (fileUri, fileName, displayPath) => {
   Alert.alert(
     "Download Complete",
-    `${fileName}\n\nwas saved successfully.`,
-    buttons,
-    { cancelable: true }
+    `${fileName}`,
+    [
+      {
+        text: "Open File",
+        onPress: () => openFile(fileUri, fileName)
+      },
+      {
+        text: "OK",
+        style: "cancel"
+      }
+    ]
   );
 };
 const getMimeType = (extension) => {
@@ -443,11 +423,112 @@ const getMimeType = (extension) => {
   return mimeTypes[extension.toLowerCase()] || 'application/octet-stream';
 };
 
+const requestStoragePermission = async () => {
+  if (Platform.OS === 'android') {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission required',
+        'Please grant storage permissions to save files to your device'
+      );
+      return false;
+    }
+    return true;
+  }
+  return true;
+};
+
+const saveToDownloads = async (tempUri, fileName) => {
+  try {
+    if (Platform.OS === 'android') {
+      // For Android 10+ we need to use SAF to save to Downloads
+      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      
+      if (!permissions.granted) {
+        throw new Error('Storage permission not granted');
+      }
+
+      const destinationUri = await FileSystem.StorageAccessFramework.createFileAsync(
+        permissions.directoryUri,
+        fileName,
+        getMimeType(fileName.split('.').pop())
+      );
+      
+      const fileContent = await FileSystem.readAsStringAsync(tempUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      await FileSystem.StorageAccessFramework.writeAsStringAsync(
+        destinationUri,
+        fileContent,
+        { encoding: FileSystem.EncodingType.Base64 }
+      );
+      
+      return {
+        uri: destinationUri,
+        displayPath: permissions.directoryUri.includes('downloads') ? 
+          'Downloads folder' : 'selected location'
+      };
+    } else {
+      // On iOS, save to Documents directory
+      const saveDir = `${FileSystem.documentDirectory}Downloads/`;
+      await FileSystem.makeDirectoryAsync(saveDir, { intermediates: true });
+      const newUri = `${saveDir}${fileName}`;
+      await FileSystem.copyAsync({ from: tempUri, to: newUri });
+      return {
+        uri: newUri,
+        displayPath: 'Files app (Downloads folder)'
+      };
+    }
+  } catch (error) {
+    console.error('Error saving to downloads:', error);
+    throw error;
+  }
+};
+
+
+const promptSaveLocation = async (fileName) => {
+  if (Platform.OS === 'android') {
+    return new Promise((resolve) => {
+      Alert.alert(
+        'Save file',
+        'Where would you like to save the file?',
+        [
+          { 
+            text: 'Downloads folder', 
+            onPress: () => resolve('downloads') 
+          },
+          { 
+            text: 'Choose location', 
+            onPress: () => resolve('picker') 
+          },
+          { 
+            text: 'Cancel', 
+            style: 'cancel', 
+            onPress: () => resolve('cancel') 
+          }
+        ]
+      );
+    });
+  } else {
+    // On iOS, we'll use the document picker to choose location
+    try {
+      const dir = await DocumentPicker.getDocumentAsync({
+        type: 'public.folder',
+        copyToCacheDirectory: false,
+      });
+      return dir.canceled ? 'cancel' : 'picker';
+    } catch (error) {
+      console.error('Error picking directory:', error);
+      return 'cancel';
+    }
+  }
+};
+
 const downloadFile = async (url, fileName = 'downloaded_file') => {
   try {
     // Clean filename
     const safeFileName = fileName.replace(/[^a-zA-Z0-9\-._]/g, '_');
-    const fileExtension = safeFileName.split('.').pop().toLowerCase();
     
     // Always download to app's cache directory first
     const tempUri = `${FileSystem.cacheDirectory}${safeFileName}`;
@@ -468,10 +549,24 @@ const downloadFile = async (url, fileName = 'downloaded_file') => {
       );
       
       const { uri } = await downloadResumable.downloadAsync();
-      showDownloadSuccess(uri, safeFileName);
-      return uri;
+      
+      // Ask user where to save the file
+      const saveAction = await promptSaveLocation(safeFileName);
+      
+      if (saveAction === 'cancel') {
+        // User cancelled, keep file in cache
+        showDownloadSuccess(uri, safeFileName, 'temporary storage');
+        return uri;
+      } else {
+        // For both 'downloads' and 'picker' we'll use the same method on Android
+        // since we need to use SAF for both cases
+        const { uri: finalUri, displayPath } = await saveToDownloads(uri, safeFileName);
+        showDownloadSuccess(finalUri, safeFileName, displayPath);
+        return finalUri;
+      }
     } else {
-      showDownloadSuccess(tempUri, safeFileName);
+      // File already exists in cache
+      showDownloadSuccess(tempUri, safeFileName, 'temporary storage');
       return tempUri;
     }
   } catch (error) {
@@ -483,30 +578,41 @@ const downloadFile = async (url, fileName = 'downloaded_file') => {
     throw error;
   }
 };
+
 const openFile = async (fileUri, fileName) => {
   try {
     const mimeType = getMimeType(fileName.split('.').pop());
     
+    // First ensure the file exists
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    if (!fileInfo.exists) {
+      throw new Error("File doesn't exist");
+    }
+
     if (Platform.OS === 'android') {
-      // For Android, we need to use a content URI
-      const contentUri = await FileSystem.getContentUriAsync(fileUri);
-      
-      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-        data: contentUri,
-        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-        type: mimeType,
-      });
-    } else {
-      // iOS can use the file URI directly
-      const canOpen = await Linking.canOpenURL(fileUri);
-      if (canOpen) {
-        await Linking.openURL(fileUri);
-      } else {
-        await Share.share({
-          url: fileUri,
-          title: `Open ${fileName}`,
+      try {
+        // Try to get content URI
+        const contentUri = await FileSystem.getContentUriAsync(fileUri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+          type: mimeType,
+        });
+      } catch (contentUriError) {
+        console.log("Content URI failed, trying direct share", contentUriError);
+        
+        // Fallback to sharing the file
+        await Sharing.shareAsync(fileUri, {
+          mimeType,
+          dialogTitle: `Open ${fileName}`,
         });
       }
+    } else {
+      // iOS implementation
+      await Sharing.shareAsync(fileUri, {
+        mimeType,
+        dialogTitle: `Open ${fileName}`,
+      });
     }
   } catch (error) {
     console.error("Error opening file:", error);
@@ -516,7 +622,6 @@ const openFile = async (fileUri, fileName) => {
     );
   }
 };
-
 
 
   const isMe = msg.memberId && msg.memberId.userId === currentUserId;
