@@ -30,6 +30,7 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     const [showUpdateButton, setShowUpdateButton] = useState(false);
 
+    console.log(`LOG Dynamic`, dynamicOptions);
 
     useEffect(() => {
         if (visible) {
@@ -359,8 +360,11 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     useEffect(() => {
         const handleVoteOptionSelectS = (selectoption) => {
+
+
             if (isRemoved) return;
 
+            setDynamicOptions(selectoption.options || []);
             onSubmit(selectoption);
         };
         const handleLeaveConversation = (data) => {
@@ -382,14 +386,13 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
 
     useEffect(() => {
         const handleDeSelect = (selectoption) => {
-            setDynamicOptions(prev => [...prev, selectoption]);
 
             if (isRemoved) return;
 
+            setDynamicOptions(selectoption.options || []);
             onSubmit(selectoption);
         };
         const handleLeaveConversation = (data) => {
-            setDynamicOptions(prev => [...prev, data]);
             if (data.conversationId === conversation._id) {
                 setIsRemoved(true);
             }
@@ -480,7 +483,6 @@ const VoteModal = ({ visible, onClose, message, onSubmit, memberId, conversation
                                             <Text style={{ fontSize: 10 }}>{opt.members.length}</Text>
                                         </View>
                                     ) : (
-                                        // Hiển thị avatar nếu không phải ẩn danh
                                         <>
                                             {opt.members.slice(0, 2).map((member, i) => (
                                                 <Image
