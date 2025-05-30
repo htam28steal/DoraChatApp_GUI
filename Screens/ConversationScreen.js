@@ -193,7 +193,6 @@ const onlyFalse = Array.isArray(res.data)
         }, []);
 const filteredConversations = useMemo(() => {
   const base = Array.isArray(conversations) ? conversations : [];
-  // apply tag filters (if any)
   let convs = selectedFilters.length > 0
     ? base.filter(c =>
         c && selectedFilters.some(tagId =>
@@ -201,7 +200,6 @@ const filteredConversations = useMemo(() => {
         )
       )
     : base;
-  // only keep those with type === false
   return convs.filter(c => c?.type === false);
 }, [conversations, classifies, selectedFilters]);
 
@@ -369,12 +367,7 @@ const filteredConversations = useMemo(() => {
             setClassifyOptionsVisible(true);
           };
       
-          const applyClassification = (optionKey) => {
-           
-            // TODO: call API to save classification
-            setClassifyOptionsVisible(false);
-            setTargetConversationId(null);
-          };
+
       
           const openClassifyModal = async () => {
 

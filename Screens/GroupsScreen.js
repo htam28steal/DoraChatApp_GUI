@@ -339,12 +339,6 @@ export default function GroupsScreen({ navigation }) {
     setClassifyOptionsVisible(true);
   };
 
-  const applyClassification = (optionKey) => {
-
-    // TODO: call API to save classification
-    setClassifyOptionsVisible(false);
-    setTargetConversationId(null);
-  };
 
   const openClassifyModal = async () => {
     try {
@@ -387,8 +381,8 @@ export default function GroupsScreen({ navigation }) {
 
   useEffect(() => {
     // 🔧 Debug: am I connected?
-    socket.on('connect');
-    socket.on('disconnect');
+socket.on('connect', () => console.log('✅ socket connected'));
+socket.on('disconnect', () => console.log('❌ socket disconnected'));
 
     // 🔧 Debug: log every incoming event
     socket.onAny((event, payload) => {
